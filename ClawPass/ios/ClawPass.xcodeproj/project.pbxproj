@@ -15,6 +15,7 @@
 		000000000000000000000006 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* CryptoService.swift */; };
 		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
 		000000000000000000000008 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000034 /* SyncService.swift */; };
+		000000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000035 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
