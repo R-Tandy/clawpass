@@ -8,6 +8,7 @@ enum VaultError: Error {
     case invalidPassword
     case databaseError(Error)
     case entryNotFound
+    case keychainError(OSStatus)
 }
 
 class VaultManager: ObservableObject {
