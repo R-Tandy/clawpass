@@ -20,7 +20,7 @@ jobs:
       run: xcrun simctl list devices
 
     - name: Run iOS simulator
-      run: xcrun simctl create
+      run: xcrun simctl create test-iphone com.apple.CoreSimulator.SimDeviceType.iPhone-15 com.apple.CoreSimulator.SimRuntime.iOS-18-0 || true
     
     - name: List project files
       run: ls -la
