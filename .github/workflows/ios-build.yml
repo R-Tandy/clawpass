@@ -18,6 +18,9 @@ jobs:
     
     - name: List available simulators
       run: xcrun simctl list devices
+
+    - name: Run iOS simulator
+      run: xcrun simctl create
     
     - name: List project files
       run: ls -la
