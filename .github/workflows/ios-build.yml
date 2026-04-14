@@ -27,7 +27,7 @@ jobs:
         xcodebuild build \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
-          -destination 'platform=iOS Simulator,name=iPhone 16' \
+          -destination 'platform=iOS 18.5, id:940902826E9E4A21AAA33D6CFD0F3C55, name=iPhone 16' \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO
     
