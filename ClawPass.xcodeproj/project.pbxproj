@@ -1,0 +1,276 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		000000000000000000000001 /* ClawPassApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000011 /* ClawPassApp.swift */; };
+		000000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000021 /* ContentView.swift */; };
+		000000000000000000000003 /* AddEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000022 /* AddEntryView.swift */; };
+		000000000000000000000004 /* EntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000023 /* EntryDetailView.swift */; };
+		000000000000000000000005 /* VaultEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000031 /* VaultEntry.swift */; };
+		000000000000000000000006 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* CryptoService.swift */; };
+		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
+		000000000000000000000008 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000034 /* SyncService.swift */; };
+		000000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000035 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000010 /* ClawPass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClawPass.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000011 /* ClawPassApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClawPassApp.swift; sourceTree = "<group>"; };
+		000000000000000000000021 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		000000000000000000000022 /* AddEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEntryView.swift; sourceTree = "<group>"; };
+		000000000000000000000023 /* EntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryDetailView.swift; sourceTree = "<group>"; };
+		000000000000000000000031 /* VaultEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultEntry.swift; sourceTree = "<group>"; };
+		000000000000000000000032 /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
+		000000000000000000000033 /* VaultManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultManager.swift; sourceTree = "<group>"; };
+		000000000000000000000034 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000000000040 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000050 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000051 /* ClawPass */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000051 /* ClawPass */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000052 /* ClawPassApp.swift */,
+				000000000000000000000053 /* Views */,
+				000000000000000000000054 /* Models */,
+				000000000000000000000055 /* Services */,
+			);
+			path = ClawPass;
+			sourceTree = "<group>";
+		};
+		000000000000000000000052 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000011 /* ClawPassApp.swift */,
+			);
+			name = "";
+			sourceTree = "<group>";
+		};
+		000000000000000000000053 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000021 /* ContentView.swift */,
+				000000000000000000000022 /* AddEntryView.swift */,
+				000000000000000000000023 /* EntryDetailView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		000000000000000000000054 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000031 /* VaultEntry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		000000000000000000000055 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000032 /* CryptoService.swift */,
+				000000000000000000000033 /* VaultManager.swift */,
+				000000000000000000000034 /* SyncService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000000000090 /* ClawPass */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000091 /* Build configuration list for PBXNativeTarget "ClawPass" */;
+			buildPhases = (
+				000000000000000000000092 /* Sources */,
+				000000000000000000000040 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ClawPass;
+			productName = ClawPass;
+			productReference = 000000000000000000000010 /* ClawPass.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000100 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					000000000000000000000090 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000000000101 /* Build configuration list for PBXProject "ClawPass" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000050;
+			productRefGroup = 000000000000000000000050;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000090 /* ClawPass */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000000000092 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000001 /* ClawPassApp.swift in Sources */,
+				000000000000000000000002 /* ContentView.swift in Sources */,
+				000000000000000000000003 /* AddEntryView.swift in Sources */,
+				000000000000000000000004 /* EntryDetailView.swift in Sources */,
+				000000000000000000000005 /* VaultEntry.swift in Sources */,
+				000000000000000000000006 /* CryptoService.swift in Sources */,
+				000000000000000000000007 /* VaultManager.swift in Sources */,
+				000000000000000000000008 /* SyncService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000000000200 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		000000000000000000000201 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+			};
+			name = Release;
+		};
+		000000000000000000000210 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = ClawPass;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "ClawPass uses Face ID to unlock your secure password vault.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clawpass.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		000000000000000000000211 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = ClawPass;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "ClawPass uses Face ID to unlock your secure password vault.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.clawpass.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000000000091 /* Build configuration list for PBXNativeTarget "ClawPass" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000210 /* Debug */,
+				000000000000000000000211 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000000101 /* Build configuration list for PBXProject "ClawPass" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000000000200 /* Debug */,
+				000000000000000000000201 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000100 /* Project object */;
+}
