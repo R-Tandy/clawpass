@@ -22,6 +22,39 @@ jobs:
       run: |
         pod install
     
+    - name: Generate App Icons
+      run: |
+        # Install ImageMagick for icon conversion
+        brew install imagemagick || true
+        
+        # Check for source icon
+        if [ -f "icon.png" ]; then
+          SOURCE="icon.png"
+        elif [ -f "icon.ico" ]; then
+          SOURCE="icon.ico"
+        else
+          echo "No icon source found, using placeholder"
+          SOURCE=""
+        fi
+        
+        # Generate icons if source exists
+        if [ -n "$SOURCE" ]; then
+          cd ClawPass/Assets.xcassets/AppIcon.appiconset
+          
+          # Generate various sizes
+          convert "$SOURCE" -resize 40x40 Icon-20@2x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 60x60 Icon-20@3x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 58x58 Icon-29@2x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 87x87 Icon-29@3x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 80x80 Icon-40@2x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 120x120 Icon-40@3x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 120x120 Icon-60@2x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 180x180 Icon-60@3x.png 2>/dev/null || true
+          convert "$SOURCE" -resize 1024x1024 Icon-1024@1x.png 2>/dev/null || true
+          
+          ls -la *.png 2>/dev/null || echo "Icon generation may have failed"
+        fi
+    
     - name: Show Xcode version
       run: xcodebuild -version
     
