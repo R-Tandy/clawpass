@@ -14,20 +14,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Fetch and embed SQLite.swift
+    - name: Setup CocoaPods
       run: |
-        # Clone SQLite.swift
-        git clone --depth 1 --branch 0.16.0 https://github.com/stephencelis/SQLite.swift.git .sqlite-temp
-        
-        # Copy SQLite sources directly into ClawPass
-        mkdir -p ClawPass/SQLite
-        cp -r .sqlite-temp/Sources/SQLite/* ClawPass/SQLite/ 2>/dev/null || true
-        
-        # Show what we got
-        ls -la ClawPass/SQLite/
-        
-        # Clean up
-        rm -rf .sqlite-temp
+        sudo gem install cocoapods
+    
+    - name: Install Dependencies
+      run: |
+        pod install
     
     - name: Show Xcode version
       run: xcodebuild -version
@@ -35,7 +28,7 @@ jobs:
     - name: Build for iOS Device (Unsigned)
       run: |
         xcodebuild archive \
-          -project ClawPass.xcodeproj \
+          -workspace ClawPass.xcworkspace \
           -scheme ClawPass \
           -sdk iphoneos \
           -configuration Release \
