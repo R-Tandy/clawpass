@@ -14,21 +14,21 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Delete Xcode Project
-      run: rm -rf ClawPass.xcodeproj
-    
     - name: Show Xcode version
       run: xcodebuild -version
+    
+    - name: Show available destinations
+      run: xcodebuild -showdestinations -scheme ClawPass 2>&1 || true
     
     - name: Resolve Packages
       run: swift package resolve
     
     - name: Build for iOS Device (Unsigned)
       run: |
-        # Build the Swift Package for iOS
+        # Build the Swift Package for iOS with destination
         xcodebuild archive \
           -scheme ClawPass \
-          -sdk iphoneos \
+          -destination 'generic/platform=iOS' \
           -configuration Release \
           -archivePath build/ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
