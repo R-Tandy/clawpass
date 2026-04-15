@@ -14,36 +14,32 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Fetch and embed SQLite.swift
+      run: |
+        # Clone SQLite.swift
+        git clone --depth 1 --branch 0.16.0 https://github.com/stephencelis/SQLite.swift.git .sqlite-temp
+        
+        # Copy SQLite sources directly into ClawPass
+        mkdir -p ClawPass/SQLite
+        cp -r .sqlite-temp/Sources/SQLite/* ClawPass/SQLite/ 2>/dev/null || true
+        
+        # Show what we got
+        ls -la ClawPass/SQLite/
+        
+        # Clean up
+        rm -rf .sqlite-temp
+    
     - name: Show Xcode version
       run: xcodebuild -version
-    
-    - name: Create XCWorkspace for SPM Support
-      run: |
-        mkdir -p ClawPass.xcworkspace/xcshareddata/swiftpm
-        echo '<?xml version="1.0" encoding="UTF-8"?>' > ClawPass.xcworkspace/contents.xcworkspacedata
-        echo '<Workspace version="1.0">' >> ClawPass.xcworkspace/contents.xcworkspacedata
-        echo '  <FileRef location="group:ClawPass.xcodeproj"></FileRef>' >> ClawPass.xcworkspace/contents.xcworkspacedata
-        echo '</Workspace>' >> ClawPass.xcworkspace/contents.xcworkspacedata
-        if [ -f Package.resolved ]; then
-          cp Package.resolved ClawPass.xcworkspace/xcshareddata/swiftpm/ 2>/dev/null || true
-        fi
-    
-    - name: Resolve Packages
-      run: |
-        xcodebuild -resolvePackageDependencies \
-          -workspace ClawPass.xcworkspace \
-          -scheme ClawPass \
-          -derivedDataPath .build/DerivedData 2>&1 || true
     
     - name: Build for iOS Device (Unsigned)
       run: |
         xcodebuild archive \
-          -workspace ClawPass.xcworkspace \
+          -project ClawPass.xcodeproj \
           -scheme ClawPass \
           -sdk iphoneos \
           -configuration Release \
           -archivePath build/ClawPass.xcarchive \
-          -derivedDataPath .build/DerivedData \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
