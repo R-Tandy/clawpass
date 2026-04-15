@@ -10,6 +10,11 @@ struct ContentView: View {
         Group {
             if vaultManager.isUnlocked {
                 VaultView()
+            } else if showingSetup {
+                SetupView(onComplete: {
+                    showingSetup = false
+                    showingUnlock = true
+                })
             } else {
                 UnlockView()
             }
@@ -186,5 +191,90 @@ struct EntryRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Setup View
+
+struct SetupView: View {
+    let onComplete: () -> Void
+    
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 30) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(.accentColor)
+                
+                Text("Welcome to ClawPass")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Text("Create your master password to secure your vault.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                VStack(spacing: 15) {
+                    SecureField("Master Password", text: $password)
+                        .textContentType(.newPassword)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(maxWidth: 300)
+                    
+                    SecureField("Confirm Password", text: $confirmPassword)
+                        .textContentType(.newPassword)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .frame(maxWidth: 300)
+                }
+                
+                Button(action: createVault) {
+                    Text("Create Vault")
+                        .font(.headline)
+                        .frame(maxWidth: 280)
+                        .padding()
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .disabled(password.isEmpty || password != confirmPassword)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationBarHidden(true)
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage)
+            }
+        }
+    }
+    
+    private func createVault() {
+        guard password == confirmPassword else {
+            errorMessage = "Passwords do not match"
+            showingError = true
+            return
+        }
+        
+        guard password.count >= 8 else {
+            errorMessage = "Password must be at least 8 characters"
+            showingError = true
+            return
+        }
+        
+        do {
+            try VaultManager.shared.initialize(with: password)
+            onComplete()
+        } catch {
+            errorMessage = "Failed to create vault: \(error.localizedDescription)"
+            showingError = true
+        }
     }
 }
