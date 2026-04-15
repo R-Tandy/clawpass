@@ -16,6 +16,7 @@
 		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
 		000000000000000000000008 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000034 /* SyncService.swift */; };
 		000000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000035 /* Assets.xcassets */; };
+		00000000000000000000003A /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = 00000000000000000000003B /* SQLite */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,10 +36,42 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00000000000000000000003A /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		000000000000000000000300 /* ClawPass */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ClawPass;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXSwiftPackageProductDependency section */
+		00000000000000000000003B /* SQLite */ = {
+			isa = PBXSwiftPackageProductDependency;
+			package = 00000000000000000000003C /* XCRemoteSwiftPackageReference "SQLite.swift" */;
+			productName = SQLite;
+		};
+/* End PBXSwiftPackageProductDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		00000000000000000000003C /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin PBXGroup section */
 		000000000000000000000050 = {
@@ -137,6 +170,9 @@
 				Base,
 			);
 			mainGroup = 000000000000000000000050;
+			packageReferences = (
+				00000000000000000000003C /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+			);
 			productRefGroup = 000000000000000000000050;
 			projectDirPath = "";
 			projectRoot = "";

@@ -14,36 +14,45 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Show Swift version
-      run: swift --version
+    - name: Show Xcode version
+      run: xcodebuild -version
     
-    - name: Build using Swift Package Manager
-      run: |
-        # Build for iOS using SwiftPM and xcbuild
-        swift build -Xswiftc -sdk -Xswiftc $(xcrun --sdk iphoneos --show-sdk-path) \
-          -Xswiftc -target -Xswiftc arm64-apple-ios16.0 \
-          -Xcc -arch -Xcc arm64 \
-          -c release
+    - name: Show available SDKs
+      run: xcodebuild -showsdks
     
-    - name: Create App Bundle from Build
+    - name: Resolve Packages
       run: |
-        # Find the built product
-        BUILD_PATH=$(find .build -name "*.app" -type d 2>/dev/null | head -1)
-        
-        if [ -z "$BUILD_PATH" ]; then
-          echo "No .app found, trying executable..."
-          BUILD_PATH=$(find .build -type f -perm +111 2>/dev/null | head -1)
-          echo "Found: $BUILD_PATH"
-        fi
-        
-        # Create Payload directory
+        # Let Xcode resolve SPM packages
+        xcodebuild -resolvePackageDependencies \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass \
+          -sdk iphoneos \
+          -configuration Release \
+          -derivedDataPath .build/DerivedData 2>&1 || true
+    
+    - name: Build for iOS Device (Unsigned)
+      run: |
+        xcodebuild archive \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass \
+          -sdk iphoneos \
+          -configuration Release \
+          -archivePath build/ClawPass.xcarchive \
+          -derivedDataPath .build/DerivedData \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_SPECIFIER=""
+    
+    - name: Create IPA Structure
+      run: |
+        # Create Payload directory for IPA
         mkdir -p build/Payload
         
-        if [ -d "$BUILD_PATH" ]; then
-          cp -r "$BUILD_PATH" build/Payload/
-        fi
+        # Copy the app bundle from the archive
+        cp -r build/ClawPass.xcarchive/Products/Applications/ClawPass.app build/Payload/
         
-        # Create IPA
+        # Create IPA (unsigned, AltStore will sign it)
         cd build
         zip -r ClawPass.ipa Payload
     
@@ -53,4 +62,3 @@ jobs:
         name: ClawPass-iOS-IPA
         path: build/ClawPass.ipa
         retention-days: 30
-      if: always()
