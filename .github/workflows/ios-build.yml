@@ -17,10 +17,12 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Show available SDKs
-      run: xcodebuild -showsdks
+    - name: Generate Xcode Workspace from Package
+      run: |
+        # Generate Xcode project from Package.swift
+        swift package generate-xcodeproj
     
-    - name: Resolve Swift Package Dependencies
+    - name: Resolve Packages
       run: |
         xcodebuild -resolvePackageDependencies \
           -project ClawPass.xcodeproj \
