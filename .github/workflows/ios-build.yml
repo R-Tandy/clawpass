@@ -5,6 +5,7 @@ on:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,35 +17,34 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: List available simulators
-      run: xcrun simctl list devices
-
-    - name: Run iOS simulator
-      run: xcrun simctl create test-iphone com.apple.CoreSimulator.SimDeviceType.iPhone-15 com.apple.CoreSimulator.SimRuntime.iOS-18-0 || true
-    
-    - name: List project files
-      run: ls -la
-    
-    - name: Build for Simulator
+    - name: Build for iOS Device (Unsigned)
       run: |
-        xcodebuild build \
+        xcodebuild archive \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
-          -destination 'generic/platform=iOS Simulator' \
+          -destination 'generic/platform=iOS' \
+          -configuration Release \
+          -archivePath build/ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_SPECIFIER=""
     
-    - name: Create App Bundle
-      if: github.ref == 'refs/heads/main'
+    - name: Create IPA Structure
       run: |
-        mkdir -p build/Products
-        cp -r build/Debug-iphonesimulator/ClawPass.app build/Products/
-      continue-on-error: true
+        # Create Payload directory for IPA
+        mkdir -p build/Payload
+        
+        # Copy the app bundle from the archive
+        cp -r build/ClawPass.xcarchive/Products/Applications/ClawPass.app build/Payload/
+        
+        # Create IPA (unsigned, AltStore will sign it)
+        cd build
+        zip -r ClawPass.ipa Payload
     
-    - name: Upload Artifact
-      if: github.ref == 'refs/heads/main'
+    - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS-Simulator
-        path: build/Products/
-      continue-on-error: true
+        name: ClawPass-iOS-IPA
+        path: build/ClawPass.ipa
+        retention-days: 30
