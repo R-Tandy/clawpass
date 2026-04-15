@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 struct ContentView: View {
     @StateObject private var vaultManager = VaultManager.shared

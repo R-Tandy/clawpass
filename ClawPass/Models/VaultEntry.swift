@@ -39,7 +39,7 @@ struct VaultEntry: Identifiable, Codable, Equatable {
     }
 }
 
-struct Category: Identifiable, Codable, Equatable {
+struct Category: Identifiable, Codable, Equatable, Hashable {
     let id: UUID
     var name: String
     var icon: String // SF Symbol name

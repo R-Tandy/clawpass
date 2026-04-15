@@ -1,6 +1,7 @@
 import Foundation
 import SQLite
 import LocalAuthentication
+import CryptoKit
 
 enum VaultError: Error {
     case notInitialized
