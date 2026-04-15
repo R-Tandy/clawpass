@@ -17,18 +17,22 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
+    - name: Show available SDKs
+      run: xcodebuild -showsdks
+    
     - name: Build for iOS Device (Unsigned)
       run: |
         xcodebuild archive \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
-          -destination 'generic/platform=iOS' \
+          -sdk iphoneos \
           -configuration Release \
           -archivePath build/ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
-          PROVISIONING_SPECIFIER=""
+          PROVISIONING_SPECIFIER="" \
+          SUPPORTED_PLATFORMS="iphoneos iphonesimulator"
     
     - name: Create IPA Structure
       run: |
