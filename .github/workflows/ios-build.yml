@@ -19,20 +19,13 @@ jobs:
     
     - name: Create XCWorkspace for SPM Support
       run: |
-        # Create workspace to enable SPM
         mkdir -p ClawPass.xcworkspace/xcshareddata/swiftpm
-        
-        cat > ClawPass.xcworkspace/contents.xcworkspacedata << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<Workspace version="1.0">
-  <FileRef location="group:ClawPass.xcodeproj"></FileRef>
-</Workspace>
-EOF
-        
-        # Copy Package.resolved for SPM
+        echo '<?xml version="1.0" encoding="UTF-8"?>' > ClawPass.xcworkspace/contents.xcworkspacedata
+        echo '<Workspace version="1.0">' >> ClawPass.xcworkspace/contents.xcworkspacedata
+        echo '  <FileRef location="group:ClawPass.xcodeproj"></FileRef>' >> ClawPass.xcworkspace/contents.xcworkspacedata
+        echo '</Workspace>' >> ClawPass.xcworkspace/contents.xcworkspacedata
         if [ -f Package.resolved ]; then
-          mkdir -p ClawPass.xcworkspace/xcshareddata/swiftpm
-          cp Package.resolved ClawPass.xcworkspace/xcshareddata/swiftpm/
+          cp Package.resolved ClawPass.xcworkspace/xcshareddata/swiftpm/ 2>/dev/null || true
         fi
     
     - name: Resolve Packages
@@ -58,20 +51,12 @@ EOF
     
     - name: Create IPA Structure
       run: |
-        # Find the built app
         APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d | head -1)
         echo "Found app at: $APP_PATH"
-        
-        # Create Payload directory for IPA
         mkdir -p build/Payload
-        
-        # Copy the app bundle
         cp -r "$APP_PATH" build/Payload/
-        
-        # Create IPA (unsigned, AltStore will sign it)
         cd build
         zip -r ClawPass.ipa Payload
-        echo "Created ClawPass.ipa"
         ls -lh ClawPass.ipa
     
     - name: Upload IPA Artifact
