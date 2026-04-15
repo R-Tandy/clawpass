@@ -20,6 +20,12 @@ jobs:
     - name: Show available SDKs
       run: xcodebuild -showsdks
     
+    - name: Resolve Swift Package Dependencies
+      run: |
+        xcodebuild -resolvePackageDependencies \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass
+    
     - name: Build for iOS Device (Unsigned)
       run: |
         xcodebuild archive \
@@ -31,8 +37,7 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
-          PROVISIONING_SPECIFIER="" \
-          SUPPORTED_PLATFORMS="iphoneos iphonesimulator"
+          PROVISIONING_SPECIFIER=""
     
     - name: Create IPA Structure
       run: |
