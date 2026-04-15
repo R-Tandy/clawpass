@@ -17,9 +17,6 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Show available destinations
-      run: xcodebuild -showdestinations -scheme ClawPass 2>&1 || true
-    
     - name: Resolve Packages
       run: swift package resolve
     
@@ -38,8 +35,26 @@ jobs:
     
     - name: Create IPA Structure
       run: |
-        # Find the built app
-        APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d | head -1)
+        # Debug: Show what we have in the archive
+        echo "Contents of build directory:"
+        find build -type d -name "*.app" 2>/dev/null || true
+        
+        echo "Contents of xcarchive:"
+        find build/ClawPass.xcarchive -type f 2>/dev/null | head -20 || true
+        
+        # Find the built app - try multiple locations
+        APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d 2>/dev/null | head -1)
+        
+        if [ -z "$APP_PATH" ]; then
+          # Try Products/Applications
+          APP_PATH=$(find build -path "*/Products/Applications/*.app" -type d 2>/dev/null | head -1)
+        fi
+        
+        if [ -z "$APP_PATH" ]; then
+          echo "ERROR: No .app found in build output"
+          exit 1
+        fi
+        
         echo "Found app at: $APP_PATH"
         
         # Create Payload directory for IPA
@@ -52,6 +67,7 @@ jobs:
         cd build
         zip -r ClawPass.ipa Payload
         echo "Created ClawPass.ipa"
+        ls -lh ClawPass.ipa
     
     - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
