@@ -14,6 +14,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Delete Xcode Project
+      run: rm -rf ClawPass.xcodeproj
+    
     - name: Show Xcode version
       run: xcodebuild -version
     
@@ -22,7 +25,7 @@ jobs:
     
     - name: Build for iOS Device (Unsigned)
       run: |
-        # Build the package for iOS
+        # Build the Swift Package for iOS
         xcodebuild archive \
           -scheme ClawPass \
           -sdk iphoneos \
