@@ -17,21 +17,40 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Show available SDKs
-      run: xcodebuild -showsdks
+    - name: Setup Project with SPM
+      run: |
+        # Create workspace for SPM support
+        mkdir -p ClawPass.xcworkspace/xcshareddata/swiftpm
+        
+        cat > ClawPass.xcworkspace/contents.xcworkspacedata << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version="1.0">
+  <FileRef location="group:ClawPass.xcodeproj"></FileRef>
+</Workspace>
+EOF
+        
+        # Create project.xcworkspace structure for SPM
+        mkdir -p ClawPass.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+        
+        # Copy Package.resolved if it exists
+        if [ -f Package.resolved ]; then
+          cp Package.resolved ClawPass.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+        fi
     
     - name: Resolve Packages
       run: |
-        # Let Xcode resolve SPM packages
+        # First resolve with swift package
+        swift package resolve
+        
+        # Then resolve with xcodebuild (this will pick up the packages)
         xcodebuild -resolvePackageDependencies \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
-          -sdk iphoneos \
-          -configuration Release \
           -derivedDataPath .build/DerivedData 2>&1 || true
     
     - name: Build for iOS Device (Unsigned)
       run: |
+        # Try to build, capturing output
         xcodebuild archive \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
@@ -39,26 +58,17 @@ jobs:
           -configuration Release \
           -archivePath build/ClawPass.xcarchive \
           -derivedDataPath .build/DerivedData \
+          CLANG_MODULES_AUTOLINK=YES \
+          OTHER_SWIFT_FLAGS="-package-cache-path .build/checkouts" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
-          PROVISIONING_SPECIFIER=""
+          PROVISIONING_SPECIFIER="" \
+          2>&1 | tee build.log
     
-    - name: Create IPA Structure
-      run: |
-        # Create Payload directory for IPA
-        mkdir -p build/Payload
-        
-        # Copy the app bundle from the archive
-        cp -r build/ClawPass.xcarchive/Products/Applications/ClawPass.app build/Payload/
-        
-        # Create IPA (unsigned, AltStore will sign it)
-        cd build
-        zip -r ClawPass.ipa Payload
-    
-    - name: Upload IPA Artifact
+    - name: Upload Build Log
+      if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS-IPA
-        path: build/ClawPass.ipa
-        retention-days: 30
+        name: build-log
+        path: build.log
