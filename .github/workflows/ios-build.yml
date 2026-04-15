@@ -20,18 +20,9 @@ jobs:
     - name: Resolve Packages
       run: swift package resolve
     
-    - name: Generate Xcode Project from Package
-      run: |
-        # Generate Xcode project from Package.swift for iOS
-        swift package generate-xcodeproj 2>&1 || true
-        
-        # If that fails, use xcodebuild on the package directly
-        # xcodebuild can build Swift packages directly
-        xcodebuild -resolvePackageDependencies -scheme ClawPass 2>&1 || true
-    
     - name: Build for iOS Device (Unsigned)
       run: |
-        # Try building the package for iOS
+        # Build the package for iOS
         xcodebuild archive \
           -scheme ClawPass \
           -sdk iphoneos \
@@ -40,16 +31,28 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
-          PROVISIONING_SPECIFIER="" \
-          2>&1 | tee build.log || true
-        
-        # Check what we got
-        find build -name "*.app" -o -name "ClawPass" 2>/dev/null || true
+          PROVISIONING_SPECIFIER=""
     
-    - name: Upload Build Log
-      if: always()
+    - name: Create IPA Structure
+      run: |
+        # Find the built app
+        APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d | head -1)
+        echo "Found app at: $APP_PATH"
+        
+        # Create Payload directory for IPA
+        mkdir -p build/Payload
+        
+        # Copy the app bundle
+        cp -r "$APP_PATH" build/Payload/
+        
+        # Create IPA (unsigned, AltStore will sign it)
+        cd build
+        zip -r ClawPass.ipa Payload
+        echo "Created ClawPass.ipa"
+    
+    - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: build-log
-        path: build.log
-        retention-days: 1
+        name: ClawPass-iOS-IPA
+        path: build/ClawPass.ipa
+        retention-days: 30
