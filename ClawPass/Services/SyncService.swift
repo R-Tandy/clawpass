@@ -79,10 +79,10 @@ enum SyncMessage: Codable {
 
 // MARK: - Sync Vault Entry (Matches Desktop Structure)
 struct SyncVaultEntry: Codable {
-    let id: String  // Changed from UUID to String to match desktop
+    let id: String
     let title: String
     let username: String
-    let encrypted_password: [UInt8]  // Matches desktop's Vec<u8>
+    let encrypted_password: [UInt8]
     let url: String?
     let encrypted_notes: [UInt8]?
     let category_id: String?
@@ -91,28 +91,38 @@ struct SyncVaultEntry: Codable {
     let modified_at: Int64
     let is_favorite: Bool
     
+    // TEST MODE: Plain text constructor (no encryption)
+    init(id: String, title: String, username: String, password: String, url: String?, notes: String?, categoryId: String?, totpSecret: String?, createdAt: Int64, modifiedAt: Int64, isFavorite: Bool) {
+        self.id = id
+        self.title = title
+        self.username = username
+        // For testing, store plaintext as UTF-8 bytes
+        self.encrypted_password = Array(password.utf8)
+        self.url = url
+        self.encrypted_notes = notes.map { Array($0.utf8) }
+        self.category_id = categoryId
+        self.totp_secret = totpSecret
+        self.created_at = createdAt
+        self.modified_at = modifiedAt
+        self.is_favorite = isFavorite
+    }
+    
     // Convert from local VaultEntry
     init(from entry: VaultEntry, vaultKey: SymmetricKey) throws {
         self.id = entry.id.uuidString
         self.title = entry.title
         self.username = entry.username
-        
-        // Decrypt and re-encrypt for sync (or use existing encrypted data)
-        // For now, we'll pass the encrypted data directly
         self.encrypted_password = entry.encryptedPassword.map { UInt8($0) }
-        self.encrypted_notes = entry.encryptedNotes?.map { UInt8($0) }
-        
         self.url = entry.url
+        self.encrypted_notes = entry.encryptedNotes?.map { UInt8($0) }
         self.category_id = entry.categoryID?.uuidString
         self.totp_secret = entry.totpSecret
-        
-        // Convert Date to Unix timestamp (seconds)
         self.created_at = Int64(entry.createdAt.timeIntervalSince1970)
         self.modified_at = Int64(entry.modifiedAt.timeIntervalSince1970)
         self.is_favorite = entry.isFavorite
     }
     
-    // Convert to local VaultEntry
+    // Convert to local VaultEntry (test mode - assumes plaintext)
     func toVaultEntry() throws -> VaultEntry {
         guard let uuid = UUID(uuidString: self.id) else {
             throw SyncError.invalidEntryId
@@ -120,7 +130,9 @@ struct SyncVaultEntry: Codable {
         
         let categoryUUID = self.category_id.flatMap { UUID(uuidString: $0) }
         
-        return VaultEntry(
+        // Create entry with placeholder encrypted data
+        // In test mode, the "encrypted" data is actually plaintext UTF-8
+        let entry = VaultEntry(
             id: uuid,
             title: self.title,
             username: self.username,
@@ -133,6 +145,8 @@ struct SyncVaultEntry: Codable {
             modifiedAt: Date(timeIntervalSince1970: TimeInterval(self.modified_at)),
             isFavorite: self.is_favorite
         )
+        
+        return entry
     }
 }
 
@@ -367,30 +381,44 @@ class SyncService: ObservableObject {
     private func send(_ message: SyncMessage) {
         do {
             let data = try JSONEncoder().encode(message)
+            let jsonString = String(data: data, encoding: .utf8) ?? "invalid"
+            print("[SYNC] Sending message: \(jsonString)")
+            
             let length = UInt32(data.count).bigEndian
             var packet = Data()
             packet.append(contentsOf: withUnsafeBytes(of: length) { Array($0) })
             packet.append(data)
             
+            print("[SYNC] Packet size: \(packet.count) bytes (length prefix: \(length), data: \(data.count))")
+            
             connection?.send(content: packet, completion: .contentProcessed { error in
                 if let error = error {
-                    print("[Sync] Send error: \(error)")
+                    print("[SYNC] Send error: \(error)")
+                    DispatchQueue.main.async {
+                        self.delegate?.syncService(self, didEncounterError: error)
+                    }
+                } else {
+                    print("[SYNC] Message sent successfully")
                 }
             })
             
-            // After sending, wait for response
+            // Wait for response
             receiveNextMessage()
         } catch {
+            print("[SYNC] Encoding error: \(error)")
             delegate?.syncService(self, didEncounterError: SyncError.encodingFailed)
         }
     }
     
     private func receiveNextMessage() {
+        print("[SYNC] Waiting to receive...")
+        
         // First receive 4 bytes (length prefix)
         connection?.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
             
             if let error = error {
+                print("[SYNC] Receive length error: \(error)")
                 DispatchQueue.main.async {
                     self.delegate?.syncService(self, didEncounterError: error)
                 }
@@ -398,28 +426,39 @@ class SyncService: ObservableObject {
             }
             
             guard let data = data, data.count == 4 else {
+                print("[SYNC] Invalid length data: \(data?.count ?? 0) bytes")
                 return
             }
             
             let length = data.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+            print("[SYNC] Expected message length: \(length)")
             
             // Then receive the actual message
             self.connection?.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { [weak self] data, _, _, error in
                 guard let self = self else { return }
                 
                 if let error = error {
+                    print("[SYNC] Receive data error: \(error)")
                     DispatchQueue.main.async {
                         self.delegate?.syncService(self, didEncounterError: error)
                     }
                     return
                 }
                 
-                guard let data = data else { return }
+                guard let data = data else {
+                    print("[SYNC] No data received")
+                    return
+                }
+                
+                let jsonString = String(data: data, encoding: .utf8) ?? "invalid"
+                print("[SYNC] Received raw data: \(jsonString)")
                 
                 do {
                     let message = try JSONDecoder().decode(SyncMessage.self, from: data)
+                    print("[SYNC] Decoded message: \(message)")
                     self.handleMessage(message)
                 } catch {
+                    print("[SYNC] Decoding error: \(error)")
                     DispatchQueue.main.async {
                         self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
                     }
