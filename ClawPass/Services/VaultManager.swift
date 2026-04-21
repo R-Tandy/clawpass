@@ -12,16 +12,18 @@ enum VaultError: Error {
     case keychainError(OSStatus)
 }
 
-class VaultManager: ObservableObject {
+class VaultManager: ObservableObject, SyncServiceDelegate {
     static let shared = VaultManager()
     
     @Published private(set) var isUnlocked = false
     @Published private(set) var entries: [VaultEntry] = []
     @Published private(set) var categories: [Category] = []
+    @Published var syncStatus: String = ""
     
     private var db: Connection?
     private var encryptionKey: SymmetricKey?
     private let cryptoService = CryptoService.shared
+    private var syncService = SyncService.shared
     
     private let entriesTable = Table("entries")
     private let categoriesTable = Table("categories")
@@ -102,6 +104,9 @@ class VaultManager: ObservableObject {
             encryptionKey = key
             try loadData()
             isUnlocked = true
+            
+            // Set up sync delegate
+            syncService.delegate = self
         } catch {
             throw VaultError.invalidPassword
         }
@@ -319,6 +324,36 @@ class VaultManager: ObservableObject {
         guard status == errSecSuccess else { return nil }
         return result as? Data
     }
+    
+    // MARK: - SyncServiceDelegate
+    
+    func syncServiceDidConnect(_ service: SyncService) {
+        syncStatus = "Connected to desktop"
+    }
+    
+    func syncServiceDidDisconnect(_ service: SyncService) {
+        syncStatus = "Disconnected"
+    }
+    
+    func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry]) {
+        // Merge incoming entries with local entries
+        // For now, just log it
+        syncStatus = "Received \(entries.count) entries from desktop"
+        
+        // TODO: Implement proper merge logic
+        // - Check timestamps to determine which entry is newer
+        // - Add new entries, update existing ones
+        // - Handle conflicts (same ID, different content)
+    }
+    
+    func syncService(_ service: SyncService, didEncounterError error: Error) {
+        syncStatus = "Sync error: \(error.localizedDescription)"
+    }
+    
+    func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice]) {
+        // Discovery handled in UI
+    }
+}
 }
 
 // MARK: - Extensions

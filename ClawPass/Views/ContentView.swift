@@ -119,6 +119,7 @@ struct UnlockView: View {
 struct VaultView: View {
     @StateObject private var vaultManager = VaultManager.shared
     @State private var showingAddEntry = false
+    @State private var showingSync = false
     @State private var searchText = ""
     @State private var selectedCategory: Category?
     
@@ -158,13 +159,23 @@ struct VaultView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddEntry = true }) {
-                        Image(systemName: "plus")
+                    HStack {
+                        Button(action: { showingSync = true }) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundColor(vaultManager.syncStatus.contains("Connected") ? .green : .primary)
+                        }
+                        
+                        Button(action: { showingAddEntry = true }) {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
             .sheet(isPresented: $showingAddEntry) {
                 AddEntryView()
+            }
+            .sheet(isPresented: $showingSync) {
+                SyncView()
             }
         }
     }
