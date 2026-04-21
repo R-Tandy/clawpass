@@ -14,7 +14,14 @@ enum SyncMessage: Codable {
     case pong
     
     enum CodingKeys: String, CodingKey {
-        case type, deviceId, version, lastTimestamp, entries, timestamp, entry, entryId
+        case type
+        case device_id = "device_id"
+        case version
+        case last_timestamp = "last_timestamp"
+        case entries
+        case timestamp
+        case entry
+        case entry_id = "entry_id"
     }
     
     func encode(to encoder: Encoder) throws {
@@ -23,11 +30,11 @@ enum SyncMessage: Codable {
         switch self {
         case .handshake(let deviceId, let version):
             try container.encode("handshake", forKey: .type)
-            try container.encode(deviceId, forKey: .deviceId)
+            try container.encode(deviceId, forKey: .device_id)
             try container.encode(version, forKey: .version)
         case .syncRequest(let lastTimestamp):
             try container.encode("sync_request", forKey: .type)
-            try container.encode(lastTimestamp, forKey: .lastTimestamp)
+            try container.encode(lastTimestamp, forKey: .last_timestamp)
         case .syncResponse(let entries, let timestamp):
             try container.encode("sync_response", forKey: .type)
             try container.encode(entries, forKey: .entries)
@@ -37,7 +44,7 @@ enum SyncMessage: Codable {
             try container.encode(entry, forKey: .entry)
         case .entryDelete(let entryId):
             try container.encode("entry_delete", forKey: .type)
-            try container.encode(entryId, forKey: .entryId)
+            try container.encode(entryId, forKey: .entry_id)
         case .ping:
             try container.encode("ping", forKey: .type)
         case .pong:
@@ -51,11 +58,11 @@ enum SyncMessage: Codable {
         
         switch type {
         case "handshake":
-            let deviceId = try container.decode(String.self, forKey: .deviceId)
+            let deviceId = try container.decode(String.self, forKey: .device_id)
             let version = try container.decode(UInt32.self, forKey: .version)
             self = .handshake(deviceId: deviceId, version: version)
         case "sync_request":
-            let lastTimestamp = try container.decode(Int64.self, forKey: .lastTimestamp)
+            let lastTimestamp = try container.decode(Int64.self, forKey: .last_timestamp)
             self = .syncRequest(lastTimestamp: lastTimestamp)
         case "sync_response":
             let entries = try container.decode([SyncVaultEntry].self, forKey: .entries)
@@ -65,7 +72,7 @@ enum SyncMessage: Codable {
             let entry = try container.decode(SyncVaultEntry.self, forKey: .entry)
             self = .entryUpdate(entry: entry)
         case "entry_delete":
-            let entryId = try container.decode(String.self, forKey: .entryId)
+            let entryId = try container.decode(String.self, forKey: .entry_id)
             self = .entryDelete(entryId: entryId)
         case "ping":
             self = .ping
