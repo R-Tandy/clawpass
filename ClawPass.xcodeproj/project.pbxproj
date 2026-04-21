@@ -11,6 +11,7 @@
 		000000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000021 /* ContentView.swift */; };
 		000000000000000000000003 /* AddEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000022 /* AddEntryView.swift */; };
 		000000000000000000000004 /* EntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000023 /* EntryDetailView.swift */; };
+		00000000000000000000000A /* SyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000024 /* SyncView.swift */; };
 		000000000000000000000005 /* VaultEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000031 /* VaultEntry.swift */; };
 		000000000000000000000006 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* CryptoService.swift */; };
 		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
@@ -24,6 +25,7 @@
 		000000000000000000000021 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		000000000000000000000022 /* AddEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEntryView.swift; sourceTree = "<group>"; };
 		000000000000000000000023 /* EntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryDetailView.swift; sourceTree = "<group>"; };
+		000000000000000000000024 /* SyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncView.swift; sourceTree = "<group>"; };
 		000000000000000000000031 /* VaultEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultEntry.swift; sourceTree = "<group>"; };
 		000000000000000000000032 /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
 		000000000000000000000033 /* VaultManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultManager.swift; sourceTree = "<group>"; };
@@ -67,6 +69,7 @@
 				000000000000000000000021 /* ContentView.swift */,
 				000000000000000000000022 /* AddEntryView.swift */,
 				000000000000000000000023 /* EntryDetailView.swift */,
+				000000000000000000000024 /* SyncView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -149,6 +152,7 @@
 				000000000000000000000002 /* ContentView.swift in Sources */,
 				000000000000000000000003 /* AddEntryView.swift in Sources */,
 				000000000000000000000004 /* EntryDetailView.swift in Sources */,
+				00000000000000000000000A /* SyncView.swift in Sources */,
 				000000000000000000000005 /* VaultEntry.swift in Sources */,
 				000000000000000000000006 /* CryptoService.swift in Sources */,
 				000000000000000000000007 /* VaultManager.swift in Sources */,
