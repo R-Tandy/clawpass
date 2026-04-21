@@ -354,7 +354,6 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // Discovery handled in UI
     }
 }
-}
 
 // MARK: - Extensions
 

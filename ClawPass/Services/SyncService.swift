@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import CryptoKit
+import UIKit
 
 // MARK: - Sync Message Protocol (Matches Desktop)
 enum SyncMessage: Codable {
@@ -273,8 +274,8 @@ class SyncService: ObservableObject {
         disconnect()
         
         // Create TCP connection
-        guard let host = NWEndpoint.Host(device.host),
-              let port = NWEndpoint.Port(rawValue: device.port) else {
+        let host = NWEndpoint.Host(device.host)
+        guard let port = NWEndpoint.Port(rawValue: device.port) else {
             delegate?.syncService(self, didEncounterError: SyncError.networkError(NSError(domain: "Invalid endpoint", code: -1)))
             return
         }
