@@ -15,6 +15,9 @@ Package.resolved
 .DS_Store
 Thumbs.db
 
+# Desktop app (never track - local only)
+ClawPass/desktop/
+
 # IDE
 .vscode/
 .idea/
