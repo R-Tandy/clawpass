@@ -171,6 +171,7 @@ protocol SyncServiceDelegate: AnyObject {
     func syncServiceDidConnect(_ service: SyncService)
     func syncServiceDidDisconnect(_ service: SyncService)
     func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry])
+    func syncService(_ service: SyncService, didDeleteEntry entryId: String)
     func syncService(_ service: SyncService, didEncounterError error: Error)
     func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
 }
@@ -507,7 +508,10 @@ class SyncService: ObservableObject {
             
         case .entryDelete(let entryId):
             print("[Sync] Received entry delete: \(entryId)")
-            // Handle delete - notify delegate
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.delegate?.syncService(self, didDeleteEntry: entryId)
+            }
             
         default:
             print("[Sync] Unhandled message type")

@@ -336,14 +336,41 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry]) {
-        // Merge incoming entries with local entries
-        // For now, just log it
-        syncStatus = "Received \(entries.count) entries from desktop"
+        syncStatus = "Syncing \(entries.count) entries..."
         
-        // TODO: Implement proper merge logic
-        // - Check timestamps to determine which entry is newer
-        // - Add new entries, update existing ones
-        // - Handle conflicts (same ID, different content)
+        do {
+            // Merge entries using timestamp-based conflict resolution
+            for entry in entries {
+                try mergeEntry(entry)
+            }
+            
+            // Reload data from database after merge
+            try loadData()
+            
+            syncStatus = "Synced \(entries.count) entries from desktop"
+        } catch {
+            syncStatus = "Sync merge error: \(error.localizedDescription)"
+        }
+    }
+    
+    func syncService(_ service: SyncService, didDeleteEntry entryId: String) {
+        syncStatus = "Processing deletion..."
+        
+        do {
+            // Find and delete the entry by ID
+            if let uuid = UUID(uuidString: entryId) {
+                if let entry = entries.first(where: { $0.id == uuid }) {
+                    try deleteEntry(entry)
+                    syncStatus = "Deleted entry: \(entry.title)"
+                } else {
+                    syncStatus = "Entry not found for deletion"
+                }
+            } else {
+                syncStatus = "Invalid entry ID"
+            }
+        } catch {
+            syncStatus = "Delete sync error: \(error.localizedDescription)"
+        }
     }
     
     func syncService(_ service: SyncService, didEncounterError error: Error) {
@@ -352,6 +379,67 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice]) {
         // Discovery handled in UI
+    }
+    
+    // MARK: - Merge Logic
+    
+    /// Merges a single entry into the local vault using timestamp-based conflict resolution
+    /// - If entry doesn't exist locally: add it
+    /// - If entry exists and desktop is newer: update local
+    /// - If entry exists and local is newer: skip (local wins)
+    private func mergeEntry(_ desktopEntry: VaultEntry) throws {
+        guard let db = db else {
+            throw VaultError.notInitialized
+        }
+        
+        // Check if entry exists locally
+        if let existingIndex = entries.firstIndex(where: { $0.id == desktopEntry.id }) {
+            let existingEntry = entries[existingIndex]
+            
+            // Compare timestamps - desktop wins if equal (desktop is source of truth for merges)
+            if desktopEntry.modifiedAt >= existingEntry.modifiedAt {
+                // Desktop is newer or equal - update local entry
+                let entryRow = entriesTable.filter(id == desktopEntry.id.uuidString)
+                
+                // For sync entries, the encryptedPassword/Notes are already encrypted data
+                // from the desktop. We need to store them as-is since we share the same encryption
+                // key derivation (same password -> same key)
+                let update = entryRow.update(
+                    title <- desktopEntry.title,
+                    username <- desktopEntry.username,
+                    encryptedPassword <- desktopEntry.encryptedPassword,
+                    url <- desktopEntry.url,
+                    encryptedNotes <- desktopEntry.encryptedNotes,
+                    categoryID <- desktopEntry.categoryID?.uuidString,
+                    totpSecret <- desktopEntry.totpSecret,
+                    modifiedAt <- desktopEntry.modifiedAt,
+                    isFavorite <- desktopEntry.isFavorite
+                )
+                
+                try db.run(update)
+                print("[VaultManager] Updated entry '\(desktopEntry.title)' (desktop was newer)")
+            } else {
+                print("[VaultManager] Skipped entry '\(desktopEntry.title)' (local was newer)")
+            }
+        } else {
+            // New entry - insert it
+            let insert = entriesTable.insert(
+                id <- desktopEntry.id.uuidString,
+                title <- desktopEntry.title,
+                username <- desktopEntry.username,
+                encryptedPassword <- desktopEntry.encryptedPassword,
+                url <- desktopEntry.url,
+                encryptedNotes <- desktopEntry.encryptedNotes,
+                categoryID <- desktopEntry.categoryID?.uuidString,
+                totpSecret <- desktopEntry.totpSecret,
+                createdAt <- desktopEntry.createdAt,
+                modifiedAt <- desktopEntry.modifiedAt,
+                isFavorite <- desktopEntry.isFavorite
+            )
+            
+            try db.run(insert)
+            print("[VaultManager] Added new entry '\(desktopEntry.title)' from desktop")
+        }
     }
 }
 
