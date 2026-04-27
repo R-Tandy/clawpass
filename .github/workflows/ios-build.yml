@@ -18,7 +18,7 @@ jobs:
       run: xcodebuild -version
     
     - name: Resolve SPM dependencies
-      run: xcodebuild -project ClawPass.xcodeproj -scheme ClawPass -configuration Release -resolvePackageDependencies 2>&1 | tail -20
+      run: xcodebuild -project ClawPass.xcodeproj -scheme ClawPass -configuration Release -resolvePackageDependencies 2>&1 | tail -5
     
     - name: Build for iOS Device (Unsigned)
       run: |
@@ -31,7 +31,7 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
           PROVISIONING_SPECIFIER="" \
-          2>&1 | tail -30
+          2>&1 | tail -20
     
     - name: Build for iOS Simulator
       run: |
@@ -46,3 +46,17 @@ jobs:
           CODE_SIGN_IDENTITY="" \
           PROVISIONING_SPECIFIER="" \
           2>&1 | tail -20
+    
+    - name: Find built app
+      run: |
+        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "ClawPass.app" -type d 2>/dev/null | head -1)
+        echo "Found app at: $APP_PATH"
+        echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+    
+    - name: Upload iOS App Artifact
+      if: env.APP_PATH != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: ClawPass-iOS-App
+        path: ${{ env.APP_PATH }}
+        retention-days: 7
