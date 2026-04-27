@@ -17,6 +17,7 @@ Thumbs.db
 
 # Desktop app (never track - local only)
 ClawPass/desktop/
+ClawPass/TODO.md
 
 # IDE
 .vscode/
