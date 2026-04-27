@@ -17,6 +17,10 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
+    - name: Resolve SPM dependencies
+      run: |
+        xcodebuild -project ClawPass.xcodeproj -scheme ClawPass -configuration Release -resolvePackageDependencies 2>&1 | tail -10
+    
     - name: Build for iOS Device (Unsigned)
       run: |
         xcodebuild archive \
@@ -29,7 +33,8 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
           PROVISIONING_SPECIFIER="" \
-          2>&1
+          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/SourcePackages" \
+          2>&1 | tail -30
     
     - name: Build for iOS Simulator
       run: |
@@ -47,8 +52,6 @@ jobs:
     
     - name: Create IPA from archive
       run: |
-        ls -la build/ClawPass.xcarchive/
-        ls -la build/ClawPass.xcarchive/Products/
         APP_PATH=$(find build/ClawPass.xcarchive/Products -name "*.app" -type d | head -1)
         echo "Found app at: $APP_PATH"
         mkdir -p build/Payload
