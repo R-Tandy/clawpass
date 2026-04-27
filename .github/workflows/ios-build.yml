@@ -14,43 +14,35 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup CocoaPods
-      run: |
-        sudo gem install cocoapods
-    
-    - name: Install Dependencies
-      run: |
-        pod install
-    
     - name: Show Xcode version
       run: xcodebuild -version
     
+    - name: Resolve SPM dependencies
+      run: xcodebuild -project ClawPass.xcodeproj -scheme ClawPass -configuration Release -resolvePackageDependencies 2>&1 | tail -20
+    
     - name: Build for iOS Device (Unsigned)
       run: |
-        xcodebuild archive \
-          -workspace ClawPass.xcworkspace \
+        xcodebuild build \
+          -project ClawPass.xcodeproj \
           -scheme ClawPass \
           -sdk iphoneos \
           -configuration Release \
-          -archivePath build/ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
-          PROVISIONING_SPECIFIER=""
+          PROVISIONING_SPECIFIER="" \
+          2>&1 | tail -30
     
-    - name: Create IPA Structure
+    - name: Build for iOS Simulator
       run: |
-        APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d | head -1)
-        echo "Found app at: $APP_PATH"
-        mkdir -p build/Payload
-        cp -r "$APP_PATH" build/Payload/
-        cd build
-        zip -r ClawPass.ipa Payload
-        ls -lh ClawPass.ipa
-    
-    - name: Upload IPA Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ClawPass-iOS-IPA
-        path: build/ClawPass.ipa
-        retention-days: 30
+        xcodebuild build \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass \
+          -sdk iphonesimulator \
+          -configuration Release \
+          -destination 'platform=iOS Simulator,name=iPhone 16' \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_SPECIFIER="" \
+          2>&1 | tail -20
