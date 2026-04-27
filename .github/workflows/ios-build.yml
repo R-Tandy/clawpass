@@ -17,21 +17,19 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Resolve SPM dependencies
-      run: xcodebuild -project ClawPass.xcodeproj -scheme ClawPass -configuration Release -resolvePackageDependencies 2>&1 | tail -5
-    
     - name: Build for iOS Device (Unsigned)
       run: |
-        xcodebuild build \
+        xcodebuild archive \
           -project ClawPass.xcodeproj \
           -scheme ClawPass \
           -sdk iphoneos \
           -configuration Release \
+          -archivePath build/ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
           PROVISIONING_SPECIFIER="" \
-          2>&1 | tail -20
+          2>&1 | tail -30
     
     - name: Build for iOS Simulator
       run: |
@@ -47,16 +45,19 @@ jobs:
           PROVISIONING_SPECIFIER="" \
           2>&1 | tail -20
     
-    - name: Find built app
+    - name: Create IPA from archive
       run: |
-        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "ClawPass.app" -type d 2>/dev/null | head -1)
+        APP_PATH=$(find build/ClawPass.xcarchive -name "*.app" -type d | head -1)
         echo "Found app at: $APP_PATH"
-        echo "APP_PATH=$APP_PATH" >> $GITHUB_ENV
+        mkdir -p build/Payload
+        cp -r "$APP_PATH" build/Payload/
+        cd build
+        zip -r ClawPass.ipa Payload
+        ls -lh ClawPass.ipa
     
-    - name: Upload iOS App Artifact
-      if: env.APP_PATH != ''
+    - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS-App
-        path: ${{ env.APP_PATH }}
+        name: ClawPass-iOS-IPA
+        path: build/ClawPass.ipa
         retention-days: 7
