@@ -211,7 +211,7 @@ class SyncService: ObservableObject {
         discoveredDevices.removeAll()
         
         let parameters = NWParameters.tcp
-        browser = NWBrowser(for: .bonjour(type: serviceType, domain: nil), using: parameters)
+        browser = NWBrowser(for: .bonjour(type: serviceType, domain: "local."), using: parameters)
         
         browser?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
