@@ -498,8 +498,9 @@ class SyncService: ObservableObject {
                     }
                 }
                 
-                print("[Sync] Converted \(vaultEntries.count)/\(entries.count) entries (\(failedEntries) failed)")
-                print("[Sync] Entries to merge: \(vaultEntries.map { \($0.title, $0.username) })")
+                let convertedCount = vaultEntries.count
+                let totalCount = entries.count
+                print("[Sync] Converted \(convertedCount)/\(totalCount) entries (\(failedEntries) failed)")
                 self.lastSyncTimestamp = timestamp
                 self.delegate?.syncService(self, didReceiveEntries: vaultEntries)
             }
