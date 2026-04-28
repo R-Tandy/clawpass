@@ -73,7 +73,11 @@ struct SyncView: View {
                 }
             }
             
-            if !lastSyncMessage.isEmpty {
+            if !VaultManager.shared.syncStatus.isEmpty {
+                Text(VaultManager.shared.syncStatus)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else if !lastSyncMessage.isEmpty {
                 Text(lastSyncMessage)
                     .font(.caption)
                     .foregroundColor(.secondary)
