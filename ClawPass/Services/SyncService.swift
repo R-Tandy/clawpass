@@ -488,11 +488,15 @@ class SyncService: ObservableObject {
                 // Convert entries
                 var vaultEntries: [VaultEntry] = []
                 for entry in entries {
-                    if let vaultEntry = try? entry.toVaultEntry() {
+                    do {
+                        let vaultEntry = try entry.toVaultEntry()
                         vaultEntries.append(vaultEntry)
+                    } catch {
+                        print("[Sync] Failed to convert entry '\(entry.title)': \(error)")
                     }
                 }
                 
+                print("[Sync] Converted \(vaultEntries.count)/\(entries.count) entries successfully")
                 self.lastSyncTimestamp = timestamp
                 self.delegate?.syncService(self, didReceiveEntries: vaultEntries)
             }
