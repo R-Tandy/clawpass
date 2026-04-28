@@ -336,6 +336,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry]) {
+        let originalStatus = syncStatus
         syncStatus = "Syncing \(entries.count) entries..."
         
         do {
@@ -347,9 +348,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             // Reload data from database after merge
             try loadData()
             
-            syncStatus = "Synced \(entries.count) entries from desktop"
+            print("[VaultManager] Sync completed: \(entries.count) entries merged")
+            syncStatus = "Synced \(entries.count) entries from desktop ✓"
+            
+            // Reset to default after 4 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                if self?.syncStatus == "Synced \(entries.count) entries from desktop ✓" {
+                    self?.syncStatus = originalStatus
+                }
+            }
         } catch {
-            syncStatus = "Sync merge error: \(error.localizedDescription)"
+            print("[VaultManager] Sync merge error: \(error)")
+            syncStatus = "Sync error: \(error.localizedDescription)"
         }
     }
     
