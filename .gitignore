@@ -1,0 +1,4 @@
+# Ignore compiled binaries and build artifacts for ControlCenter_v3
+ControlCenter_v3/publish/
+ControlCenter_v3/bin/
+ControlCenter_v3/obj/

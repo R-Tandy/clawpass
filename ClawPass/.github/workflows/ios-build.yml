@@ -1,0 +1,113 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'ios/**'
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
+    
+    - name: Install dependencies
+      run: |
+        brew install sqlcipher
+    
+    - name: Build iOS App
+      working-directory: ios
+      run: |
+        xcodebuild build \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass \
+          -destination "platform=iOS Simulator,name=iPhone 15" \
+          -configuration Release \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
+    
+    - name: Archive build logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: ios/build/
+
+  build-ipa:
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Apple certificate
+      uses: apple-actions/import-codesign-certs@v2
+      with:
+        p12-file-base64: ${{ secrets.CERTIFICATE_P12 }}
+        p12-password: ${{ secrets.CERTIFICATE_PASSWORD }}
+      continue-on-error: true
+    
+    - name: Install provisioning profile
+      uses: apple-actions/download-provisioning-profiles@v1
+      with:
+        bundle-id: com.clawpass.ios
+        profile-type: 'iOS_APP_DEVELOPMENT'
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      continue-on-error: true
+    
+    - name: Build Archive
+      working-directory: ios
+      run: |
+        xcodebuild archive \
+          -project ClawPass.xcodeproj \
+          -scheme ClawPass \
+          -destination "generic/platform=iOS" \
+          -archivePath build/ClawPass.xcarchive \
+          CODE_SIGNING_ALLOWED=NO \
+          || true
+    
+    - name: Export IPA (unsigned for testing)
+      working-directory: ios
+      run: |
+        # Create export options plist for ad-hoc distribution
+        cat > ExportOptions.plist << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>thinning</key>
+            <string><none></string>
+        </dict>
+        </plist>
+        EOF
+        
+        # Try to export, may fail without signing
+        xcodebuild -exportArchive \
+          -archivePath build/ClawPass.xcarchive \
+          -exportPath build/IPA \
+          -exportOptionsPlist ExportOptions.plist \
+          -allowProvisioningUpdates \
+          || echo "Export requires signing certificate"
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ClawPass-iOS
+        path: |
+          ios/build/ClawPass.xcarchive
+          ios/build/IPA/*.ipa
+        if-no-files-found: ignore
