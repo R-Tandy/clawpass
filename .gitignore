@@ -2,3 +2,6 @@
 ControlCenter_v3/publish/
 ControlCenter_v3/bin/
 ControlCenter_v3/obj/
+
+# Exclude ClawPass desktop code from repository (iOS‑only repo)
+ClawPass/desktop/
