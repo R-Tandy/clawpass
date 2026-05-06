@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-05T13:45:57.440Z",
+  "updatedAt": "2026-05-06T16:00:13.010Z",
   "entries": {
     "memory:memory/.dreams/session-corpus/2026-04-07.txt:1:1": {
       "key": "memory:memory/.dreams/session-corpus/2026-04-07.txt:1:1",
@@ -7691,24 +7691,37 @@
       "startLine": 1,
       "endLine": 32,
       "source": "memory",
-      "snippet": "# ClawPass Session Summary - April 13, 2026 ## Completed ✅ ### iOS App - Successfully pushed clean iOS-only repo to GitHub: https://github.com/R-Tandy/clawpass - Repo now on `main` branch with just Swift files (no desktop code) - Fixed GitHub Actions workflow (removed hardcoded Xcode path, uses default) - iOS app structure is complete and ready for build ### Desktop App - Fixed `VaultEntry` - added `Debug` derive trait to fix sync_tcp.rs compile error - Fixed password generator showing `[object Promise]` bug - Removed `target/` from git tracking (still has history issues for push) ## Still Pending 🔧 ### iOS GitHub Actions - Workflow is now pushing to GitHub with corrected Xcode setting",
-      "recallCount": 5,
+      "snippet": "# ClawPass Session Summary - April 13, 2026 ## Completed ✅ ### iOS App - Successfully pushed clean iOS-only repo to GitHub: https://github.com/R-Tandy/clawpass - Repo now on `main` branch with just Swift files (no desktop code) - Fixed GitHub Actions workflow (removed hardcoded Xcode path, uses default) - iOS app structure is complete and ready for build ### Desktop App - Fixed `VaultEntry` - added `Debug` derive trait to fix sync_tcp.rs compile error - Fixed password generator showing `[object Promise]` bug - Removed `target/` from git tracking (still has history issues for push) ## Still Pending 🔧 ### iOS GitHub Actions - Workflow is now pushing to GitHub with corre",
+      "recallCount": 20,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 4.348247916545239,
+      "totalScore": 19.34824791654524,
       "maxScore": 1,
       "firstRecalledAt": "2026-04-21T05:59:16.515Z",
-      "lastRecalledAt": "2026-05-05T13:31:55.188Z",
+      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
       "queryHashes": [
         "c914a3293e0f",
         "1a3cc129ab54",
         "ce1e564e78bb",
         "a5b22f05666f",
-        "c56817c450e1"
+        "c56817c450e1",
+        "f6ab24c815ef",
+        "97a8e46860d5",
+        "6ed0b63098d1",
+        "821e1f8114f8",
+        "c23993cb5f7b",
+        "4ea69fb367e5",
+        "c276484dc82a",
+        "108eee8d0c4f",
+        "014d364d8aba",
+        "8bef2ebfa56b",
+        "adfddda49404",
+        "8864cc5f7c03"
       ],
       "recallDays": [
         "2026-04-21",
-        "2026-05-05"
+        "2026-05-05",
+        "2026-05-06"
       ],
       "conceptTags": [
         "ios-only",
@@ -7958,21 +7971,24 @@
       "startLine": 27,
       "endLine": 48,
       "source": "memory",
-      "snippet": "- **Generate Password**: Replaced wand icon with key+plus icon (temporary, Reno may make custom icon later) ## File Changes - `src/stores/vault.ts` - Fixed addEntry/updateEntry, added category functions - `src/views/VaultView.vue` - Added category sidebar, favorites button - `src/components/AddEntryModal.vue` - Added category dropdown - `src/components/icons/IconRefresh.vue` - New key+plus icon - `src/components/icons/index.ts` - Exported IconRefresh ## Technical Notes - Backend expects `NewVaultEntryInput` with plaintext `password` and `notes` fields - Categories stored in `~/.clawpass/categories.dat` - Vault entries use AES-GCM encryption, backend handles encrypt/decrypt ## Still Pendin",
-      "recallCount": 2,
+      "snippet": "- **Generate Password**: Replaced wand icon with key+plus icon (temporary, Reno may make custom icon later) ## File Changes - `src/stores/vault.ts` - Fixed addEntry/updateEntry, added category functions - `src/views/VaultView.vue` - Added category sidebar, favorites button - `src/components/AddEntryModal.vue` - Added category dropdown - `src/components/icons/IconRefresh.vue` - New key+plus icon - `src/components/icons/index.ts` - Exported IconRefresh ## Technical Notes - Backend expects `NewVaultEntryInput` with plaintext `password` and `notes` fields - Categories stored in `~/.clawpass/categories.dat` - Vault entries use AES-GCM encryption, backend handles encrypt/decrypt #",
+      "recallCount": 5,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 2,
+      "totalScore": 5,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-04T03:39:54.773Z",
-      "lastRecalledAt": "2026-05-05T13:45:57.440Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
       "queryHashes": [
         "3fe9047380c9",
-        "ecc3c8e1a1d6"
+        "ecc3c8e1a1d6",
+        "8bef2ebfa56b",
+        "adfddda49404"
       ],
       "recallDays": [
         "2026-05-03",
-        "2026-05-05"
+        "2026-05-05",
+        "2026-05-06"
       ],
       "conceptTags": [
         "src/stores/vault.ts",
@@ -8022,21 +8038,23 @@
       "startLine": 1,
       "endLine": 33,
       "source": "memory",
-      "snippet": "# 2026-04-22 - ClawPass Desktop Session ## Summary Great productive session - fixed multiple issues in the ClawPass Tauri desktop app. ## Issues Fixed ### 1. Save Entry button broken - **Root cause**: Frontend was sending pre-encrypted passwords, but backend expects plaintext and encrypts internally - **Fix**: Updated `addEntry` in `vault.ts` to send plaintext password/notes; backend handles encryption ### 2. Categories not showing - **Root cause**: Frontend never called `loadCategories()`, categories sidebar not implemented - **Fix**: Added `loadCategories()` on mount, category list loop in VaultView, category dropdown in AddEntryModal ### 3. Update Entry broken - **Root cause**: Sendi",
-      "recallCount": 2,
+      "snippet": "# 2026-04-22 - ClawPass Desktop Session ## Summary Great productive session - fixed multiple issues in the ClawPass Tauri desktop app. ## Issues Fixed ### 1. Save Entry button broken - **Root cause**: Frontend was sending pre-encrypted passwords, but backend expects plaintext and encrypts internally - **Fix**: Updated `addEntry` in `vault.ts` to send plaintext password/notes; backend handles encryption ### 2. Categories not showing - **Root cause**: Frontend never called `loadCategories()`, categories sidebar not implemented - **Fix**: Added `loadCategories()` on mount, category list loop in VaultView, category dropdown in AddEntryModal ### 3. Update Entry broken - **Roo",
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 2,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-04T03:39:54.773Z",
-      "lastRecalledAt": "2026-05-05T13:45:57.440Z",
+      "lastRecalledAt": "2026-05-06T08:09:29.904Z",
       "queryHashes": [
         "3fe9047380c9",
-        "ecc3c8e1a1d6"
+        "ecc3c8e1a1d6",
+        "f6ab24c815ef"
       ],
       "recallDays": [
         "2026-05-03",
-        "2026-05-05"
+        "2026-05-05",
+        "2026-05-06"
       ],
       "conceptTags": [
         "pre-encrypted",
@@ -8151,19 +8169,32 @@
       "startLine": 1,
       "endLine": 37,
       "source": "memory",
-      "snippet": "# 2026-04-27 ## ClawPass Sync Investigation ### Desktop rebuild (12:15-12:23 CDT) - Rewrote `sync_tcp.rs` with proper error logging - Added JSON parse error logging: `[SyncServer] JSON parse error: {e} | bytes: {raw}` - Changed log level to INFO for raw bytes visibility - Desktop app restarted multiple times — running fresh build ### Last sync attempt (12:17-12:18) - iOS connected from 192.168.4.60:54202 at 17:18:05 - Desktop read error: 10054 (forcibly closed by remote) - NO \"Received raw bytes\" log → desktop app wasn't rebuilt yet when this happened ### Current state - Desktop: fresh build with debug logging, running since ~17:23 CDT - iOS: old build (before `b112e54` domain fix) — won",
-      "recallCount": 1,
+      "snippet": "# 2026-04-27 ## ClawPass Sync Investigation ### Desktop rebuild (12:15-12:23 CDT) - Rewrote `sync_tcp.rs` with proper error logging - Added JSON parse error logging: `[SyncServer] JSON parse error: {e} | bytes: {raw}` - Changed log level to INFO for raw bytes visibility - Desktop app restarted multiple times — running fresh build ### Last sync attempt (12:17-12:18) - iOS connected from 192.168.4.60:54202 at 17:18:05 - Desktop read error: 10054 (forcibly closed by remote) - NO \"Received raw bytes\" log → desktop app wasn't rebuilt yet when this happened ### Current state - Desktop: fresh build with debug logging, running since ~17:23 CDT - iOS: old build (before `b112e54`",
+      "recallCount": 16,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 16,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-04T13:43:46.550Z",
-      "lastRecalledAt": "2026-05-04T13:43:46.550Z",
+      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
       "queryHashes": [
-        "34691b3c1096"
+        "34691b3c1096",
+        "ac18bdd41c1c",
+        "f6ab24c815ef",
+        "807fd345b1f6",
+        "821e1f8114f8",
+        "11f9578d05e6",
+        "c23993cb5f7b",
+        "4ea69fb367e5",
+        "108eee8d0c4f",
+        "014d364d8aba",
+        "8bef2ebfa56b",
+        "adfddda49404",
+        "8864cc5f7c03"
       ],
       "recallDays": [
-        "2026-05-04"
+        "2026-05-04",
+        "2026-05-06"
       ],
       "conceptTags": [
         "15-12",
@@ -8182,19 +8213,27 @@
       "startLine": 1,
       "endLine": 28,
       "source": "memory",
-      "snippet": "# 2026-04-28 - Daily Memory ## Desktop App Issues (reported ~01:21 CDT) - **Categories messed up** - desktop Vue app categories not displaying correctly - **Favorites not showing in list** - favorites filter not working properly ## Desktop VaultView.vue Architecture (from context) - Sidebar: \"All Items\" (no selectedCategory), \"Favorites\" (selectedCategory = 'favorites'), then user categories - Entry list: `v-for=\"entry in vault.filteredEntries\"` with `:class=\"{ favorite: entry.is_favorite }\"` - `filteredEntries` computed property filters by `selectedCategory` - if 'favorites', shows only `entry.is_favorite` entries - Categories stored in `vault.categories` array with `{ id, name, icon }`",
-      "recallCount": 1,
+      "snippet": "# 2026-04-28 - Daily Memory ## Desktop App Issues (reported ~01:21 CDT) - **Categories messed up** - desktop Vue app categories not displaying correctly - **Favorites not showing in list** - favorites filter not working properly ## Desktop VaultView.vue Architecture (from context) - Sidebar: \"All Items\" (no selectedCategory), \"Favorites\" (selectedCategory = 'favorites'), then user categories - Entry list: `v-for=\"entry in vault.filteredEntries\"` with `:class=\"{ favorite: entry.is_favorite }\"` - `filteredEntries` computed property filters by `selectedCategory` - if 'favorites', shows only `entry.is_favorite` entries - Categories stored in `vault.categories` array with `{ id, name,",
+      "recallCount": 11,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 11,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-05T13:45:57.440Z",
-      "lastRecalledAt": "2026-05-05T13:45:57.440Z",
+      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
       "queryHashes": [
-        "ecc3c8e1a1d6"
+        "ecc3c8e1a1d6",
+        "ac18bdd41c1c",
+        "f6ab24c815ef",
+        "821e1f8114f8",
+        "014d364d8aba",
+        "8bef2ebfa56b",
+        "adfddda49404",
+        "8864cc5f7c03"
       ],
       "recallDays": [
-        "2026-05-05"
+        "2026-05-05",
+        "2026-05-06"
       ],
       "conceptTags": [
         "vaultview.vue",
@@ -8213,29 +8252,500 @@
       "startLine": 164,
       "endLine": 192,
       "source": "memory",
-      "snippet": "- confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:35-35 - recalls: 0 - status: staged - Candidate: Assistant: There's still something on port 1420. Let me kill it and restart: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:36-36 - recalls: 0 - status: staged - Candidate: Assistant: Rust compilation finished. Let me check if the app launched: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:37-37 - recalls: 0 - status: staged - Candidate: Assistant: Build finished. Let me check if the app window opened: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:38-38",
-      "recallCount": 1,
+      "snippet": "- confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:35-35 - recalls: 0 - status: staged - Candidate: Assistant: There's still something on port 1420. Let me kill it and restart: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:36-36 - recalls: 0 - status: staged - Candidate: Assistant: Rust compilation finished. Let me check if the app launched: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:37-37 - recalls: 0 - status: staged - Candidate: Assistant: Build finished. Let me check if the app window opened: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-",
+      "recallCount": 2,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 2,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-05T13:45:57.440Z",
-      "lastRecalledAt": "2026-05-05T13:45:57.440Z",
+      "lastRecalledAt": "2026-05-06T08:14:13.931Z",
       "queryHashes": [
-        "ecc3c8e1a1d6"
+        "ecc3c8e1a1d6",
+        "821e1f8114f8"
       ],
       "recallDays": [
-        "2026-05-05"
+        "2026-05-05",
+        "2026-05-06"
       ],
       "conceptTags": [
         "0.00",
         "35-35",
         "36-36",
         "37-37",
-        "38-38",
+        "dreams/session-corpus/2026",
         "confidence",
         "evidence",
         "dreams"
+      ]
+    },
+    "memory:memory/2026-04-27.md:31:54": {
+      "key": "memory:memory/2026-04-27.md:31:54",
+      "path": "memory/2026-04-27.md",
+      "startLine": 31,
+      "endLine": 54,
+      "source": "memory",
+      "snippet": "### iOS says \"sync completed\" but desktop vault unchanged - Suggests iOS got a response it accepted (maybe old `FullSync` type string matching?) - But desktop's `serde_json::from_slice` failed silently (no `else` clause) - FIX: added explicit error logging ### Protocol status - Desktop sends: `{\"type\":\"sync_response\",\"entries\":[...],\"timestamp\":...}` - iOS expects: `{\"type\":\"sync_response\",\"entries\":[...],\"timestamp\":...}` (same) - But old desktop build was sending `type:\"FullSync\"` with `#[serde(tag)]` internal format - New build uses `#[serde(rename = \"sync_response\")]` — should be correct ### Console popup windows - NOT from app's `println!` — all replaced with `tracing!` -",
+      "recallCount": 13,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 13,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:09:22.218Z",
+      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "queryHashes": [
+        "ac18bdd41c1c",
+        "f6ab24c815ef",
+        "807fd345b1f6",
+        "821e1f8114f8",
+        "11f9578d05e6",
+        "c23993cb5f7b",
+        "014d364d8aba",
+        "8bef2ebfa56b",
+        "adfddda49404",
+        "8864cc5f7c03"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "serde-json",
+        "from-slice",
+        "sync-response",
+        "ios",
+        "says",
+        "sync",
+        "completed",
+        "but"
+      ]
+    },
+    "memory:memory/2026-04-26.md:80:120": {
+      "key": "memory:memory/2026-04-26.md:80:120",
+      "path": "memory/2026-04-26.md",
+      "startLine": 80,
+      "endLine": 120,
+      "source": "memory",
+      "snippet": "- Desktop newer → update local - Local newer → skip (local wins) - New entry → insert - Added `syncService(_:didDeleteEntry:)` handler that deletes by ID - Full error handling and status updates ### Key Merge Logic ```swift private func mergeEntry(_ desktopEntry: VaultEntry) throws { if entry exists locally { if desktopEntry.modifiedAt >= existingEntry.modifiedAt { // Desktop wins - update local } else { // Local wins - skip } } else { // New entry - insert } } ``` ### Next Steps 1. **Build and test iOS app** - Verify sync works with desktop 2. **Test bidirectional sync** - iOS sends EntryUpdat",
+      "recallCount": 14,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 14,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:09:22.218Z",
+      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "queryHashes": [
+        "ac18bdd41c1c",
+        "f6ab24c815ef",
+        "821e1f8114f8",
+        "11f9578d05e6",
+        "c23993cb5f7b",
+        "4ea69fb367e5",
+        "108eee8d0c4f",
+        "014d364d8aba",
+        "8bef2ebfa56b",
+        "adfddda49404",
+        "8864cc5f7c03"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "desktopentry.modifiedat",
+        "existingentry.modifiedat",
+        "desktop",
+        "newer",
+        "update",
+        "local",
+        "skip",
+        "wins"
+      ]
+    },
+    "memory:memory/2026-04-26.md:1:36": {
+      "key": "memory:memory/2026-04-26.md:1:36",
+      "path": "memory/2026-04-26.md",
+      "startLine": 1,
+      "endLine": 36,
+      "source": "memory",
+      "snippet": "# 2026-04-26 - ClawPass Sync Investigation ## Session Focus Working on ClawPass iOS sync functionality - specifically entry merge logic so entries received from desktop sync are properly merged into the iOS vault. ## Critical Findings ### Root Cause of Broken Sync The desktop TCP sync server has **TWO SEPARATE VAULTS** that are never synchronized: 1. **AppState.vault** (Tauri state) - Populated when vault is unlocked via `unlock_vault` command. Contains actual entries. 2. **sync_tcp's vault** - `Arc<RwLock<Vec<VaultEntry>>>` initialized as empty `Vec::new()` in main.rs. Never gets populated! ```rust // main.rs creates EMPTY separate vault for sync_tcp let vault = Arc::new",
+      "recallCount": 4,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 4,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:09:29.904Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "f6ab24c815ef",
+        "8bef2ebfa56b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "appstate.vault",
+        "unlock-vault",
+        "sync-tcp",
+        "main.rs",
+        "clawpass",
+        "sync",
+        "investigation",
+        "focus"
+      ]
+    },
+    "memory:memory/2026-04-26.md:53:89": {
+      "key": "memory:memory/2026-04-26.md:53:89",
+      "path": "memory/2026-04-26.md",
+      "startLine": 53,
+      "endLine": 89,
+      "source": "memory",
+      "snippet": "- After `unlock_vault`: Copy entries to sync_tcp vault - After `add_entry`, `update_entry`, `delete_entry`: Update sync_tcp vault - sync_tcp needs a reference to AppState's vault lock ### iOS Side (VaultManager.swift) Implement actual merge logic in `syncService(_:didReceiveEntries:)`: - Compare `modifiedAt` timestamps - Add new entries, update existing if desktop is newer - Add delegate method `syncService(_:didDeleteEntry:)` for deletions ## Files Involved - **Desktop main.rs**: Where TCP sync server is initialized with wrong vault - **Desktop sync_tcp.rs**: Has `start_with_state()` that syncs from AppState but isn't called - **iOS VaultManager.swift**: `syncService(_:didRec",
+      "recallCount": 4,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 4,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:09:29.904Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "f6ab24c815ef",
+        "8bef2ebfa56b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "unlock-vault",
+        "sync-tcp",
+        "add-entry",
+        "update-entry",
+        "delete-entry",
+        "vaultmanager.swift",
+        "main.rs",
+        "sync-tcp.rs"
+      ]
+    },
+    "memory:memory/2026-04-08.md:170:202": {
+      "key": "memory:memory/2026-04-08.md:170:202",
+      "path": "memory/2026-04-08.md",
+      "startLine": 170,
+      "endLine": 202,
+      "source": "memory",
+      "snippet": "- evidence: memory/.dreams/session-corpus/2026-04-07.txt:39-39 - recalls: 0 - status: staged - Candidate: Assistant: No executable yet. The build was started but didn't complete. Let me build the Tauri app. Since this may take a while, I'll run it in the background: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:40-40 - recalls: 0 - status: staged - Candidate: Assistant: The build is running. Let me check on it: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:41-41 - recalls: 0 - status: staged - Candidate: Assistant: Ah, PowerShell uses different syntax. Let me fix that: - confidence: 0.00 - ev",
+      "recallCount": 4,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 4,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "821e1f8114f8",
+        "c23993cb5f7b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "39-39",
+        "0.00",
+        "40-40",
+        "41-41",
+        "evidence",
+        "dreams",
+        "corpus",
+        "recalls"
+      ]
+    },
+    "memory:memory/2026-04-08.md:307:333": {
+      "key": "memory:memory/2026-04-08.md:307:333",
+      "path": "memory/2026-04-08.md",
+      "startLine": 307,
+      "endLine": 333,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: Assistant: Now I need to understand why tauri-build is still looking for icons. The issue is that tauri-build has a default icon path. Let me check if there's a way to disable this. Looking at the error, it's coming from `tauri-winres` which is part of tauri-build. Let me try a d - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:67-67 - recalls: 0 - status: staged - Candidate: Assistant: Actually, let me check the tauri-build documentation approach. The real issue is that `embed-resource` is being invoked by `tauri-winres`. Let me look for a simpler workaround — I'll create a proper PNG icon and convert it: - confiden",
+      "recallCount": 4,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 4,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "821e1f8114f8",
+        "c23993cb5f7b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "tauri-build",
+        "tauri-winres",
+        "0.00",
+        "67-67",
+        "embed-resource",
+        "status",
+        "staged",
+        "candidate"
+      ]
+    },
+    "memory:memory/2026-04-08.md:196:219": {
+      "key": "memory:memory/2026-04-08.md:196:219",
+      "path": "memory/2026-04-08.md",
+      "startLine": 196,
+      "endLine": 219,
+      "source": "memory",
+      "snippet": "- recalls: 0 - status: staged - Candidate: Assistant: Still building — it's running the npm build first, then will compile the Rust code. This can take a few minutes. Let me check if it progresses: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:45-45 - recalls: 0 - status: staged - Candidate: Assistant: There's an error — the build is looking for an icon file that doesn't exist. Let me check the icon configuration and fix it: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:46-46 - recalls: 0 - status: staged - Candidate: Assistant: The icons folder doesn't exist. Let me check the tauri.conf.json — I noti",
+      "recallCount": 4,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 4,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "821e1f8114f8",
+        "11f9578d05e6",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "0.00",
+        "45-45",
+        "46-46",
+        "tauri.conf.json",
+        "recalls",
+        "status",
+        "staged",
+        "candidate"
+      ]
+    },
+    "memory:memory/2026-04-08.md:256:287": {
+      "key": "memory:memory/2026-04-08.md:256:287",
+      "path": "memory/2026-04-08.md",
+      "startLine": 256,
+      "endLine": 287,
+      "source": "memory",
+      "snippet": "- recalls: 0 - status: staged - Candidate: Assistant: The icon isn't in the right place. Let me create it there: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:57-57 - recalls: 0 - status: staged - Candidate: Assistant: Now let's try building again: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:58-58 - recalls: 0 - status: staged - Candidate: Assistant: Let me check progress: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:59-59 - recalls: 0 - status: staged - Candidate: Assistant: The icon file I created is in an old format that Windows RC doesn't like. Let me",
+      "recallCount": 3,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 3,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "821e1f8114f8",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "0.00",
+        "57-57",
+        "58-58",
+        "59-59",
+        "recalls",
+        "status",
+        "staged",
+        "candidate"
+      ]
+    },
+    "memory:memory/2026-04-08.md:137:158": {
+      "key": "memory:memory/2026-04-08.md:137:158",
+      "path": "memory/2026-04-08.md",
+      "startLine": 137,
+      "endLine": 158,
+      "source": "memory",
+      "snippet": "- status: staged - Candidate: User: System (untrusted): [2026-04-07 23:12:25 CDT] Exec completed (briny-ri, code 0) :: kimi-k2.5:cloud │ 21k/128k (17%) │ └───────────────────────────────────────────────────────────────┴────────┴──────────┴─────────────────┴────────────────┘ FAQ: https://docs.openc… Read HEART - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:32-32 - recalls: 0 - status: staged - Candidate: User: Sender (untrusted metadata): ```json { \"label\": \"openclaw-tui\", \"id\": \"openclaw-tui\", \"name\": \"openclaw-tui\", \"username\": \"openclaw-tui\" } ``` [Tue 2026-04-07 23:17 CDT] Got it, thanks! So - there is a project I'd like to get operational at C",
+      "recallCount": 3,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 3,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "821e1f8114f8",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "briny-ri",
+        "kimi-k2.5",
+        "21k/128k",
+        "docs.openc",
+        "0.00",
+        "32-32",
+        "openclaw-tui",
+        "status"
+      ]
+    },
+    "memory:memory/2026-04-08.md:234:264": {
+      "key": "memory:memory/2026-04-08.md:234:264",
+      "path": "memory/2026-04-08.md",
+      "startLine": 234,
+      "endLine": 264,
+      "source": "memory",
+      "snippet": "- confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:52-52 - recalls: 0 - status: staged - Candidate: Assistant: Still building. Let me wait a bit longer for the Rust compilation: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:53-53 - recalls: 0 - status: staged - Candidate: Assistant: Still looking for icons in the wrong place. The tauri.conf.json expects icons at `icons/icon.ico` but it's looking relative to the src-tauri folder. Let me check where it actually expects them: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:54-54 - recalls: 0 - status: staged - Candidate: Assi",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:13.931Z",
+      "lastRecalledAt": "2026-05-06T08:14:13.931Z",
+      "queryHashes": [
+        "821e1f8114f8"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "0.00",
+        "52-52",
+        "53-53",
+        "tauri.conf.json",
+        "icons/icon.ico",
+        "src-tauri",
+        "54-54",
+        "confidence"
+      ]
+    },
+    "memory:memory/2026-04-09.md:330:354": {
+      "key": "memory:memory/2026-04-09.md:330:354",
+      "path": "memory/2026-04-09.md",
+      "startLine": 330,
+      "endLine": 354,
+      "source": "memory",
+      "snippet": "- evidence: memory/.dreams/session-corpus/2026-04-08.txt:68-68 - recalls: 0 - status: staged - Candidate: Assistant: I see the issue — the frontend is still sending the old format with `encrypted_password` as bytes, but the backend now expects plaintext `password` and `notes` fields. Let me fix thefrontend: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:69-69 - recalls: 0 - status: staged - Candidate: Assistant: Now let me add better error logging to see what's happening: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-08.txt:70-70 - recalls: 0 - status: staged - Candidate: Assistant: The frontend is updated",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T08:14:18.632Z",
+      "lastRecalledAt": "2026-05-06T08:14:18.632Z",
+      "queryHashes": [
+        "11f9578d05e6"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "68-68",
+        "encrypted-password",
+        "0.00",
+        "69-69",
+        "70-70",
+        "evidence",
+        "dreams",
+        "corpus"
+      ]
+    },
+    "memory:memory/2026-05-05.md:1:13": {
+      "key": "memory:memory/2026-05-05.md:1:13",
+      "path": "memory/2026-05-05.md",
+      "startLine": 1,
+      "endLine": 13,
+      "source": "memory",
+      "snippet": "# Project: OpenClaw Control Center (Completed) - Created a native C# Windows Forms application (`ControlCenter_v3.exe`) to manage `openclaw.json`. - Implemented \"Atomic Save\" using `System.Text.Json.Nodes` to prevent JSON corruption. - Features: Primary model selection, API key management (Nvidia/Ollama/Bot), Gateway control (Restart/Stop), and advanced toggles. - Location: `C:\\Users\\Reno\\.openclaw\\workspace\\ControlCenter_v3\\publish\\ControlCenter_v3.exe` # Project: ClawPass (Pending/Next) - Current Status: - Desktop (Tauri/Rust): Mostly working, but needs testing on Edit/Delete and functional Import/Export. - iOS (Swift): Pushed to GitHub, syncing via local TCP. - Goal: R",
+      "recallCount": 5,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 5,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T14:11:46.755Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "c23993cb5f7b",
+        "108eee8d0c4f",
+        "8bef2ebfa56b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "gateway",
+        "controlcenter-v3.exe",
+        "openclaw.json",
+        "system.text.json.nodes",
+        "nvidia/ollama/bot",
+        "restart/stop",
+        "controlcenter-v3",
+        "pending/next"
+      ]
+    },
+    "memory:memory/2026-04-08.md:50:72": {
+      "key": "memory:memory/2026-04-08.md:50:72",
+      "path": "memory/2026-04-08.md",
+      "startLine": 50,
+      "endLine": 72,
+      "source": "memory",
+      "snippet": "- evidence: memory/.dreams/session-corpus/2026-04-07.txt:12-12 - recalls: 0 - status: staged - Candidate: Assistant: Let me check the OpenClaw docs directory structure and find where config lives: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:13-13 - recalls: 0 - status: staged - Candidate: Assistant: There's the config! Let me look at `openclaw.json` and the `models.json` file: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:14-14 - recalls: 0 - status: staged - Candidate: Assistant: Perfect! I can see your current setup. Ollama is your only provider right now. To add Nvidia as a fallback without br",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T14:38:54.697Z",
+      "lastRecalledAt": "2026-05-06T14:38:54.697Z",
+      "queryHashes": [
+        "8bef2ebfa56b"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "12-12",
+        "0.00",
+        "13-13",
+        "openclaw.json",
+        "models.json",
+        "14-14",
+        "evidence",
+        "dreams"
+      ]
+    },
+    "memory:memory/2026-04-26.md:25:59": {
+      "key": "memory:memory/2026-04-26.md:25:59",
+      "path": "memory/2026-04-26.md",
+      "startLine": 25,
+      "endLine": 59,
+      "source": "memory",
+      "snippet": "- BUT main.rs uses `start()` instead of `start_with_state()` - The functionality exists but isn't being used! ### iOS Issues (VaultManager.swift) - `syncService(_:didReceiveEntries:)` only **logs** received entries, doesn't merge them - No delegate method for `EntryDelete` - protocol doesn't have `didDeleteEntry` - No timestamp-based conflict resolution ## Fix Plan ### Desktop Side (main.rs) Change: ```rust let vault = Arc::new(RwLock::new(Vec::<VaultEntry>::new())); let vault_clone = vault.clone(); sync_tcp::TcpSyncServer::start(vault_clone, 7878) ``` To: ```rust let vault = Arc::new(RwLock::new(Vec::<VaultEntry>::new())); let vault_clone = vault.clone(); let app_stat",
+      "recallCount": 3,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 3,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-05-06T14:38:54.697Z",
+      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "queryHashes": [
+        "8bef2ebfa56b",
+        "adfddda49404"
+      ],
+      "recallDays": [
+        "2026-05-06"
+      ],
+      "conceptTags": [
+        "main.rs",
+        "start-with-state",
+        "vaultmanager.swift",
+        "timestamp-based",
+        "vault-clone",
+        "vault.clone",
+        "sync-tcp",
+        "app-stat"
       ]
     }
   }
