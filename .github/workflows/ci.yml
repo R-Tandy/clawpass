@@ -35,7 +35,7 @@ jobs:
       - name: Create IPA structure
         run: |
           mkdir -p ipa
-          cp -R ./build/Release-iphoneos/*.app ipa/ || true
+          cp -R .build/Release-iphoneos/*.app ipa/ || true
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
