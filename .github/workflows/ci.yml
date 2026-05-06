@@ -7,31 +7,6 @@ on:
     branches: [master]
 
 jobs:
-  desktop:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ClawPass/desktop
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build Vue app
-        run: npm run build
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli
-      - name: Build Tauri desktop app
-        run: npm run tauri build
 
   ios:
     runs-on: macos-latest
