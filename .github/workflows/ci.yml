@@ -30,7 +30,7 @@ jobs:
         run: |
           xcodebuild -scheme ClawPass \
             -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=iOS Simulator,name=iPhone 12,OS=latest' \
             -configuration Release clean build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
