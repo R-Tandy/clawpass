@@ -1,1 +1,49 @@
+name: CI Build
 
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ClawPass/ios
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Use the runner’s default Xcode (currently Xcode 15.x) – no version spec needed.
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+
+      # Show the actual Xcode version – useful for debugging.
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # Build the iOS app.
+      # • Removes the `swift build` line (it tries to build for macOS by default).  
+      # • Targets the iOS SDK explicitly and tells Xcode to use a generic iOS device destination.  
+      # • This avoids any macOS‑only API (like `@State` on macOS) from being compiled.
+      - name: Build iOS app
+        run: |
+          xcodebuild -scheme ClawPass \
+                    -sdk iphoneos \
+                    -destination 'generic/platform=iOS' \
+                    -configuration Release clean build
+
+      # Package the resulting .app into an “IPA‑style” folder so you can download it from the Actions UI.
+      - name: Create IPA structure
+        run: |
+          mkdir -p ipa
+          cp -R .build/Release-iphoneos/*.app ipa/ || true
+
+      # Upload the artifact for later download.
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: ipa
