@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 jobs:
   ios:
@@ -22,11 +23,14 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: List available iOS simulators
+        run: xcrun simctl list devices available
+
       - name: Build iOS app (simulator, unsigned)
         run: |
           xcodebuild -scheme ClawPass \
             -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=iOS Simulator,name=iPhone 14,OS=latest' \
             -configuration Release clean build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
