@@ -26,7 +26,7 @@ jobs:
       - name: List available iOS simulators
         run: xcrun simctl list devices available
 
-      -name: Build iOS app (simulator, unsigned)
+      - name: Build iOS app (simulator, unsigned)
         run: |
           xcodebuild -scheme ClawPass \
             -sdk iphonesimulator \
