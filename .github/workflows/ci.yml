@@ -26,19 +26,35 @@ jobs:
       - name: List available iOS simulators
         run: xcrun simctl list devices available
 
-      - name: Build iOS app (simulator, unsigned)
+      - name: Build iOS app (device, unsigned)
         run: |
           xcodebuild -scheme ClawPass \
-            -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 12,OS=16.0' \
-            -configuration Release clean build \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $PWD/build/ClawPass.xcarchive \
+            archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      - name: Create IPA structure
+      - name: Create ExportOptions.plist
         run: |
-          mkdir -p ipa
-          cp -R .build/Release-iphonesimulator/*.app ipa/ || true
+          cat > ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export IPA from archive
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/ClawPass.xcarchive \
+            -exportPath $PWD/ipa \
+            -exportOptionsPlist $PWD/ExportOptions.plist
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
