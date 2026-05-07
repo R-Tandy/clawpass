@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-06T16:00:13.010Z",
+  "updatedAt": "2026-05-07T13:26:25.253Z",
   "entries": {
     "memory:memory/.dreams/session-corpus/2026-04-07.txt:1:1": {
       "key": "memory:memory/.dreams/session-corpus/2026-04-07.txt:1:1",
@@ -7692,13 +7692,13 @@
       "endLine": 32,
       "source": "memory",
       "snippet": "# ClawPass Session Summary - April 13, 2026 ## Completed ✅ ### iOS App - Successfully pushed clean iOS-only repo to GitHub: https://github.com/R-Tandy/clawpass - Repo now on `main` branch with just Swift files (no desktop code) - Fixed GitHub Actions workflow (removed hardcoded Xcode path, uses default) - iOS app structure is complete and ready for build ### Desktop App - Fixed `VaultEntry` - added `Debug` derive trait to fix sync_tcp.rs compile error - Fixed password generator showing `[object Promise]` bug - Removed `target/` from git tracking (still has history issues for push) ## Still Pending 🔧 ### iOS GitHub Actions - Workflow is now pushing to GitHub with corre",
-      "recallCount": 20,
+      "recallCount": 24,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 19.34824791654524,
+      "totalScore": 23.34824791654524,
       "maxScore": 1,
       "firstRecalledAt": "2026-04-21T05:59:16.515Z",
-      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "lastRecalledAt": "2026-05-07T13:26:25.253Z",
       "queryHashes": [
         "c914a3293e0f",
         "1a3cc129ab54",
@@ -7716,12 +7716,15 @@
         "014d364d8aba",
         "8bef2ebfa56b",
         "adfddda49404",
-        "8864cc5f7c03"
+        "8864cc5f7c03",
+        "80754af91bfb",
+        "25a1ffb00a67"
       ],
       "recallDays": [
         "2026-04-21",
         "2026-05-05",
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "ios-only",
@@ -8170,13 +8173,13 @@
       "endLine": 37,
       "source": "memory",
       "snippet": "# 2026-04-27 ## ClawPass Sync Investigation ### Desktop rebuild (12:15-12:23 CDT) - Rewrote `sync_tcp.rs` with proper error logging - Added JSON parse error logging: `[SyncServer] JSON parse error: {e} | bytes: {raw}` - Changed log level to INFO for raw bytes visibility - Desktop app restarted multiple times — running fresh build ### Last sync attempt (12:17-12:18) - iOS connected from 192.168.4.60:54202 at 17:18:05 - Desktop read error: 10054 (forcibly closed by remote) - NO \"Received raw bytes\" log → desktop app wasn't rebuilt yet when this happened ### Current state - Desktop: fresh build with debug logging, running since ~17:23 CDT - iOS: old build (before `b112e54`",
-      "recallCount": 16,
+      "recallCount": 21,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 16,
+      "totalScore": 21,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-04T13:43:46.550Z",
-      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "lastRecalledAt": "2026-05-07T13:26:25.253Z",
       "queryHashes": [
         "34691b3c1096",
         "ac18bdd41c1c",
@@ -8190,11 +8193,15 @@
         "014d364d8aba",
         "8bef2ebfa56b",
         "adfddda49404",
-        "8864cc5f7c03"
+        "8864cc5f7c03",
+        "3c4530a2d718",
+        "80754af91bfb",
+        "25a1ffb00a67"
       ],
       "recallDays": [
         "2026-05-04",
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "15-12",
@@ -8214,13 +8221,13 @@
       "endLine": 28,
       "source": "memory",
       "snippet": "# 2026-04-28 - Daily Memory ## Desktop App Issues (reported ~01:21 CDT) - **Categories messed up** - desktop Vue app categories not displaying correctly - **Favorites not showing in list** - favorites filter not working properly ## Desktop VaultView.vue Architecture (from context) - Sidebar: \"All Items\" (no selectedCategory), \"Favorites\" (selectedCategory = 'favorites'), then user categories - Entry list: `v-for=\"entry in vault.filteredEntries\"` with `:class=\"{ favorite: entry.is_favorite }\"` - `filteredEntries` computed property filters by `selectedCategory` - if 'favorites', shows only `entry.is_favorite` entries - Categories stored in `vault.categories` array with `{ id, name,",
-      "recallCount": 11,
+      "recallCount": 13,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 11,
+      "totalScore": 13,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-05T13:45:57.440Z",
-      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "lastRecalledAt": "2026-05-07T05:33:43.323Z",
       "queryHashes": [
         "ecc3c8e1a1d6",
         "ac18bdd41c1c",
@@ -8233,7 +8240,8 @@
       ],
       "recallDays": [
         "2026-05-05",
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "vaultview.vue",
@@ -8286,13 +8294,13 @@
       "endLine": 54,
       "source": "memory",
       "snippet": "### iOS says \"sync completed\" but desktop vault unchanged - Suggests iOS got a response it accepted (maybe old `FullSync` type string matching?) - But desktop's `serde_json::from_slice` failed silently (no `else` clause) - FIX: added explicit error logging ### Protocol status - Desktop sends: `{\"type\":\"sync_response\",\"entries\":[...],\"timestamp\":...}` - iOS expects: `{\"type\":\"sync_response\",\"entries\":[...],\"timestamp\":...}` (same) - But old desktop build was sending `type:\"FullSync\"` with `#[serde(tag)]` internal format - New build uses `#[serde(rename = \"sync_response\")]` — should be correct ### Console popup windows - NOT from app's `println!` — all replaced with `tracing!` -",
-      "recallCount": 13,
+      "recallCount": 16,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 13,
+      "totalScore": 16,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T08:09:22.218Z",
-      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "lastRecalledAt": "2026-05-07T13:16:04.866Z",
       "queryHashes": [
         "ac18bdd41c1c",
         "f6ab24c815ef",
@@ -8303,10 +8311,12 @@
         "014d364d8aba",
         "8bef2ebfa56b",
         "adfddda49404",
-        "8864cc5f7c03"
+        "8864cc5f7c03",
+        "80754af91bfb"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "serde-json",
@@ -8326,13 +8336,13 @@
       "endLine": 120,
       "source": "memory",
       "snippet": "- Desktop newer → update local - Local newer → skip (local wins) - New entry → insert - Added `syncService(_:didDeleteEntry:)` handler that deletes by ID - Full error handling and status updates ### Key Merge Logic ```swift private func mergeEntry(_ desktopEntry: VaultEntry) throws { if entry exists locally { if desktopEntry.modifiedAt >= existingEntry.modifiedAt { // Desktop wins - update local } else { // Local wins - skip } } else { // New entry - insert } } ``` ### Next Steps 1. **Build and test iOS app** - Verify sync works with desktop 2. **Test bidirectional sync** - iOS sends EntryUpdat",
-      "recallCount": 14,
+      "recallCount": 19,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 14,
+      "totalScore": 19,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T08:09:22.218Z",
-      "lastRecalledAt": "2026-05-06T16:00:04.228Z",
+      "lastRecalledAt": "2026-05-07T13:26:25.253Z",
       "queryHashes": [
         "ac18bdd41c1c",
         "f6ab24c815ef",
@@ -8344,10 +8354,14 @@
         "014d364d8aba",
         "8bef2ebfa56b",
         "adfddda49404",
-        "8864cc5f7c03"
+        "8864cc5f7c03",
+        "66b5b878eb62",
+        "a3b9a1e94c3f",
+        "25a1ffb00a67"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "desktopentry.modifiedat",
@@ -8433,20 +8447,23 @@
       "endLine": 202,
       "source": "memory",
       "snippet": "- evidence: memory/.dreams/session-corpus/2026-04-07.txt:39-39 - recalls: 0 - status: staged - Candidate: Assistant: No executable yet. The build was started but didn't complete. Let me build the Tauri app. Since this may take a while, I'll run it in the background: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:40-40 - recalls: 0 - status: staged - Candidate: Assistant: The build is running. Let me check on it: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:41-41 - recalls: 0 - status: staged - Candidate: Assistant: Ah, PowerShell uses different syntax. Let me fix that: - confidence: 0.00 - ev",
-      "recallCount": 4,
+      "recallCount": 6,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 4,
+      "totalScore": 6,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T08:14:13.931Z",
-      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "lastRecalledAt": "2026-05-07T13:16:04.866Z",
       "queryHashes": [
         "821e1f8114f8",
         "c23993cb5f7b",
-        "adfddda49404"
+        "adfddda49404",
+        "3c4530a2d718",
+        "80754af91bfb"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "39-39",
@@ -8466,20 +8483,23 @@
       "endLine": 333,
       "source": "memory",
       "snippet": "- status: staged - Candidate: Assistant: Now I need to understand why tauri-build is still looking for icons. The issue is that tauri-build has a default icon path. Let me check if there's a way to disable this. Looking at the error, it's coming from `tauri-winres` which is part of tauri-build. Let me try a d - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:67-67 - recalls: 0 - status: staged - Candidate: Assistant: Actually, let me check the tauri-build documentation approach. The real issue is that `embed-resource` is being invoked by `tauri-winres`. Let me look for a simpler workaround — I'll create a proper PNG icon and convert it: - confiden",
-      "recallCount": 4,
+      "recallCount": 6,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 4,
+      "totalScore": 6,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T08:14:13.931Z",
-      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "lastRecalledAt": "2026-05-07T13:16:04.866Z",
       "queryHashes": [
         "821e1f8114f8",
         "c23993cb5f7b",
-        "adfddda49404"
+        "adfddda49404",
+        "3c4530a2d718",
+        "80754af91bfb"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "tauri-build",
@@ -8499,20 +8519,22 @@
       "endLine": 219,
       "source": "memory",
       "snippet": "- recalls: 0 - status: staged - Candidate: Assistant: Still building — it's running the npm build first, then will compile the Rust code. This can take a few minutes. Let me check if it progresses: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:45-45 - recalls: 0 - status: staged - Candidate: Assistant: There's an error — the build is looking for an icon file that doesn't exist. Let me check the icon configuration and fix it: - confidence: 0.00 - evidence: memory/.dreams/session-corpus/2026-04-07.txt:46-46 - recalls: 0 - status: staged - Candidate: Assistant: The icons folder doesn't exist. Let me check the tauri.conf.json — I noti",
-      "recallCount": 4,
+      "recallCount": 5,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 4,
+      "totalScore": 5,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T08:14:13.931Z",
-      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "lastRecalledAt": "2026-05-07T13:16:04.866Z",
       "queryHashes": [
         "821e1f8114f8",
         "11f9578d05e6",
-        "adfddda49404"
+        "adfddda49404",
+        "80754af91bfb"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "0.00",
@@ -8658,21 +8680,23 @@
       "endLine": 13,
       "source": "memory",
       "snippet": "# Project: OpenClaw Control Center (Completed) - Created a native C# Windows Forms application (`ControlCenter_v3.exe`) to manage `openclaw.json`. - Implemented \"Atomic Save\" using `System.Text.Json.Nodes` to prevent JSON corruption. - Features: Primary model selection, API key management (Nvidia/Ollama/Bot), Gateway control (Restart/Stop), and advanced toggles. - Location: `C:\\Users\\Reno\\.openclaw\\workspace\\ControlCenter_v3\\publish\\ControlCenter_v3.exe` # Project: ClawPass (Pending/Next) - Current Status: - Desktop (Tauri/Rust): Mostly working, but needs testing on Edit/Delete and functional Import/Export. - iOS (Swift): Pushed to GitHub, syncing via local TCP. - Goal: R",
-      "recallCount": 5,
+      "recallCount": 6,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 5,
+      "totalScore": 6,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-06T14:11:46.755Z",
-      "lastRecalledAt": "2026-05-06T15:59:57.734Z",
+      "lastRecalledAt": "2026-05-07T13:26:25.253Z",
       "queryHashes": [
         "c23993cb5f7b",
         "108eee8d0c4f",
         "8bef2ebfa56b",
-        "adfddda49404"
+        "adfddda49404",
+        "25a1ffb00a67"
       ],
       "recallDays": [
-        "2026-05-06"
+        "2026-05-06",
+        "2026-05-07"
       ],
       "conceptTags": [
         "gateway",
