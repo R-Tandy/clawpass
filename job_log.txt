@@ -1,0 +1,473 @@
+﻿2026-05-07T13:36:32.9035130Z Current runner version: '2.334.0'
+2026-05-07T13:36:32.9049640Z ##[group]Runner Image Provisioner
+2026-05-07T13:36:32.9050090Z Hosted Compute Agent
+2026-05-07T13:36:32.9050430Z Version: 20260422.526
+2026-05-07T13:36:32.9050800Z Commit: e1a9e573f4d0838b3a7c1b07401aeb29ed3635a9
+2026-05-07T13:36:32.9051210Z Build Date: 2026-04-22T09:31:31Z
+2026-05-07T13:36:32.9051600Z Worker ID: {365034a0-f3ec-4991-aae4-8587536a895d}
+2026-05-07T13:36:32.9052020Z Azure Region: westus
+2026-05-07T13:36:32.9052340Z ##[endgroup]
+2026-05-07T13:36:32.9053140Z ##[group]Operating System
+2026-05-07T13:36:32.9053480Z macOS
+2026-05-07T13:36:32.9053750Z 15.7.4
+2026-05-07T13:36:32.9054020Z 24G517
+2026-05-07T13:36:32.9054290Z ##[endgroup]
+2026-05-07T13:36:32.9054580Z ##[group]Runner Image
+2026-05-07T13:36:32.9054910Z Image: macos-15-arm64
+2026-05-07T13:36:32.9055220Z Version: 20260427.0018.1
+2026-05-07T13:36:32.9055970Z Included Software: https://github.com/actions/runner-images/blob/macos-15-arm64/20260427.0018/images/macos/macos-15-arm64-Readme.md
+2026-05-07T13:36:32.9056920Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-15-arm64%2F20260427.0018
+2026-05-07T13:36:32.9057500Z ##[endgroup]
+2026-05-07T13:36:32.9058170Z ##[group]GITHUB_TOKEN Permissions
+2026-05-07T13:36:32.9059280Z Contents: read
+2026-05-07T13:36:32.9059580Z Metadata: read
+2026-05-07T13:36:32.9059870Z Packages: read
+2026-05-07T13:36:32.9060160Z ##[endgroup]
+2026-05-07T13:36:32.9061510Z Secret source: Actions
+2026-05-07T13:36:32.9061880Z Prepare workflow directory
+2026-05-07T13:36:32.9317370Z Prepare all required actions
+2026-05-07T13:36:32.9345710Z Getting action download info
+2026-05-07T13:36:33.1618370Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-05-07T13:36:33.6452660Z Download action repository 'maxim-lobanov/setup-xcode@v1' (SHA:ed7a3b1fda3918c0306d1b724322adc0b8cc0a90)
+2026-05-07T13:36:34.5127940Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-05-07T13:36:34.7555420Z Complete job name: ios
+2026-05-07T13:36:34.7962730Z ##[group]Run actions/checkout@v4
+2026-05-07T13:36:34.7963220Z with:
+2026-05-07T13:36:34.7963490Z   repository: R-Tandy/clawpass
+2026-05-07T13:36:34.7963920Z   token: ***
+2026-05-07T13:36:34.7964170Z   ssh-strict: true
+2026-05-07T13:36:34.7964440Z   ssh-user: git
+2026-05-07T13:36:34.7964710Z   persist-credentials: true
+2026-05-07T13:36:34.7965010Z   clean: true
+2026-05-07T13:36:34.7965290Z   sparse-checkout-cone-mode: true
+2026-05-07T13:36:34.7965610Z   fetch-depth: 1
+2026-05-07T13:36:34.7965880Z   fetch-tags: false
+2026-05-07T13:36:34.7966150Z   show-progress: true
+2026-05-07T13:36:34.7966420Z   lfs: false
+2026-05-07T13:36:34.7966670Z   submodules: false
+2026-05-07T13:36:34.7966950Z   set-safe-directory: true
+2026-05-07T13:36:34.7967340Z ##[endgroup]
+2026-05-07T13:36:35.2277220Z Syncing repository: R-Tandy/clawpass
+2026-05-07T13:36:35.2278580Z ##[group]Getting Git version info
+2026-05-07T13:36:35.2279060Z Working directory is '/Users/runner/work/clawpass/clawpass'
+2026-05-07T13:36:35.2279890Z [command]/opt/homebrew/bin/git version
+2026-05-07T13:36:35.2707110Z git version 2.54.0
+2026-05-07T13:36:35.2736960Z ##[endgroup]
+2026-05-07T13:36:35.2746550Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/c5ba239c-a1f8-4499-a48c-783f584d8d26/.gitconfig'
+2026-05-07T13:36:35.2756020Z Temporarily overriding HOME='/Users/runner/work/_temp/c5ba239c-a1f8-4499-a48c-783f584d8d26' before making global git config changes
+2026-05-07T13:36:35.2758790Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-07T13:36:35.2767100Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/clawpass/clawpass
+2026-05-07T13:36:35.2889440Z Deleting the contents of '/Users/runner/work/clawpass/clawpass'
+2026-05-07T13:36:35.2894760Z ##[group]Initializing the repository
+2026-05-07T13:36:35.2897290Z [command]/opt/homebrew/bin/git init /Users/runner/work/clawpass/clawpass
+2026-05-07T13:36:35.3111950Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-05-07T13:36:35.3113040Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-05-07T13:36:35.3113700Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-05-07T13:36:35.3114230Z hint: call:
+2026-05-07T13:36:35.3114530Z hint:
+2026-05-07T13:36:35.3114890Z hint: 	git config --global init.defaultBranch <name>
+2026-05-07T13:36:35.3115310Z hint:
+2026-05-07T13:36:35.3115720Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-05-07T13:36:35.3116360Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-05-07T13:36:35.3116880Z hint:
+2026-05-07T13:36:35.3117160Z hint: 	git branch -m <name>
+2026-05-07T13:36:35.3117490Z hint:
+2026-05-07T13:36:35.3117910Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-05-07T13:36:35.3118640Z Initialized empty Git repository in /Users/runner/work/clawpass/clawpass/.git/
+2026-05-07T13:36:35.3120110Z [command]/opt/homebrew/bin/git remote add origin https://github.com/R-Tandy/clawpass
+2026-05-07T13:36:35.3248600Z ##[endgroup]
+2026-05-07T13:36:35.3250510Z ##[group]Disabling automatic garbage collection
+2026-05-07T13:36:35.3252080Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-05-07T13:36:35.3323940Z ##[endgroup]
+2026-05-07T13:36:35.3324620Z ##[group]Setting up auth
+2026-05-07T13:36:35.3325650Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-07T13:36:35.3393410Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-07T13:36:35.4460300Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-07T13:36:35.4518820Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-07T13:36:35.5404980Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-07T13:36:35.5483710Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-07T13:36:35.6551670Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-05-07T13:36:35.6632030Z ##[endgroup]
+2026-05-07T13:36:35.6633470Z ##[group]Fetching the repository
+2026-05-07T13:36:35.6637840Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +7c4c869fca10d79b587a644470740475a780c176:refs/remotes/origin/master
+2026-05-07T13:36:36.5510990Z From https://github.com/R-Tandy/clawpass
+2026-05-07T13:36:36.5514700Z  * [new ref]         7c4c869fca10d79b587a644470740475a780c176 -> origin/master
+2026-05-07T13:36:36.5602560Z ##[endgroup]
+2026-05-07T13:36:36.5603320Z ##[group]Determining the checkout info
+2026-05-07T13:36:36.5604110Z ##[endgroup]
+2026-05-07T13:36:36.5604600Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-05-07T13:36:36.5675560Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-05-07T13:36:36.5734530Z ##[group]Checking out the ref
+2026-05-07T13:36:36.5736410Z [command]/opt/homebrew/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-05-07T13:36:36.5976180Z Reset branch 'master'
+2026-05-07T13:36:36.6083220Z branch 'master' set up to track 'origin/master'.
+2026-05-07T13:36:36.6361700Z ##[endgroup]
+2026-05-07T13:36:36.6364930Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-05-07T13:36:36.6365930Z 7c4c869fca10d79b587a644470740475a780c176
+2026-05-07T13:36:36.6603040Z ##[group]Run maxim-lobanov/setup-xcode@v1
+2026-05-07T13:36:36.6603950Z with:
+2026-05-07T13:36:36.6604850Z   xcode-version: latest
+2026-05-07T13:36:36.6605720Z ##[endgroup]
+2026-05-07T13:36:36.9519940Z Switching Xcode to version 'latest'...
+2026-05-07T13:36:37.0532850Z Xcode is set to 26.3.0 (17C529)
+2026-05-07T13:36:37.0683270Z ##[group]Run xcodebuild -version
+2026-05-07T13:36:37.0683940Z [36;1mxcodebuild -version[0m
+2026-05-07T13:36:37.0869670Z shell: /bin/bash -e {0}
+2026-05-07T13:36:37.0870100Z env:
+2026-05-07T13:36:37.0870460Z   MD_APPLE_SDK_ROOT: /Applications/Xcode_26.3.app
+2026-05-07T13:36:37.0870870Z ##[endgroup]
+2026-05-07T13:36:40.0043170Z Xcode 26.3
+2026-05-07T13:36:40.0044760Z Build version 17C529
+2026-05-07T13:36:40.0098230Z ##[group]Run xcrun simctl list devices available
+2026-05-07T13:36:40.0098690Z [36;1mxcrun simctl list devices available[0m
+2026-05-07T13:36:40.0134670Z shell: /bin/bash -e {0}
+2026-05-07T13:36:40.0134930Z env:
+2026-05-07T13:36:40.0135190Z   MD_APPLE_SDK_ROOT: /Applications/Xcode_26.3.app
+2026-05-07T13:36:40.0135440Z ##[endgroup]
+2026-05-07T13:36:57.3756290Z == Devices ==
+2026-05-07T13:36:57.3765420Z -- iOS 18.5 --
+2026-05-07T13:36:57.3767010Z     iPhone 16 Pro (54EB901A-0CBC-49BA-A9D4-EFB6A88ABEBE) (Shutdown) 
+2026-05-07T13:36:57.3767930Z     iPhone 16 Pro Max (F301093B-DA36-4DA1-95A3-4D609641C066) (Shutdown) 
+2026-05-07T13:36:57.3768870Z     iPhone 16e (B5E09CD2-CC8C-4DC4-B50F-7C3B103B7458) (Shutdown) 
+2026-05-07T13:36:57.3769560Z     iPhone 16 (B54345BC-8476-4205-AC17-3045FEBF52F7) (Shutdown) 
+2026-05-07T13:36:57.3770270Z     iPhone 16 Plus (0081902C-B5A7-4B68-B499-F7CFF4CFAF4E) (Shutdown) 
+2026-05-07T13:36:57.3771280Z     iPhone SE (3rd generation) (8A6C256F-4F32-49B0-A115-9B88BAB62ACB) (Shutdown) 
+2026-05-07T13:36:57.3771920Z     iPad Pro 11-inch (M4) (E0B73613-5AB3-436C-A024-6823FC26C412) (Shutdown) 
+2026-05-07T13:36:57.3772720Z     iPad Pro 13-inch (M4) (0BCF6AF3-9BE1-450A-A4F7-B5949A140F28) (Shutdown) 
+2026-05-07T13:36:57.3773230Z     iPad mini (A17 Pro) (AAD6D5F6-BDDA-4755-9B80-6D30C9EFE2C3) (Shutdown) 
+2026-05-07T13:36:57.3773860Z     iPad (A16) (43ED46F6-2D89-476A-ABB0-D2F52D9C7FCC) (Shutdown) 
+2026-05-07T13:36:57.3774700Z     iPad Air 13-inch (M3) (F8AA84E7-1E0E-4CA5-ABB8-0F06EAA3AE2F) (Shutdown) 
+2026-05-07T13:36:57.3775320Z     iPad Air 11-inch (M3) (76BE396E-2D2E-4C93-9EC5-447BEC8EE53B) (Shutdown) 
+2026-05-07T13:36:57.3775970Z     iPad Air 11-inch (M2) (59F74A77-97D8-4AE8-B9BE-0178EA1167F1) (Shutdown) 
+2026-05-07T13:36:57.3776790Z     iPad Air 13-inch (M2) (DC300854-D9F0-45AD-AEDB-994990A762FD) (Shutdown) 
+2026-05-07T13:36:57.3777370Z     iPad (10th generation) (1B32F2AC-168E-43A0-BFFC-65CB97D745BB) (Shutdown) 
+2026-05-07T13:36:57.3777980Z -- iOS 18.6 --
+2026-05-07T13:36:57.3778810Z     iPhone 16 Pro (B6925D84-723C-4966-9F12-5570B9217301) (Shutdown) 
+2026-05-07T13:36:57.3779560Z     iPhone 16 Pro Max (F5DFD3B0-6BD3-46BF-8C1B-E9B272A96F78) (Shutdown) 
+2026-05-07T13:36:57.3782500Z     iPhone 16e (E30FC7A6-1092-45CA-8C0B-8B1866B4A3BA) (Shutdown) 
+2026-05-07T13:36:57.3783040Z     iPhone 16 (4CAE0F50-248B-4738-A684-2B454F8B1323) (Shutdown) 
+2026-05-07T13:36:57.3783600Z     iPhone 16 Plus (7A1A3487-CB4D-4B98-92BD-88274D775D30) (Shutdown) 
+2026-05-07T13:36:57.3784150Z     iPhone SE (3rd generation) (A3C00C27-0E60-47C3-9A63-5D32AC7BCF57) (Shutdown) 
+2026-05-07T13:36:57.3784850Z     iPad Pro 11-inch (M4) (A0CCC457-B9E9-4832-9A79-BC952DD26427) (Shutdown) 
+2026-05-07T13:36:57.3785440Z     iPad Pro 13-inch (M4) (2E018329-3D51-4E70-8110-AD440B6C3609) (Shutdown) 
+2026-05-07T13:36:57.3785970Z     iPad mini (A17 Pro) (C882CB3B-42B0-4B51-A06C-257C3093E8B6) (Shutdown) 
+2026-05-07T13:36:57.3786830Z     iPad (A16) (0576E406-9608-4701-80AF-15C4504DAB94) (Shutdown) 
+2026-05-07T13:36:57.3787430Z     iPad Air 13-inch (M3) (6DC96F3C-B987-4C35-B563-0D9E09800E82) (Shutdown) 
+2026-05-07T13:36:57.3788210Z     iPad Air 11-inch (M3) (AD3C1548-D2F2-42A9-B162-7FE654FE8D81) (Shutdown) 
+2026-05-07T13:36:57.3788810Z     iPad Air 11-inch (M2) (2BAFD9B3-02EE-42D9-B0FD-DB39E263C8AB) (Shutdown) 
+2026-05-07T13:36:57.3789460Z     iPad Air 13-inch (M2) (0683CC77-AF13-4CC0-BEF7-DD0AAEB2A618) (Shutdown) 
+2026-05-07T13:36:57.3798750Z     iPad (10th generation) (7B94520C-ED22-4F17-B926-A7CF80F3BE20) (Shutdown) 
+2026-05-07T13:36:57.3799120Z -- iOS 26.0 --
+2026-05-07T13:36:57.3799420Z     iPhone 17 Pro (4F6BE3D2-E659-4A8A-B9BA-1FADDCFAF8EA) (Shutdown) 
+2026-05-07T13:36:57.3799840Z     iPhone 17 Pro Max (BB5CBB6B-D4AA-4EDD-A41C-C95B3CFA9A9E) (Shutdown) 
+2026-05-07T13:36:57.3800320Z     iPhone Air (112E13E3-F2D4-4ADD-B2C9-C08372815839) (Shutdown) 
+2026-05-07T13:36:57.3800690Z     iPhone 17 (D702A391-895C-4CE7-8917-16964F7D65AB) (Shutdown) 
+2026-05-07T13:36:57.3801620Z     iPhone 16 Pro (77F8B1A2-F39D-4184-AB5F-45AF8B4C7C2D) (Shutdown) 
+2026-05-07T13:36:57.3802160Z     iPhone 16 Pro Max (A5D90CC6-ECD4-4270-821A-4FD30B78DA76) (Shutdown) 
+2026-05-07T13:36:57.3802540Z     iPhone 16e (0CFB924D-A434-46EC-97D8-C2588E2BB378) (Shutdown) 
+2026-05-07T13:36:57.3802990Z     iPhone 16 (F856CD82-FA82-45D8-A20E-064B603DCED5) (Shutdown) 
+2026-05-07T13:36:57.3803360Z     iPhone 16 Plus (D7FB81B8-BA3A-4507-871D-20B093B71F50) (Shutdown) 
+2026-05-07T13:36:57.3803890Z     iPhone SE (3rd generation) (FEC24E31-77CD-448F-A626-C527B2FBBDD8) (Shutdown) 
+2026-05-07T13:36:57.3804360Z     iPad Pro 13-inch (M5) (005DDE0B-4E8D-4792-AEC9-78C4D5CC73AC) (Shutdown) 
+2026-05-07T13:36:57.3804760Z     iPad Pro 11-inch (M5) (234B2D68-57F1-4EBC-AAC5-535EA40EFE5F) (Shutdown) 
+2026-05-07T13:36:57.3805190Z     iPad Pro 11-inch (M4) (668C59EB-D582-4881-BFF0-66AB4784BA5F) (Shutdown) 
+2026-05-07T13:36:57.3805670Z     iPad Pro 13-inch (M4) (16659830-2E52-4020-9780-72FD48E5C41C) (Shutdown) 
+2026-05-07T13:36:57.3806100Z     iPad mini (A17 Pro) (1376166F-B2E7-456E-95D1-1EC443B3755A) (Shutdown) 
+2026-05-07T13:36:57.3806510Z     iPad (A16) (13371963-9139-4340-AB62-1868A3D9F02B) (Shutdown) 
+2026-05-07T13:36:57.3807020Z     iPad Air 13-inch (M3) (E10BF203-F01C-47DD-96EB-12A101F0B0DE) (Shutdown) 
+2026-05-07T13:36:57.3807450Z     iPad Air 11-inch (M3) (7EBE8C49-3011-4266-972B-A74B502A92E7) (Shutdown) 
+2026-05-07T13:36:57.3807960Z     iPad Air 11-inch (M2) (8908DCA1-E3B2-484A-B73B-70A689DB2627) (Shutdown) 
+2026-05-07T13:36:57.3808390Z     iPad Air 13-inch (M2) (3212A545-2297-4E58-8A10-75EEFEAA7F4A) (Shutdown) 
+2026-05-07T13:36:57.3808830Z     iPad (10th generation) (EDB93C20-19B8-4A10-A198-C542DBCDC1E8) (Shutdown) 
+2026-05-07T13:36:57.3809250Z -- iOS 26.1 --
+2026-05-07T13:36:57.3809510Z     iPhone 17 Pro (3EAB9E92-60DF-4FEE-A2D7-A4A95245B4E2) (Shutdown) 
+2026-05-07T13:36:57.3809910Z     iPhone 17 Pro Max (5C383ED6-E33C-4BF9-B560-6E4D111CFAAD) (Shutdown) 
+2026-05-07T13:36:57.3810330Z     iPhone Air (B38E5BF1-5723-4142-A196-D2B374BCFEDB) (Shutdown) 
+2026-05-07T13:36:57.3810820Z     iPhone 17 (7834B4B1-0C33-4D96-AD87-40A0B231F149) (Shutdown) 
+2026-05-07T13:36:57.3811200Z     iPhone 16 Pro (375ED6CF-5B88-4D42-88EF-7CD8E4CB187F) (Shutdown) 
+2026-05-07T13:36:57.3811630Z     iPhone 16 Pro Max (6372A1A8-EAE2-4736-A9F1-0E2DEAEE06C8) (Shutdown) 
+2026-05-07T13:36:57.3812110Z     iPhone 16e (36C7306F-AE16-4DF9-804B-7326D497BB9D) (Shutdown) 
+2026-05-07T13:36:57.3812520Z     iPhone 16 (F210995D-26CC-486F-878A-DA93D426C447) (Shutdown) 
+2026-05-07T13:36:57.3812920Z     iPhone 16 Plus (574B7F3C-1FF1-4FA5-A8BA-0F99DB9D84BE) (Shutdown) 
+2026-05-07T13:36:57.3813610Z     iPhone SE (3rd generation) (21845C08-FA12-4A57-B4BA-E635B55A43F0) (Shutdown) 
+2026-05-07T13:36:57.3814240Z     iPad Pro 13-inch (M5) (40AECDE4-4332-403F-AF47-0A09AA0BD0A5) (Shutdown) 
+2026-05-07T13:36:57.3814670Z     iPad Pro 11-inch (M5) (13749E96-BB10-4451-8C31-1593FD1DA765) (Shutdown) 
+2026-05-07T13:36:57.3815090Z     iPad Pro 11-inch (M4) (CF55560E-AAE1-4E68-8684-A04067AF440F) (Shutdown) 
+2026-05-07T13:36:57.3815690Z     iPad Pro 13-inch (M4) (A5FD6C92-2E00-48DB-8236-6FAE6D0867CA) (Shutdown) 
+2026-05-07T13:36:57.3816120Z     iPad mini (A17 Pro) (4D649797-60B7-4716-9927-A6CBF32BB8D7) (Shutdown) 
+2026-05-07T13:36:57.3816510Z     iPad (A16) (2EC0D209-FE40-4996-9058-BB0DBD541094) (Shutdown) 
+2026-05-07T13:36:57.3816990Z     iPad Air 13-inch (M3) (2DD88728-2E1C-487E-9BDD-EA29738E2DCC) (Shutdown) 
+2026-05-07T13:36:57.3817820Z     iPad Air 11-inch (M3) (049E0E9D-7E5D-4817-9436-B943C5E474D3) (Shutdown) 
+2026-05-07T13:36:57.3818230Z     iPad Air 11-inch (M2) (4DDEB64A-FA5C-4ACE-849D-93A6A8023AF0) (Shutdown) 
+2026-05-07T13:36:57.3818710Z     iPad Air 13-inch (M2) (DA9D3419-6112-4A7E-AD1D-5637043F030F) (Shutdown) 
+2026-05-07T13:36:57.3819190Z     iPad (10th generation) (AAEEBCB5-E254-4C22-A624-910D6D962A84) (Shutdown) 
+2026-05-07T13:36:57.3819560Z -- iOS 26.2 --
+2026-05-07T13:36:57.3819960Z     iPhone 17 Pro (3AC7382D-C1C1-42B7-A219-AA9F9CD59202) (Shutdown) 
+2026-05-07T13:36:57.3820460Z     iPhone 17 Pro Max (74004FCE-E804-4788-ADCE-FA25DBD79723) (Shutdown) 
+2026-05-07T13:36:57.3821110Z     iPhone Air (440370EE-E868-4FB7-AEDB-A80F51B086E8) (Shutdown) 
+2026-05-07T13:36:57.3821540Z     iPhone 17 (61AE1FC1-A43D-439B-92B0-FAB4CE70C7CE) (Shutdown) 
+2026-05-07T13:36:57.3821930Z     iPhone 16 Pro (8771F174-9D44-4B14-A464-C88F3524493B) (Shutdown) 
+2026-05-07T13:36:57.3822390Z     iPhone 16 Pro Max (8713A7DE-FFC8-44B0-B62C-DB246E523B39) (Shutdown) 
+2026-05-07T13:36:57.3822780Z     iPhone 16e (96BFD719-F016-407E-91FE-4071DD198016) (Shutdown) 
+2026-05-07T13:36:57.3823140Z     iPhone 16 (7CE5C8A0-568A-4D13-A36E-99B1B0AF37A6) (Shutdown) 
+2026-05-07T13:36:57.3823620Z     iPhone 16 Plus (F8A59A85-4293-4964-AEDE-AAD74E110F66) (Shutdown) 
+2026-05-07T13:36:57.3824060Z     iPhone SE (3rd generation) (7631B9C5-26B8-47DC-AE96-B2D87F4D54B2) (Shutdown) 
+2026-05-07T13:36:57.3824500Z     iPad Pro 13-inch (M5) (546EF23F-DD17-40AF-8B52-82A873B78D30) (Shutdown) 
+2026-05-07T13:36:57.3824940Z     iPad Pro 11-inch (M5) (AE21ADEF-2E06-4714-9F13-A9323D0C88CF) (Shutdown) 
+2026-05-07T13:36:57.3825420Z     iPad Pro 11-inch (M4) (E0023001-EA90-42F3-A074-A70BAE074D68) (Shutdown) 
+2026-05-07T13:36:57.3825820Z     iPad Pro 13-inch (M4) (9AB3EFBB-7156-483E-9B00-30A6445AD83B) (Shutdown) 
+2026-05-07T13:36:57.3826220Z     iPad (A16) (7373CF27-6B7A-472A-8DC9-D9C356E65FF5) (Shutdown) 
+2026-05-07T13:36:57.3826720Z     iPad Air 13-inch (M3) (7E212EBC-E00F-496C-9F3A-2290CB873A56) (Shutdown) 
+2026-05-07T13:36:57.3827140Z     iPad Air 11-inch (M2) (FB2BC00F-8D5A-493F-BFED-46816BBB8F66) (Shutdown) 
+2026-05-07T13:36:57.3827680Z     iPad Air 13-inch (M2) (E98D0440-312F-4AD7-AD50-84EAD586CF78) (Shutdown) 
+2026-05-07T13:36:57.3828100Z     iPad mini (A17 Pro) (5F48FA10-F576-4E6A-BADC-9E1FA0735F6D) (Shutdown) 
+2026-05-07T13:36:57.3828600Z     iPad Air 11-inch (M3) (1860FA54-F251-4ABC-922E-229B78F35A9B) (Shutdown) 
+2026-05-07T13:36:57.3829040Z     iPad (10th generation) (FBE6340F-41B1-4F0C-93AC-07DD6707E255) (Shutdown) 
+2026-05-07T13:36:57.3829390Z -- tvOS 18.5 --
+2026-05-07T13:36:57.3829830Z     Apple TV 4K (3rd generation) (F72949C3-8679-4E18-BC81-2F18E01169DA) (Shutdown) 
+2026-05-07T13:36:57.3830350Z     Apple TV 4K (3rd generation) (at 1080p) (11823FE8-82D0-46F4-BA19-6992B9B1A854) (Shutdown) 
+2026-05-07T13:36:57.3830830Z     Apple TV (6FEEC20E-DFE1-45DB-A6E5-15EF8E945F9E) (Shutdown) 
+2026-05-07T13:36:57.3831200Z -- tvOS 26.1 --
+2026-05-07T13:36:57.3831650Z     Apple TV 4K (3rd generation) (92596B8D-4ED8-4113-A44C-D9C7F118B44C) (Shutdown) 
+2026-05-07T13:36:57.3832160Z     Apple TV 4K (3rd generation) (at 1080p) (EA2C524D-276D-4C07-9644-668D0A09FE7B) (Shutdown) 
+2026-05-07T13:36:57.3832620Z     Apple TV (326912EA-0334-46B0-B4CD-A5B342F8E2D5) (Shutdown) 
+2026-05-07T13:36:57.3832990Z -- tvOS 26.2 --
+2026-05-07T13:36:57.3833320Z     Apple TV 4K (3rd generation) (ADA4C7A9-AD37-4EE6-A022-D1618E67C2D2) (Shutdown) 
+2026-05-07T13:36:57.3833830Z     Apple TV 4K (3rd generation) (at 1080p) (7E414553-B986-4546-8680-BF1FBACD61CC) (Shutdown) 
+2026-05-07T13:36:57.3834280Z     Apple TV (C3775F44-F20A-4EE7-BE8C-F428BA86E7B8) (Shutdown) 
+2026-05-07T13:36:57.3834680Z -- watchOS 11.5 --
+2026-05-07T13:36:57.3835010Z     Apple Watch Series 10 (46mm) (30F08852-58A2-4E0B-81B8-4B64BFCD5C22) (Shutdown) 
+2026-05-07T13:36:57.3835480Z     Apple Watch Series 10 (42mm) (BC940695-2CBB-439A-9BF9-5793DFD904D0) (Shutdown) 
+2026-05-07T13:36:57.3836020Z     Apple Watch Ultra 2 (49mm) (7B503880-5F3E-4B21-8D6E-E48F3855FBAC) (Shutdown) 
+2026-05-07T13:36:57.3836860Z     Apple Watch SE (44mm) (2nd generation) (166D31CD-566F-42D9-BE3A-1452F12EA41E) (Shutdown) 
+2026-05-07T13:36:57.3837410Z     Apple Watch SE (40mm) (2nd generation) (A1DA849D-4933-4EB0-895F-18DC12CD38EF) (Shutdown) 
+2026-05-07T13:36:57.3837790Z -- watchOS 26.1 --
+2026-05-07T13:36:57.3838190Z     Apple Watch Series 11 (46mm) (BEF757B4-2432-4C1B-9DC6-0FC784761507) (Shutdown) 
+2026-05-07T13:36:57.3838670Z     Apple Watch Series 11 (42mm) (91C7426E-FD9E-4E32-8E6A-4B32A95FDEDD) (Shutdown) 
+2026-05-07T13:36:57.3839120Z     Apple Watch Series 10 (46mm) (F946122C-6616-405D-999C-A67F5D37EFE6) (Shutdown) 
+2026-05-07T13:36:57.3839830Z     Apple Watch Series 10 (42mm) (918C5B4F-7AAE-49CB-9B71-BC1A3B9F5158) (Shutdown) 
+2026-05-07T13:36:57.3840310Z     Apple Watch Ultra 3 (49mm) (465CF5B4-E1FF-41DA-8D56-03E52D9E57DD) (Shutdown) 
+2026-05-07T13:36:57.3840770Z     Apple Watch Ultra 2 (49mm) (31F71A17-BD17-4B36-B7C0-0012F3357363) (Shutdown) 
+2026-05-07T13:36:57.3841220Z     Apple Watch SE 3 (44mm) (99E5BBCA-F9A8-4F2D-B608-E6A11651538C) (Shutdown) 
+2026-05-07T13:36:57.3841740Z     Apple Watch SE 3 (40mm) (F5156E0C-7766-471E-B3AC-DCFA2A0C9CD0) (Shutdown) 
+2026-05-07T13:36:57.3842260Z     Apple Watch SE (44mm) (2nd generation) (FCB6FE82-82DC-45BD-A097-0DF05E6078A3) (Shutdown) 
+2026-05-07T13:36:57.3842820Z     Apple Watch SE (40mm) (2nd generation) (DB0D295F-C550-45A5-8B43-0FED1E744B07) (Shutdown) 
+2026-05-07T13:36:57.3843320Z -- watchOS 26.2 --
+2026-05-07T13:36:57.3843650Z     Apple Watch Series 11 (46mm) (7F038970-109F-4E5F-A17A-8423F433EFD0) (Shutdown) 
+2026-05-07T13:36:57.3844140Z     Apple Watch Series 11 (42mm) (B70F84F0-C929-400D-91B9-DCD666D24134) (Shutdown) 
+2026-05-07T13:36:57.3844630Z     Apple Watch Series 10 (46mm) (A95AA419-B75B-4151-A8C3-1E5C76CE043A) (Shutdown) 
+2026-05-07T13:36:57.3845150Z     Apple Watch Series 10 (42mm) (99C233F4-5CE8-44A1-9D2A-2293A2EB9FB5) (Shutdown) 
+2026-05-07T13:36:57.3845600Z     Apple Watch Ultra 3 (49mm) (D0858683-1F57-436C-B919-8A94884483E1) (Shutdown) 
+2026-05-07T13:36:57.3846050Z     Apple Watch Ultra 2 (49mm) (B7FB4883-1DF6-4C5B-B1E9-FEC2BB7411B0) (Shutdown) 
+2026-05-07T13:36:57.3846570Z     Apple Watch SE 3 (44mm) (3188F732-B59E-439D-A5D4-B0798F5340AB) (Shutdown) 
+2026-05-07T13:36:57.3847990Z     Apple Watch SE 3 (40mm) (D5C090A0-8137-4136-AB51-972421FCA4C7) (Shutdown) 
+2026-05-07T13:36:57.3849540Z     Apple Watch SE (44mm) (2nd generation) (244D7C67-AD20-4EED-8169-B443567FE177) (Shutdown) 
+2026-05-07T13:36:57.3851240Z     Apple Watch SE (40mm) (2nd generation) (110FB789-D16C-46F5-8020-6FF399B0E26E) (Shutdown) 
+2026-05-07T13:36:57.3853160Z -- visionOS 2.3 --
+2026-05-07T13:36:57.3853620Z     Apple Vision Pro (60B3BAF2-290B-4695-B686-2396CCB96138) (Shutdown) 
+2026-05-07T13:36:57.3853970Z -- visionOS 2.4 --
+2026-05-07T13:36:57.3854410Z     Apple Vision Pro (DABA7DF4-7BC2-4C4B-990D-0EEBBF570262) (Shutdown) 
+2026-05-07T13:36:57.3854780Z -- visionOS 2.5 --
+2026-05-07T13:36:57.3855120Z     Apple Vision Pro (856C0FAB-31FD-4B8A-94D1-FE27ECDAA654) (Shutdown) 
+2026-05-07T13:36:57.3855450Z -- visionOS 26.1 --
+2026-05-07T13:36:57.3855870Z     Apple Vision Pro (C490EB33-4D5F-4988-B631-FF948C721DC7) (Shutdown) 
+2026-05-07T13:36:57.3856200Z -- visionOS 26.2 --
+2026-05-07T13:36:57.3856520Z     Apple Vision Pro (9905BDB6-DBB2-4E6E-8930-4107ECD3741C) (Shutdown) 
+2026-05-07T13:36:57.3930110Z ##[group]Run xcodebuild -scheme ClawPass \
+2026-05-07T13:36:57.3930500Z [36;1mxcodebuild -scheme ClawPass \[0m
+2026-05-07T13:36:57.3930750Z [36;1m  -sdk iphoneos \[0m
+2026-05-07T13:36:57.3931010Z [36;1m  -configuration Release \[0m
+2026-05-07T13:36:57.3931320Z [36;1m  -archivePath $PWD/build/ClawPass.xcarchive \[0m
+2026-05-07T13:36:57.3931620Z [36;1m  archive \[0m
+2026-05-07T13:36:57.3931990Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-05-07T13:36:57.3932230Z [36;1m  CODE_SIGNING_REQUIRED=NO[0m
+2026-05-07T13:36:57.5256840Z shell: /bin/bash -e {0}
+2026-05-07T13:36:57.5257170Z env:
+2026-05-07T13:36:57.5257590Z   MD_APPLE_SDK_ROOT: /Applications/Xcode_26.3.app
+2026-05-07T13:36:57.5257920Z ##[endgroup]
+2026-05-07T13:36:59.4718310Z Command line invocation:
+2026-05-07T13:36:59.4731980Z     /Applications/Xcode_26.3.app/Contents/Developer/usr/bin/xcodebuild -scheme ClawPass -sdk iphoneos -configuration Release -archivePath /Users/runner/work/clawpass/clawpass/ClawPass/ios/build/ClawPass.xcarchive archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+2026-05-07T13:36:59.4737510Z 
+2026-05-07T13:36:59.4737730Z Build settings from command line:
+2026-05-07T13:36:59.4738170Z     CODE_SIGNING_ALLOWED = NO
+2026-05-07T13:36:59.4738550Z     CODE_SIGNING_REQUIRED = NO
+2026-05-07T13:36:59.4739400Z     SDKROOT = iphoneos26.2
+2026-05-07T13:36:59.4739590Z 
+2026-05-07T13:37:01.1768940Z 2026-05-07 13:37:01.176 xcodebuild[19939:57675] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-05-07T13:37:01.1983690Z --- xcodebuild: WARNING: Using the first of multiple matching destinations:
+2026-05-07T13:37:01.1984200Z { platform:macOS, name:Any Mac }
+2026-05-07T13:37:01.1984690Z { platform:macOS, arch:arm64, id:96a5ff3e38b4a51f2423075485eb9da176c2ded9, name:My Mac }
+2026-05-07T13:37:01.1985350Z { platform:macOS, arch:x86_64, id:96a5ff3e38b4a51f2423075485eb9da176c2ded9, name:My Mac }
+2026-05-07T13:37:01.7124730Z ComputePackagePrebuildTargetDependencyGraph
+2026-05-07T13:37:01.7670260Z 
+2026-05-07T13:37:01.7701260Z Prepare packages
+2026-05-07T13:37:01.7702000Z 
+2026-05-07T13:37:01.7719230Z CreateBuildRequest
+2026-05-07T13:37:01.7720150Z 
+2026-05-07T13:37:01.7720550Z SendProjectDescription
+2026-05-07T13:37:01.7769390Z 
+2026-05-07T13:37:01.7769710Z CreateBuildOperation
+2026-05-07T13:37:01.7968960Z 
+2026-05-07T13:37:01.8008450Z ComputeTargetDependencyGraph
+2026-05-07T13:37:01.8194830Z note: Building targets in dependency order
+2026-05-07T13:37:01.8195680Z note: Target dependency graph (1 target)
+2026-05-07T13:37:01.8195990Z     Target 'ClawPass' in project 'ClawPass' (no dependencies)
+2026-05-07T13:37:01.8217920Z 
+2026-05-07T13:37:01.8218830Z GatherProvisioningInputs
+2026-05-07T13:37:01.8220480Z 
+2026-05-07T13:37:01.8220730Z CreateBuildDescription
+2026-05-07T13:37:01.8362600Z 
+2026-05-07T13:37:01.8365290Z ExecuteExternalTool /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -x c -c /dev/null
+2026-05-07T13:37:02.1042380Z 
+2026-05-07T13:37:02.1043110Z ExecuteExternalTool /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+2026-05-07T13:37:02.1043630Z 
+2026-05-07T13:37:02.1100750Z ExecuteExternalTool /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+2026-05-07T13:37:02.2606390Z 
+2026-05-07T13:37:02.2825070Z Build description signature: f029deb1639b07c187736a0da1c4b50a
+2026-05-07T13:37:02.2828640Z Build description path: /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/XCBuildData/f029deb1639b07c187736a0da1c4b50a.xcbuilddata
+2026-05-07T13:37:02.3171560Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation
+2026-05-07T13:37:02.3317980Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:02.3483650Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation
+2026-05-07T13:37:02.3486080Z 
+2026-05-07T13:37:02.3486980Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath
+2026-05-07T13:37:02.3488760Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:02.3495570Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath
+2026-05-07T13:37:02.3497690Z 
+2026-05-07T13:37:02.3500480Z ClangStatCache /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk /Users/runner/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos26.2-23C57-dc75598d0054f22ec865fa860f139d722dd23b4ebda140f7210d155ff1243552.sdkstatcache
+2026-05-07T13:37:02.3501940Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:02.3503290Z     /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -o /Users/runner/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos26.2-23C57-dc75598d0054f22ec865fa860f139d722dd23b4ebda140f7210d155ff1243552.sdkstatcache
+2026-05-07T13:37:03.9655520Z 
+2026-05-07T13:37:03.9656770Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath
+2026-05-07T13:37:03.9657820Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9658780Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath
+2026-05-07T13:37:03.9659620Z 
+2026-05-07T13:37:03.9660640Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass-00cb127fa2f78203cbefaa64fe2a3a68-VFS-iphoneos/all-product-headers.yaml
+2026-05-07T13:37:03.9662110Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9663380Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass-00cb127fa2f78203cbefaa64fe2a3a68-VFS-iphoneos/all-product-headers.yaml
+2026-05-07T13:37:03.9664760Z 
+2026-05-07T13:37:03.9665830Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/SwiftExplicitPrecompiledModules
+2026-05-07T13:37:03.9667340Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9668360Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/SwiftExplicitPrecompiledModules
+2026-05-07T13:37:03.9669270Z 
+2026-05-07T13:37:03.9670520Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ExplicitPrecompiledModules
+2026-05-07T13:37:03.9671460Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9672410Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ExplicitPrecompiledModules
+2026-05-07T13:37:03.9673180Z 
+2026-05-07T13:37:03.9673860Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/EagerLinkingTBDs/Release-iphoneos
+2026-05-07T13:37:03.9675160Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9676130Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/EagerLinkingTBDs/Release-iphoneos
+2026-05-07T13:37:03.9677000Z 
+2026-05-07T13:37:03.9678260Z CreateBuildDirectory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos
+2026-05-07T13:37:03.9679190Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass.xcodeproj
+2026-05-07T13:37:03.9680040Z     builtin-create-build-directory /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos
+2026-05-07T13:37:03.9680870Z 
+2026-05-07T13:37:03.9683650Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/empty-ClawPass.plist (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9684800Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9685710Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/empty-ClawPass.plist
+2026-05-07T13:37:03.9686600Z 
+2026-05-07T13:37:03.9688180Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass_const_extract_protocols.json (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9689520Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9690520Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass_const_extract_protocols.json
+2026-05-07T13:37:03.9691910Z 
+2026-05-07T13:37:03.9692880Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.SwiftFileList (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9694130Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9695490Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.SwiftFileList
+2026-05-07T13:37:03.9696400Z 
+2026-05-07T13:37:03.9697460Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.SwiftConstValuesFileList (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9698650Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9699700Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.SwiftConstValuesFileList
+2026-05-07T13:37:03.9700830Z 
+2026-05-07T13:37:03.9701790Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.LinkFileList (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9703010Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9703980Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.LinkFileList
+2026-05-07T13:37:03.9704830Z 
+2026-05-07T13:37:03.9705870Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass-OutputFileMap.json (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9707110Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9708190Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass-OutputFileMap.json
+2026-05-07T13:37:03.9709080Z 
+2026-05-07T13:37:03.9709920Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9711040Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9712020Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.hmap
+2026-05-07T13:37:03.9712870Z 
+2026-05-07T13:37:03.9713880Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.DependencyStaticMetadataFileList (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9715070Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9716190Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.DependencyStaticMetadataFileList
+2026-05-07T13:37:03.9717150Z 
+2026-05-07T13:37:03.9718300Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.DependencyMetadataFileList (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9719470Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9720440Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass.DependencyMetadataFileList
+2026-05-07T13:37:03.9722450Z 
+2026-05-07T13:37:03.9723570Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-project-headers.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9725080Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9726190Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-project-headers.hmap
+2026-05-07T13:37:03.9727070Z 
+2026-05-07T13:37:03.9728050Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-own-target-headers.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9729220Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9730260Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-own-target-headers.hmap
+2026-05-07T13:37:03.9731370Z 
+2026-05-07T13:37:03.9732370Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-generated-files.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9733540Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9734630Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-generated-files.hmap
+2026-05-07T13:37:03.9735550Z 
+2026-05-07T13:37:03.9736520Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-all-target-headers.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9737690Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9738670Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-all-target-headers.hmap
+2026-05-07T13:37:03.9739570Z 
+2026-05-07T13:37:03.9740570Z WriteAuxiliaryFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-all-non-framework-target-headers.hmap (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9742360Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9743460Z     write-file /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-all-non-framework-target-headers.hmap
+2026-05-07T13:37:03.9744400Z 
+2026-05-07T13:37:03.9745350Z SymLink /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos/ClawPass.app ../../InstallationBuildProductsLocation/Applications/ClawPass.app (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9746660Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9747580Z     /bin/ln -sfh ../../InstallationBuildProductsLocation/Applications/ClawPass.app /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos/ClawPass.app
+2026-05-07T13:37:03.9748500Z 
+2026-05-07T13:37:03.9749300Z MkDir /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation/Applications/ClawPass.app (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9750270Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9751140Z     /bin/mkdir -p /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation/Applications/ClawPass.app
+2026-05-07T13:37:03.9751900Z 
+2026-05-07T13:37:03.9753510Z ProcessInfoPlistFile /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation/Applications/ClawPass.app/Info.plist /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/empty-ClawPass.plist (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9755260Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9758070Z     builtin-infoPlistUtility /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/empty-ClawPass.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation/Applications/ClawPass.app/PkgInfo -expandbuildsettings -format binary -platform iphoneos -requiredArchitecture arm64 -o /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/InstallationBuildProductsLocation/Applications/ClawPass.app/Info.plist
+2026-05-07T13:37:03.9760650Z 
+2026-05-07T13:37:03.9761040Z SwiftDriver ClawPass normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:03.9761550Z     cd /Users/runner/work/clawpass/clawpass/ClawPass/ios
+2026-05-07T13:37:03.9781140Z     builtin-SwiftDriver -- /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name ClawPass -O -whole-module-optimization -enforce-exclusivity\=checked @/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -target arm64-apple-ios16.0 -g -module-cache-path /Users/runner/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos -F /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos -emit-localized-strings -emit-localized-strings-path /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64 -c -num-threads 3 -Xcc -ivfsstatcache -Xcc /Users/runner/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos26.2-23C57-dc75598d0054f22ec865fa860f139d722dd23b4ebda140f7210d155ff1243552.sdkstatcache -output-file-map /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/runner/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-generated-files.hmap -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-own-target-headers.hmap -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/ClawPass-project-headers.hmap -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/BuildProductsPath/Release-iphoneos/include -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/DerivedSources/arm64 -Xcc -I/Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/Library/Developer/Xcode/DerivedData/ClawPass-gvojlyzfdepytcdadyzpzadplkis/Build/Intermediates.noindex/ArchiveIntermediates/ClawPass/IntermediateBuildFilesPath/ClawPass.build/Release-iphoneos/ClawPass.build/Objects-normal/arm64/ClawPass-Swift.h -working-directory /Users/runner/work/clawpass/clawpass/ClawPass/ios -no-emit-module-separately-wmo
+2026-05-07T13:37:05.2263240Z /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass/Services/VaultManager.swift:2:8: error: Unable to find module dependency: 'SQLite'
+2026-05-07T13:37:05.2264200Z import SQLite
+2026-05-07T13:37:05.2264500Z        ^
+2026-05-07T13:37:05.2264990Z /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass/Services/VaultManager.swift:2:8: note: a dependency of main module 'ClawPass'
+2026-05-07T13:37:05.2265620Z import SQLite
+2026-05-07T13:37:05.2265840Z        ^
+2026-05-07T13:37:05.2519850Z /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass/Services/VaultManager.swift:2:8: error: Unable to find module dependency: 'SQLite'
+2026-05-07T13:37:05.2524640Z import SQLite
+2026-05-07T13:37:05.2525030Z        ^ (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:05.2525800Z /Users/runner/work/clawpass/clawpass/ClawPass/ios/ClawPass/Services/VaultManager.swift:2:8: note: A dependency of main module 'ClawPass'
+2026-05-07T13:37:05.2526470Z import SQLite
+2026-05-07T13:37:05.2526770Z        ^ (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:05.2527080Z 
+2026-05-07T13:37:05.2585880Z warning: Traditional headermap style is no longer supported; please migrate to using separate headermaps and set 'ALWAYS_SEARCH_USER_PATHS' to NO. (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:05.2590560Z ** ARCHIVE FAILED **
+2026-05-07T13:37:05.2590770Z 
+2026-05-07T13:37:05.2590820Z 
+2026-05-07T13:37:05.2591040Z The following build commands failed:
+2026-05-07T13:37:05.2591630Z 	SwiftDriver ClawPass normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ClawPass' from project 'ClawPass')
+2026-05-07T13:37:05.2597100Z 	Archiving project ClawPass with scheme ClawPass
+2026-05-07T13:37:05.2597560Z (2 failures)
+2026-05-07T13:37:05.2805590Z ##[error]Process completed with exit code 65.
+2026-05-07T13:37:05.2954630Z Post job cleanup.
+2026-05-07T13:37:05.5882410Z [command]/opt/homebrew/bin/git version
+2026-05-07T13:37:05.6223240Z git version 2.54.0
+2026-05-07T13:37:05.6264150Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/62ce80ca-9c46-4c78-bd4e-d17c506f8b3e/.gitconfig'
+2026-05-07T13:37:05.6274240Z Temporarily overriding HOME='/Users/runner/work/_temp/62ce80ca-9c46-4c78-bd4e-d17c506f8b3e' before making global git config changes
+2026-05-07T13:37:05.6274870Z Adding repository directory to the temporary git global config as a safe directory
+2026-05-07T13:37:05.6278030Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/clawpass/clawpass
+2026-05-07T13:37:05.6387390Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-05-07T13:37:05.6502310Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-05-07T13:37:05.7260440Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-05-07T13:37:05.7319550Z http.https://github.com/.extraheader
+2026-05-07T13:37:05.7329800Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-05-07T13:37:05.7394450Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-05-07T13:37:05.8074270Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-05-07T13:37:05.8129760Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-05-07T13:37:05.8937070Z Cleaning up orphan processes
+2026-05-07T13:37:06.3339250Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
