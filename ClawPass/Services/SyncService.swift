@@ -3,6 +3,17 @@ import Network
 import CryptoKit
 import UIKit
 
+// MARK: - Sync Packet (Matches Desktop Wrapper)
+struct SyncPacket: Codable {
+    let deviceId: String
+    let message: SyncMessage
+    
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+        case message
+    }
+}
+
 // MARK: - Sync Message Protocol (Matches Desktop)
 enum SyncMessage: Codable {
     case handshake(deviceId: String, version: UInt32)
@@ -478,9 +489,9 @@ class SyncService: ObservableObject {
                 print("[SYNC] Received raw data: \(jsonString)")
                 
                 do {
-                    let message = try JSONDecoder().decode(SyncMessage.self, from: data)
-                    print("[SYNC] Decoded message: \(message)")
-                    self.handleMessage(message)
+                    let packet = try JSONDecoder().decode(SyncPacket.self, from: data)
+                    print("[SYNC] Decoded packet from \(packet.deviceId): \(packet.message)")
+                    self.handleMessage(packet.message)
                 } catch {
                     print("[SYNC] Decoding error: \(error)")
                     DispatchQueue.main.async {
