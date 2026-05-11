@@ -10,6 +10,7 @@ enum SyncMessage: Codable {
     case syncResponse(entries: [SyncVaultEntry], timestamp: Int64)
     case entryUpdate(entry: SyncVaultEntry)
     case entryDelete(entryId: String)
+    case ack
     case ping
     case pong
     case error(message: String)
@@ -47,6 +48,8 @@ enum SyncMessage: Codable {
         case .entryDelete(let entryId):
             try container.encode("entry_delete", forKey: .type)
             try container.encode(entryId, forKey: .entry_id)
+        case .ack:
+            try container.encode("ack", forKey: .type)
         case .ping:
             try container.encode("ping", forKey: .type)
         case .pong:
@@ -79,6 +82,8 @@ enum SyncMessage: Codable {
         case "entry_delete":
             let entryId = try container.decode(String.self, forKey: .entry_id)
             self = .entryDelete(entryId: entryId)
+        case "ack":
+            self = .ack
         case "ping":
             self = .ping
         case "pong":
@@ -356,13 +361,12 @@ class SyncService: ObservableObject {
     // MARK: - Protocol Messages
     
     private func sendHandshake() {
-        let message = SyncMessage.handshake(deviceId: deviceId, version: 1)
+        print("[SYNC] Initiating deterministic handshake...")
+        let message = SyncMessage.handshake(deviceId: deviceId, version: currentProtocolVersion)
         send(message)
         
-        // After handshake, request sync
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.requestSync()
-        }
+        // We no longer blindly call requestSync() here. 
+        // We wait for the server to respond in handleMessage.
     }
     
     func requestSync() {
@@ -488,6 +492,13 @@ class SyncService: ObservableObject {
     
     private func handleMessage(_ message: SyncMessage) {
         switch message {
+        case .ack:
+            print("[Sync] Handshake ACK received")
+            self.handshakeCompleted = true
+            
+            // AUTO-SYNC: Once handshake is confirmed, immediately request data
+            self.requestSync()
+            
         case .pong:
             print("[Sync] Received pong")
             
@@ -542,6 +553,9 @@ class SyncService: ObservableObject {
         default:
             print("[Sync] Unhandled message type")
         }
+        
+        // Keep the stream alive by waiting for the next message
+        receiveNextMessage()
     }
 }
 
