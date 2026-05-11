@@ -335,15 +335,66 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         syncStatus = "Disconnected"
     }
     
-    func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry]) {
-        // Merge incoming entries with local entries
-        // For now, just log it
-        syncStatus = "Received \(entries.count) entries from desktop"
+    func syncService(_ service: SyncService, didReceiveEntries incomingEntries: [VaultEntry]) {
+        guard let db = db else {
+            syncStatus = "Sync error: Vault not initialized"
+            return
+        }
         
-        // TODO: Implement proper merge logic
-        // - Check timestamps to determine which entry is newer
-        // - Add new entries, update existing ones
-        // - Handle conflicts (same ID, different content)
+        do {
+            try db.transaction {
+                var updatedCount = 0
+                var insertedCount = 0
+                
+                for incoming in incomingEntries {
+                    // Check if entry exists locally
+                    let query = entriesTable.filter(id == incoming.id.uuidString)
+                    if let localRow = try db.pluck(query) {
+                        let localModifiedAt = localRow[modifiedAt]
+                        
+                        if incoming.modifiedAt >= localModifiedAt {
+                            // Incoming is newer or same - update local
+                            let update = query.update(
+                                title <- incoming.title,
+                                username <- incoming.username,
+                                encryptedPassword <- incoming.encryptedPassword,
+                                url <- incoming.url,
+                                encryptedNotes <- incoming.encryptedNotes,
+                                categoryID <- incoming.categoryID?.uuidString,
+                                totpSecret <- incoming.totpSecret,
+                                modifiedAt <- incoming.modifiedAt,
+                                isFavorite <- incoming.isFavorite
+                            )
+                            try db.run(update)
+                            updatedCount += 1
+                        }
+                    } else {
+                        // New entry - insert
+                        let insert = entriesTable.insert(
+                            id <- incoming.id.uuidString,
+                            title <- incoming.title,
+                            username <- incoming.username,
+                            encryptedPassword <- incoming.encryptedPassword,
+                            url <- incoming.url,
+                            encryptedNotes <- incoming.encryptedNotes,
+                            categoryID <- incoming.categoryID?.uuidString,
+                            totpSecret <- incoming.totpSecret,
+                            createdAt <- incoming.createdAt,
+                            modifiedAt <- incoming.modifiedAt,
+                            isFavorite <- incoming.isFavorite
+                        )
+                        try db.run(insert)
+                        insertedCount += 1
+                    }
+                }
+                
+                try loadData()
+                syncStatus = "Sync complete: \(insertedCount) added, \(updatedCount) updated"
+            }
+        } catch {
+            syncStatus = "Sync failed: \(error.localizedDescription)"
+            print("Sync merge error: \(error)")
+        }
     }
     
     func syncService(_ service: SyncService, didEncounterError error: Error) {
