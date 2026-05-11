@@ -525,6 +525,9 @@ class SyncService: ObservableObject {
             print("[Sync] Server handshake: \(id) v\(version)")
             self.handshakeCompleted = true
             
+            // AUTO-SYNC: Once handshake is confirmed, immediately request data
+            self.requestSync()
+            
         case .syncRequest:
             // Desktop requested sync from us - typically we'd respond here
             print("[Sync] Desktop requested sync")
