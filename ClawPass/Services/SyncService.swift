@@ -206,6 +206,7 @@ class SyncService: ObservableObject {
     @Published var isDiscovering = false
     @Published var discoveredDevices: [SyncDevice] = []
     @Published var lastSyncTimestamp: Int64 = 0
+    @Published var syncStatus: String = "Idle"
     private var handshakeCompleted = false
     
     weak var delegate: SyncServiceDelegate?
@@ -494,6 +495,7 @@ class SyncService: ObservableObject {
         switch message {
         case .ack:
             print("[Sync] Handshake ACK received")
+            DispatchQueue.main.async { self.syncStatus = "ACK Received ➔ Requesting Sync..." }
             self.handshakeCompleted = true
             
             // AUTO-SYNC: Once handshake is confirmed, immediately request data
@@ -501,11 +503,13 @@ class SyncService: ObservableObject {
             
         case .pong:
             print("[Sync] Received pong")
+            DispatchQueue.main.async { self.syncStatus = "Pong received" }
             
         case .syncResponse(let entries, let timestamp):
             print("[Sync] Received \(entries.count) entries")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                self.syncStatus = "Sync Response Received (\(entries.count) entries)"
                 
                 // Convert entries
                 var vaultEntries: [VaultEntry] = []
@@ -523,6 +527,7 @@ class SyncService: ObservableObject {
             print("[Sync] Received entry update")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                self.syncStatus = "Entry Update Received"
                 if let vaultEntry = try? entry.toVaultEntry() {
                     self.delegate?.syncService(self, didReceiveEntries: [vaultEntry])
                 }
@@ -530,23 +535,26 @@ class SyncService: ObservableObject {
             
         case .entryDelete(let entryId):
             print("[Sync] Received entry delete: \(entryId)")
+            DispatchQueue.main.async { self.syncStatus = "Entry Delete Received" }
             // Handle delete - notify delegate
             
         case .handshake(let id, let version):
             print("[Sync] Server handshake: \(id) v\(version)")
+            DispatchQueue.main.async { self.syncStatus = "Server Handshake OK" }
             self.handshakeCompleted = true
             
             // AUTO-SYNC: Once handshake is confirmed, immediately request data
             self.requestSync()
             
         case .syncRequest:
-            // Desktop requested sync from us - typically we'd respond here
             print("[Sync] Desktop requested sync")
+            DispatchQueue.main.async { self.syncStatus = "Desktop requested sync" }
             
         case .error(let msg):
             print("[Sync] Server error: \(msg)")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                self.syncStatus = "Error: \(msg)"
                 self.delegate?.syncService(self, didEncounterError: SyncError.networkError(NSError(domain: "SyncError", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
             }
             

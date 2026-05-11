@@ -64,12 +64,14 @@ struct SyncView: View {
                 
                 Spacer()
                 
-                if syncService.isConnected {
-                    Button("Disconnect") {
-                        syncService.disconnect()
-                    }
-                    .font(.caption)
-                    .foregroundColor(.red)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("v1.0.0-SINCED")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Status: \(syncService.syncStatus)")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.blue)
                 }
             }
             
