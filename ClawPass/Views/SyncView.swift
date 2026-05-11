@@ -123,9 +123,7 @@ struct SyncView: View {
                         isConnected: syncService.isConnected && syncService.discoveredDevices.firstIndex(where: { $0.id == device.id }) != nil
                     )
                     .onTapGesture {
-                        if !syncService.isConnected {
-                            connect(to: device)
-                        }
+                        connectAndSync(to: device)
                     }
                 }
             }
@@ -144,7 +142,9 @@ struct SyncView: View {
                 Spacer()
                 
                 Button(action: {
-                    showManualEntry.toggle()
+                    withAnimation {
+                        showManualEntry.toggle()
+                    }
                 }) {
                     Image(systemName: showManualEntry ? "chevron.up" : "chevron.down")
                 }
@@ -155,17 +155,20 @@ struct SyncView: View {
                     TextField("IP Address (e.g., 192.168.1.100)", text: $manualHost)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .keyboardType(.decimalPad)
+                        .submitLabel(.done)
                     
                     TextField("Port", text: $manualPort)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .keyboardType(.numberPad)
+                        .submitLabel(.done)
                     
-                    Button("Connect") {
-                        connectManual()
+                    Button("Connect & Sync") {
+                        connectManualAndSync()
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(manualHost.isEmpty || manualPort.isEmpty)
                 }
+                .transition(.opacity)
             }
         }
         .padding()
@@ -174,31 +177,32 @@ struct SyncView: View {
     }
     
     private var syncButton: some View {
-        Button(action: {
-            performSync()
-        }) {
-            HStack {
-                if isSyncing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
-                }
-                Text(isSyncing ? "Syncing..." : "Sync Now")
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(isSyncing ? Color.gray : Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(12)
-        }
-        .disabled(isSyncing)
+        // Removed as we now trigger sync automatically upon connection
+        EmptyView()
     }
     
     // MARK: - Actions
     
+    private func connectAndSync(to device: SyncDevice) {
+        isSyncing = true
+        lastSyncMessage = "Connecting to \(device.name)..."
+        connect(to: device)
+    }
+    
     private func connect(to device: SyncDevice) {
         syncService.connect(to: device)
         lastSyncMessage = "Connecting to \(device.name)..."
+    }
+    
+    private func connectManualAndSync() {
+        guard let port = UInt16(manualPort) else {
+            lastSyncMessage = "Invalid port number"
+            return
+        }
+        
+        isSyncing = true
+        lastSyncMessage = "Connecting to \(manualHost)..."
+        syncService.connectManual(host: manualHost, port: port)
     }
     
     private func connectManual() {
@@ -216,10 +220,6 @@ struct SyncView: View {
         lastSyncMessage = "Requesting sync..."
         
         syncService.requestSync()
-        
-        // We no longer simulate completion here. 
-        // The isSyncing state will be managed by the syncService's connection 
-        // and the delegate callbacks in VaultManager.
     }
     
     // New method to be called by the delegate or observer
