@@ -12,6 +12,7 @@ enum SyncMessage: Codable {
     case entryDelete(entryId: String)
     case ping
     case pong
+    case error(message: String)
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -22,6 +23,7 @@ enum SyncMessage: Codable {
         case timestamp
         case entry
         case entry_id = "entry_id"
+        case message
     }
     
     func encode(to encoder: Encoder) throws {
@@ -49,6 +51,9 @@ enum SyncMessage: Codable {
             try container.encode("ping", forKey: .type)
         case .pong:
             try container.encode("pong", forKey: .type)
+        case .error(let message):
+            try container.encode("error", forKey: .type)
+            try container.encode(message, forKey: .message)
         }
     }
     
@@ -78,6 +83,9 @@ enum SyncMessage: Codable {
             self = .ping
         case "pong":
             self = .pong
+        case "error":
+            let message = try container.decode(String.self, forKey: .message)
+            self = .error(message: message)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(type)")
         }
