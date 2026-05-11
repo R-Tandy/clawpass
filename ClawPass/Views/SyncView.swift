@@ -217,11 +217,15 @@ struct SyncView: View {
         
         syncService.requestSync()
         
-        // Simulate sync completion (in real implementation, this would wait for delegate callback)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isSyncing = false
-            lastSyncMessage = "Sync completed"
-        }
+        // We no longer simulate completion here. 
+        // The isSyncing state will be managed by the syncService's connection 
+        // and the delegate callbacks in VaultManager.
+    }
+    
+    // New method to be called by the delegate or observer
+    func setSyncComplete(message: String) {
+        isSyncing = false
+        lastSyncMessage = message
     }
 }
 

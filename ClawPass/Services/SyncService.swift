@@ -175,7 +175,10 @@ protocol SyncServiceDelegate: AnyObject {
     func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
 }
 
+let currentProtocolVersion: UInt32 = 1
+
 struct SyncDevice: Identifiable {
+
     let id = UUID()
     let name: String
     let endpoint: NWEndpoint
@@ -190,6 +193,7 @@ class SyncService: ObservableObject {
     @Published var isDiscovering = false
     @Published var discoveredDevices: [SyncDevice] = []
     @Published var lastSyncTimestamp: Int64 = 0
+    private var handshakeCompleted = false
     
     weak var delegate: SyncServiceDelegate?
     
@@ -508,6 +512,21 @@ class SyncService: ObservableObject {
         case .entryDelete(let entryId):
             print("[Sync] Received entry delete: \(entryId)")
             // Handle delete - notify delegate
+            
+        case .handshake(let id, let version):
+            print("[Sync] Server handshake: \(id) v\(version)")
+            self.handshakeCompleted = true
+            
+        case .syncRequest:
+            // Desktop requested sync from us - typically we'd respond here
+            print("[Sync] Desktop requested sync")
+            
+        case .error(let msg):
+            print("[Sync] Server error: \(msg)")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.delegate?.syncService(self, didEncounterError: SyncError.networkError(NSError(domain: "SyncError", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
+            }
             
         default:
             print("[Sync] Unhandled message type")
