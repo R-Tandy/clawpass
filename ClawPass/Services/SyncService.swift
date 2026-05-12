@@ -494,9 +494,12 @@ class SyncService: ObservableObject {
                     self.handleMessage(packet.message)
                 } catch {
                     print("[SYNC] Decoding error: \(error)")
+                    print("[SYNC] Raw data that failed: \(jsonString)")
                     DispatchQueue.main.async {
                         self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
                     }
+                    // CRITICAL: Resume listening even after a decoding failure
+                    self.receiveNextMessage()
                 }
             }
         }
