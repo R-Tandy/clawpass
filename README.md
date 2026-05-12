@@ -23,7 +23,7 @@ Secure password manager for iOS with local WiFi sync.
 
 2. Open `ClawPass.xcodeproj` in Xcode
 
-3. Build and run on device or simulator
+3. Build and run on device or simulator 
 
 ## Features
 
