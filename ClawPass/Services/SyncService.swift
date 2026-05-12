@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_12_ENDIAN_FIX
+// SINCED_VERSION_2026_05_12_VERSION_STAMP
 import Foundation
 import Network
 import CryptoKit
@@ -270,7 +270,7 @@ class SyncService: ObservableObject {
                 case .ready:
                     print("[Sync] Connection ready")
                     self?.isConnected = true
-                    self?.syncStatus = "Connected. Waiting for data..."
+                    self?.syncStatus = "SINCED-V2: Waiting for data..."
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
@@ -305,7 +305,7 @@ class SyncService: ObservableObject {
                 case .ready:
                     print("[Sync] Connection ready")
                     self?.isConnected = true
-                    self?.syncStatus = "Connected. Waiting for data..."
+                    self?.syncStatus = "SINCED-V2: Waiting for data..."
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
@@ -386,7 +386,6 @@ class SyncService: ObservableObject {
                 return
             }
             
-            // CORRECTED ENDIANNESS: Interpret the 4 bytes as Big Endian
             let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
             print("[SYNC] Length received: \(length) bytes. Now fetching body...")
             DispatchQueue.main.async { self.syncStatus = "Recv 4b ➔ Fetching \(length)b..." }
@@ -439,7 +438,7 @@ class SyncService: ObservableObject {
             print("[Sync] Received \(entries.count) entries")
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                self.syncStatus = "Sync Response Received (\(entries.count) entries)"
+                self.syncStatus = "SINCED-V2: Sync Response Received (\(entries.count) entries)"
                 var vaultEntries: [VaultEntry] = []
                 for entry in entries {
                     if let vaultEntry = try? entry.toVaultEntry() { vaultEntries.append(vaultEntry) }
