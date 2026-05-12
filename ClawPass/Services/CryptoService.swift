@@ -70,6 +70,12 @@ class CryptoService {
         return plaintext
     }
     
+    func sha256(_ key: SymmetricKey) -> Data {
+        let keyData = key.withUnsafeBytes { Data($0) }
+        let digest = SHA256.hash(data: keyData)
+        return Data(digest)
+    }
+    
     // MARK: - Biometric Authentication
     
     func authenticateWithBiometric(reason: String) async throws -> Bool {
