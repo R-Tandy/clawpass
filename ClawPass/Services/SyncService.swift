@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_11_FINAL_FIXED
+// SINCED_VERSION_2026_05_12_DEBUG
 import Foundation
 import Network
 import CryptoKit
@@ -41,7 +41,6 @@ enum SyncMessage: Codable {
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .handshake(let deviceId, let version):
             try container.encode("handshake", forKey: .type)
@@ -75,7 +74,6 @@ enum SyncMessage: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-        
         switch type {
         case "handshake":
             let deviceId = try container.decode(String.self, forKey: .device_id)
@@ -109,7 +107,6 @@ enum SyncMessage: Codable {
     }
 }
 
-// MARK: - Sync Vault Entry (Matches Desktop Structure)
 struct SyncVaultEntry: Codable {
     let id: String
     let title: String
@@ -152,40 +149,20 @@ struct SyncVaultEntry: Codable {
     }
     
     func toVaultEntry() throws -> VaultEntry {
-        guard let uuid = UUID(uuidString: self.id) else {
-            throw SyncError.invalidEntryId
-        }
+        guard let uuid = UUID(uuidString: self.id) else { throw SyncError.invalidEntryId }
         let categoryUUID = self.category_id.flatMap { UUID(uuidString: $0) }
-        
-        // FIX: Match the actual VaultEntry initializer from Models/VaultEntry.swift
         var entry = VaultEntry(
-            id: uuid,
-            title: self.title,
-            username: self.username,
-            password: "", 
-            url: self.url,
-            notes: nil,
-            categoryID: categoryUUID,
-            totpSecret: self.totp_secret,
-            isFavorite: self.is_favorite
+            id: uuid, title: self.title, username: self.username, password: "",
+            url: self.url, notes: nil, categoryID: categoryUUID, totpSecret: self.totp_secret, isFavorite: self.is_favorite
         )
-        
-        // Manually assign the encrypted data and timestamps
         entry.encryptedPassword = Data(self.encrypted_password)
         entry.encryptedNotes = self.encrypted_notes.map { Data($0) }
-        // Note: createdAt/modifiedAt are constants in the current VaultEntry struct.
-        
         return entry
     }
 }
 
 enum SyncError: Error {
-    case invalidEntryId
-    case notConnected
-    case authenticationFailed
-    case encodingFailed
-    case decodingFailed
-    case networkError(Error)
+    case invalidEntryId, notConnected, authenticationFailed, encodingFailed, decodingFailed, networkError(Error)
 }
 
 protocol SyncServiceDelegate: AnyObject {
@@ -208,23 +185,17 @@ struct SyncDevice: Identifiable {
 
 class SyncService: ObservableObject {
     static let shared = SyncService()
-    
     @Published var isConnected = false
     @Published var isDiscovering = false
     @Published var discoveredDevices: [SyncDevice] = []
     @Published var lastSyncTimestamp: Int64 = 0
     @Published var syncStatus: String = "Idle"
     private var handshakeCompleted = false
-    
     weak var delegate: SyncServiceDelegate?
-    
     private var browser: NWBrowser?
     private var connection: NWConnection?
     private let syncQueue = DispatchQueue(label: "com.clawpass.sync", qos: .userInitiated)
-    private var deviceId: String {
-        UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-    }
-    
+    private var deviceId: String { UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString }
     private let serviceType = "_clawpass._tcp"
     
     func startDiscovery() {
@@ -281,8 +252,7 @@ class SyncService: ObservableObject {
                     completion(host.debugDescription, port.rawValue)
                 }
                 connection.cancel()
-            case .failed, .cancelled:
-                completion(nil, nil)
+            case .failed, .cancelled: completion(nil, nil)
             default: break
             }
         }
@@ -291,13 +261,9 @@ class SyncService: ObservableObject {
     
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
-        DispatchQueue.main.async {
-            self.syncStatus = "Connecting to \(device.name)..."
-        }
-        
+        DispatchQueue.main.async { self.syncStatus = "Connecting to \(device.name)..." }
         let parameters = NWParameters.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
-        
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
                 switch state {
@@ -308,11 +274,11 @@ class SyncService: ObservableObject {
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
-                    self?.syncStatus = "Connection waiting..."
+                    self?.syncStatus = "Waiting: \(error.localizedDescription)"
                 case .failed(let error):
                     print("[Sync] Connection failed: \(error)")
                     self?.isConnected = false
-                    self?.syncStatus = "Connection failed"
+                    self?.syncStatus = "Failed: \(error.localizedDescription)"
                     self?.delegate?.syncService(self!, didEncounterError: error)
                 case .cancelled:
                     print("[Sync] Connection cancelled")
@@ -322,7 +288,6 @@ class SyncService: ObservableObject {
                 }
             }
         }
-        
         connection?.start(queue: syncQueue)
         receiveNextMessage()
         sendHandshake()
@@ -330,14 +295,10 @@ class SyncService: ObservableObject {
 
     func connectManual(host: String, port: UInt16) {
         print("[SYNC] Manual connect triggered")
-        DispatchQueue.main.async {
-            self.syncStatus = "Connecting to \(host):\(port)..."
-        }
-        
+        DispatchQueue.main.async { self.syncStatus = "Connecting to \(host):\(port)..." }
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: port))
         let parameters = NWParameters.tcp
         connection = NWConnection(to: endpoint, using: parameters)
-        
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
                 switch state {
@@ -348,11 +309,11 @@ class SyncService: ObservableObject {
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
-                    self?.syncStatus = "Connection waiting..."
+                    self?.syncStatus = "Waiting: \(error.localizedDescription)"
                 case .failed(let error):
                     print("[Sync] Connection failed: \(error)")
                     self?.isConnected = false
-                    self?.syncStatus = "Connection failed"
+                    self?.syncStatus = "Failed: \(error.localizedDescription)"
                     self?.delegate?.syncService(self!, didEncounterError: error)
                 case .cancelled:
                     print("[Sync] Connection cancelled")
@@ -362,7 +323,6 @@ class SyncService: ObservableObject {
                 }
             }
         }
-        
         connection?.start(queue: syncQueue)
         receiveNextMessage()
         sendHandshake()
@@ -386,11 +346,7 @@ class SyncService: ObservableObject {
     }
     
     private func sendPacket(message: SyncMessage) {
-        guard let connection = connection else {
-            print("[SYNC] No connection to send packet")
-            return
-        }
-        
+        guard let connection = connection else { return }
         let packet = SyncPacket(deviceId: deviceId, message: message)
         do {
             let data = try JSONEncoder().encode(packet)
@@ -398,28 +354,20 @@ class SyncService: ObservableObject {
             var length = UInt32(data.count).bigEndian
             finalData.append(UnsafeBufferPointer(start: &length, count: 1))
             finalData.append(data)
-            
             connection.send(content: finalData, completion: .contentProcessed({ error in
-                if let error = error {
-                    print("[SYNC] Send error: \(error)")
-                }
+                if let error = error { print("[SYNC] Send error: \(error)") }
             }))
-        } catch {
-            print("[SYNC] Encoding error: \(error)")
-        }
+        } catch { print("[SYNC] Encoding error: \(error)") }
     }
     
     func receiveNextMessage() {
         guard let connection = connection else { return }
-        
         connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
             guard let self = self else { return }
-            
             if let error = error {
                 print("[SYNC] Receive length error: \(error)")
                 return
             }
-            
             guard let data = data, data.count == 4 else {
                 if isComplete {
                     print("[SYNC] Connection closed by server")
@@ -427,30 +375,20 @@ class SyncService: ObservableObject {
                 }
                 return
             }
-            
             let length = data.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
-            
             connection.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { data, _, isComplete, error in
                 if let error = error {
                     print("[SYNC] Receive body error: \(error)")
                     return
                 }
-                
-                guard let data = data, data.count == Int(length) else {
-                    print("[SYNC] Incomplete packet body")
-                    return
-                }
-                
+                guard let data = data, data.count == Int(length) else { return }
                 let jsonString = String(data: data, encoding: .utf8) ?? "invalid"
-                
                 do {
                     print("[SYNC] Received \(data.count) bytes. Attempting to decode SyncPacket...")
                     DispatchQueue.main.async { self.syncStatus = "Recv \(data.count) bytes. Decoding..." }
-                    
                     let packet = try JSONDecoder().decode(SyncPacket.self, from: data)
                     print("[SYNC] Decoded packet from \(packet.deviceId): \(packet.message)")
                     DispatchQueue.main.async { self.syncStatus = "Decoded: \(packet.message)" }
-                    
                     self.handleMessage(packet.message)
                 } catch {
                     print("[SYNC] Decoding error: \(error)")
@@ -472,11 +410,9 @@ class SyncService: ObservableObject {
             DispatchQueue.main.async { self.syncStatus = "ACK Received ➔ Requesting Sync..." }
             self.handshakeCompleted = true
             self.requestSync()
-            
         case .pong:
             print("[Sync] Received pong")
             DispatchQueue.main.async { self.syncStatus = "Pong received" }
-            
         case .syncResponse(let entries, let timestamp):
             print("[Sync] Received \(entries.count) entries")
             DispatchQueue.main.async { [weak self] in
@@ -484,14 +420,11 @@ class SyncService: ObservableObject {
                 self.syncStatus = "Sync Response Received (\(entries.count) entries)"
                 var vaultEntries: [VaultEntry] = []
                 for entry in entries {
-                    if let vaultEntry = try? entry.toVaultEntry() {
-                        vaultEntries.append(vaultEntry)
-                    }
+                    if let vaultEntry = try? entry.toVaultEntry() { vaultEntries.append(vaultEntry) }
                 }
                 self.lastSyncTimestamp = timestamp
                 self.delegate?.syncService(self, didReceiveEntries: vaultEntries)
             }
-            
         case .entryUpdate(let entry):
             print("[Sync] Received entry update")
             DispatchQueue.main.async { [weak self] in
@@ -501,21 +434,17 @@ class SyncService: ObservableObject {
                     self.delegate?.syncService(self, didReceiveEntries: [vaultEntry])
                 }
             }
-            
         case .entryDelete(let entryId):
             print("[Sync] Received entry delete: \(entryId)")
             DispatchQueue.main.async { self.syncStatus = "Entry Delete Received" }
-            
         case .handshake(let id, let version):
             print("[Sync] Server handshake: \(id) v\(version)")
             DispatchQueue.main.async { self.syncStatus = "Server Handshake OK" }
             self.handshakeCompleted = true
             self.requestSync()
-            
         case .syncRequest:
             print("[Sync] Desktop requested sync")
             DispatchQueue.main.async { self.syncStatus = "Desktop requested sync" }
-            
         case .error(let msg):
             print("[Sync] Server error: \(msg)")
             DispatchQueue.main.async { [weak self] in
@@ -523,7 +452,6 @@ class SyncService: ObservableObject {
                 self.syncStatus = "Error: \(msg)"
                 self.delegate?.syncService(self, didEncounterError: SyncError.networkError(NSError(domain: "SyncError", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
             }
-            
         default:
             print("[Sync] Unhandled message type")
         }
