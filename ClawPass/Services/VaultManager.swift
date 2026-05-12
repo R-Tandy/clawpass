@@ -66,8 +66,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let salt = Data.randomBytes(count: 32)
         let key = try cryptoService.deriveKey(from: password, salt: salt)
         
-        // Store salt in keychain
-        try storeSalt(salt)
+        // Create verification hash (SHA-256 of the derived key)
+        let verifyHash = cryptoService.sha256(key)
+        
+        // Store salt and verification hash together in keychain
+        var saltWithHash = salt
+        saltWithHash.append(verifyHash)
+        try storeSalt(saltWithHash)
         
         // Open encrypted database
         db = try Connection(path)
@@ -91,13 +96,31 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             .appendingPathComponent("vault.db")
             .path
         
-        // Retrieve stored salt
-        guard let salt = try retrieveSalt() else {
+        // Retrieve stored salt and hash
+        guard let saltWithHash = try retrieveSalt() else {
             throw VaultError.notInitialized
         }
         
-        // Derive key and try to open database
+        // Separate salt and stored hash (last 32 bytes)
+        // If saltWithHash is < 64, it's a legacy vault.
+        let salt = saltWithHash.count >= 64 ? 
+                   Data(saltWithHash.prefix(saltWithHash.count - 32)) : 
+                   saltWithHash
+        
+        let storedHash = saltWithHash.count >= 64 ? 
+                        Data(saltWithHash.suffix(32)) : 
+                        nil
+
+        // Derive key
         let key = try cryptoService.deriveKey(from: password, salt: salt)
+        
+        // Verify password using the stored hash (if available)
+        if let expectedHash = storedHash {
+            let currentHash = cryptoService.sha256(key)
+            if currentHash != expectedHash {
+                throw VaultError.invalidPassword
+            }
+        }
         
         do {
             db = try Connection(path)
