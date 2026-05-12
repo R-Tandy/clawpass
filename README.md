@@ -14,7 +14,7 @@ Secure password manager for iOS with local WiFi sync.
 - CryptoKit (Apple's crypto library)
 - LocalAuthentication (Face ID / Touch ID)
 
-## Setup
+## Setup 
 
 1. Install SQLCipher:
    ```bash
