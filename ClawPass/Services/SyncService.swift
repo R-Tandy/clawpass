@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_11_FINAL
+// SINCED_VERSION_2026_05_11_FINAL_FIXED
 import Foundation
 import Network
 import CryptoKit
@@ -156,19 +156,25 @@ struct SyncVaultEntry: Codable {
             throw SyncError.invalidEntryId
         }
         let categoryUUID = self.category_id.flatMap { UUID(uuidString: $0) }
-        let entry = VaultEntry(
+        
+        // FIX: Match the actual VaultEntry initializer from Models/VaultEntry.swift
+        var entry = VaultEntry(
             id: uuid,
             title: self.title,
             username: self.username,
-            encryptedPassword: Data(self.encrypted_password),
+            password: "", 
             url: self.url,
-            encryptedNotes: self.encrypted_notes.map { Data($0) },
+            notes: nil,
             categoryID: categoryUUID,
             totpSecret: self.totp_secret,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(self.created_at)),
-            modifiedAt: Date(timeIntervalSince1970: TimeInterval(self.modified_at)),
             isFavorite: self.is_favorite
         )
+        
+        // Manually assign the encrypted data and timestamps
+        entry.encryptedPassword = Data(self.encrypted_password)
+        entry.encryptedNotes = self.encrypted_notes.map { Data($0) }
+        // Note: createdAt/modifiedAt are constants in the current VaultEntry struct.
+        
         return entry
     }
 }
