@@ -298,19 +298,30 @@ class SyncService: ObservableObject {
         let parameters = NWParameters.tcp
         let connection = NWConnection(to: endpoint, using: parameters)
         
-        connection.stateUpdateHandler = { state in
-            switch state {
-            case .ready:
-                if let path = connection.currentPath,
-                   let endpoint = path.remoteEndpoint,
-                   case .hostPort(let host, let port) = endpoint {
-                    completion(host.debugDescription, port.rawValue)
+        connection.stateUpdateHandler = { [weak self] state in
+            DispatchQueue.main.async {
+                switch state {
+                case .ready:
+                    print("[Sync] Connection ready")
+                    self?.isConnected = true
+                    self?.syncStatus = "Connected. Waiting for data..."
+                    // Start the receiving loop immediately upon connection
+                    self?.receiveNextMessage()
+                case .waiting(let error):
+                    print("[Sync] Connection waiting: \(error)")
+                    self?.syncStatus = "Connection waiting..."
+                case .failed(let error):
+                    print("[Sync] Connection failed: \(error)")
+                    self?.isConnected = false
+                    self?.syncStatus = "Connection failed"
+                    self?.delegate?.syncService(self!, didEncounterError: error)
+                case .cancelled:
+                    print("[Sync] Connection cancelled")
+                    self?.isConnected = false
+                    self?.syncStatus = "Disconnected"
+                default:
+                    break
                 }
-                connection.cancel()
-            case .failed, .cancelled:
-                completion(nil, nil)
-            default:
-                break
             }
         }
         
