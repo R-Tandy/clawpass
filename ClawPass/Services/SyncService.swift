@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_12_SENSORY_OVERLOAD_FIXED
+// SINCED_VERSION_2026_05_12_ENDIAN_FIX
 import Foundation
 import Network
 import CryptoKit
@@ -386,7 +386,8 @@ class SyncService: ObservableObject {
                 return
             }
             
-            let length = data.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+            // CORRECTED ENDIANNESS: Interpret the 4 bytes as Big Endian
+            let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
             print("[SYNC] Length received: \(length) bytes. Now fetching body...")
             DispatchQueue.main.async { self.syncStatus = "Recv 4b ➔ Fetching \(length)b..." }
             
