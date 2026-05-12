@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_12_VERSION_STAMP
+// SINCED_VERSION_2026_05_12_SENSORY_FINAL
 import Foundation
 import Network
 import CryptoKit
@@ -270,7 +270,7 @@ class SyncService: ObservableObject {
                 case .ready:
                     print("[Sync] Connection ready")
                     self?.isConnected = true
-                    self?.syncStatus = "SINCED-V2: Waiting for data..."
+                    self?.syncStatus = "Connected. Waiting for data..."
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
@@ -305,7 +305,7 @@ class SyncService: ObservableObject {
                 case .ready:
                     print("[Sync] Connection ready")
                     self?.isConnected = true
-                    self?.syncStatus = "SINCED-V2: Waiting for data..."
+                    self?.syncStatus = "Connected. Waiting for data..."
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
@@ -386,7 +386,10 @@ class SyncService: ObservableObject {
                 return
             }
             
-            let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
+            // ATOMIC ENDIAN FIX: Use the most explicit method possible
+            let rawValue = data.withUnsafeBytes { $0.load(as: UInt32.self) }
+            let length = UInt32(bigEndian: rawValue)
+            
             print("[SYNC] Length received: \(length) bytes. Now fetching body...")
             DispatchQueue.main.async { self.syncStatus = "Recv 4b ➔ Fetching \(length)b..." }
             
