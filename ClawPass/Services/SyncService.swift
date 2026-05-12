@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_12_SENSORY_OVERLOAD
+// SINCED_VERSION_2026_05_12_SENSORY_OVERLOAD_FIXED
 import Foundation
 import Network
 import CryptoKit
@@ -262,7 +262,7 @@ class SyncService: ObservableObject {
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
         DispatchQueue.main.async { self.syncStatus = "Connecting to \(device.name)..." }
-        let parameters = NWParametersPtcp()
+        let parameters = NWParameters.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
@@ -357,13 +357,14 @@ class SyncService: ObservableObject {
             connection.send(content: finalData, completion: .contentProcessed({ error in
                 if let error = error { print("[SYNC] Send error: \(error)") }
             }))
-        } catch { print la [SYNC] Encoding error: \(error)") }
+        } catch {
+            print("[SYNC] Encoding error: \(error)")
+        }
     }
     
     func receiveNextMessage() {
         guard let connection = connection else { return }
         
-        // Sensory Overload: Explicitly log that we are waiting for 4 bytes
         DispatchQueue.main.async { self.syncStatus = "Listening for length (4b)..." }
         
         connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
@@ -417,7 +418,6 @@ class SyncService: ObservableObject {
                         self.syncStatus = "Decoding Error! (See logs)"
                         self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
                     }
-                    // CRITICAL: Even on decoding error, we MUST restart the listen loop
                     self.receiveNextMessage()
                 }
             }
