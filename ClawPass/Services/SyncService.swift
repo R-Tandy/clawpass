@@ -489,16 +489,21 @@ class SyncService: ObservableObject {
                 print("[SYNC] Received raw data: \(jsonString)")
                 
                 do {
+                    print("[SYNC] Received \(data.count) bytes. Attempting to decode SyncPacket...")
+                    DispatchQueue.main.async { self.syncStatus = "Recv \(data.count) bytes. Decoding..." }
+                    
                     let packet = try JSONDecoder().decode(SyncPacket.self, from: data)
                     print("[SYNC] Decoded packet from \(packet.deviceId): \(packet.message)")
+                    DispatchQueue.main.async { self.syncStatus = "Decoded: \(packet.message)" }
+                    
                     self.handleMessage(packet.message)
                 } catch {
                     print("[SYNC] Decoding error: \(error)")
                     print("[SYNC] Raw data that failed: \(jsonString)")
                     DispatchQueue.main.async {
+                        self.syncStatus = "Decoding Error!"
                         self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
                     }
-                    // CRITICAL: Resume listening even after a decoding failure
                     self.receiveNextMessage()
                 }
             }
