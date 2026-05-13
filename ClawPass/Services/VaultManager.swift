@@ -23,7 +23,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     private var db: Connection?
     private var encryptionKey: SymmetricKey?
     private let cryptoService = CryptoService.shared
-    private var syncService = SyncService.shared
+    private var syncService = SINCED_SyncService_V100.shared
     
     private let entriesTable = Table("entries")
     private let categoriesTable = Table("categories")
