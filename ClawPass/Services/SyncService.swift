@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_LENGTH_PREFIX_FINAL
+// SINCED_VERSION_2026_05_13_FINAL_ALIGNMENT
 import Foundation
 import Network
 import CryptoKit
@@ -166,11 +166,11 @@ enum SyncError: Error {
 }
 
 protocol SyncServiceDelegate: AnyObject {
-    func syncServiceDidConnect(_ service: SINCED_SyncService_V100)
-    func syncServiceDidDisconnect(_ service: SINCED_SyncService_V100)
-    func syncService(_ service: SINCED_SyncService_V100, didReceiveEntries entries: [VaultEntry])
-    func syncService(_ service: SINCED_SyncService_V100, didEncounterError error: Error)
-    func syncService(_ service: SINCED_SyncService_V100, didDiscoverDevices devices: [SyncDevice])
+    func syncServiceDidConnect(_ service: SyncService)
+    func syncServiceDidDisconnect(_ service: SyncService)
+    func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry])
+    func syncService(_ service: SyncService, didEncounterError error: Error)
+    func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
 }
 
 let currentProtocolVersion: UInt32 = 1
@@ -186,8 +186,8 @@ struct SyncDevice: Identifiable {
 // Global diagnostic buffer to bypass instance shadowing
 var GLOBAL_SYNC_DIAGNOSTIC: String = "No data yet"
 
-class SINCED_SyncService_V100: ObservableObject {
-    static let shared = SINCED_SyncService_V100()
+class SyncService: ObservableObject {
+    static let shared = SyncService()
     @Published var isConnected = false
     @Published var isDiscovering = false
     @Published var discoveredDevices: [SyncDevice] = []
@@ -303,8 +303,8 @@ class SINCED_SyncService_V100: ObservableObject {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
-        let portInt = Int(port)
-        let portValue = NWEndpoint.Port(rawValue: portInt) ?? NWEndpoint.Port(integerLiteral: 7878)
+        // The most primitive way to define the port to avoid compiler type errors
+        let portValue = NWEndpoint.Port(integerLiteral: Int(port))
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
@@ -312,42 +312,42 @@ class SINCED_SyncService_V100: ObservableObject {
     
     func receiveNextMessage() {
         connection?.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] (data, _, isComplete, error) in
-            guard let self = self else { return }
+            guard let strongSelf = self else { return }
             
             if let error = error {
                 print("[Sync] Length read error: \(error)")
-                DispatchQueue.main.async { self.syncStatus = "Len Error: \(error.localizedDescription)" }
+                DispatchQueue.main.async { strongSelf.syncStatus = "Len Error: \(error.localizedDescription)" }
                 return
             }
             
             guard let data = data, data.count == 4 else {
                 if isComplete {
                     print("[Sync] Connection closed by server")
-                    DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Disconnected" }
+                    DispatchQueue.main.async { strongSelf.isConnected = false; strongSelf.syncStatus = "Disconnected" }
                 } else {
-                    self.receiveNextMessage()
+                    strongSelf.receiveNextMessage()
                 }
                 return
             }
             
             // GLOBAL DUMP: Capture the 4 bytes of the length prefix
-            let hexBytes = data.map { String(format: "%02 la", $0) }.joined(separator: " ")
+            let hexBytes = data.map { String(format: "%02x", $0) }.joined(separator: " ")
             GLOBAL_SYNC_DIAGNOSTIC = "LEN: [ \(hexBytes) ]"
-            DispatchQueue.main.async { self.syncStatus = "SINCED-V100: \(GLOBAL_SYNC_DIAGNOSTIC)" }
+            DispatchQueue.main.async { strongSelf.syncStatus = "SINCED-V100: \(GLOBAL_SYNC_DIAGNOSTIC)" }
             
             let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
             
             if length == 0 {
-                self.receiveNextMessage()
+                strongSelf.receiveNextMessage()
                 return
             }
             
             connection?.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { (bodyData, _, _, bodyError) in
-                guard let self = self else { return }
+                guard let strongSelf = self else { return }
                 
                 if let bodyError = bodyError {
                     print("[Sync] Body read error: \(bodyError)")
-                    DispatchQueue.main.async { self.syncStatus = "Body Error" }
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Body Error" }
                     return
                 }
                 
@@ -358,14 +358,14 @@ class SINCED_SyncService_V100: ObservableObject {
                 
                 do {
                     let packet = try JSONDecoder().decode(SyncPacket.self, from: bodyData)
-                    DispatchQueue.main.async { self.syncStatus = "Decoded: \(packet.message)" }
-                    self.handleMessage(packet.message)
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Decoded: \(packet.message)" }
+                    strongSelf.handleMessage(packet.message)
                 } catch {
                     print("[Sync] Decoding error: \(error)")
-                    DispatchQueue.main.async { self.syncStatus = "Decoding Error" }
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Decoding Error" }
                 }
                 
-                self.receiveNextMessage()
+                strongSelf.receiveNextMessage()
             }
         }
     }
