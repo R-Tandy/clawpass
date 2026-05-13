@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_RAW_JSON_FLOW
+// SINCED_VERSION_2026_05_13_LENGTH_PREFIX_FINAL
 import Foundation
 import Network
 import CryptoKit
@@ -271,7 +271,7 @@ class SINCED_SyncService_V100: ObservableObject {
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
         DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-DEBUG-RAW: Connecting to \(device.name)..." }
-        let parameters = NWParameters.tcp
+        let parameters = NWParametersPase.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
@@ -303,51 +303,67 @@ class SINCED_SyncService_V100: ObservableObject {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
-        // HARD-CODED BYPASS: Compiler is fighting us on the Port type.
-        // We use a literal here to prove if the build can even succeed.
-        let portValue = NWEndpoint.Port(integerLiteral: 7878)
+        let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(integerLiteral: 7878)
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
     }
     
     func receiveNextMessage() {
-        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, _, isComplete, error) in
+        connection?.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] (data, _, isComplete, error) in
             guard let self = self else { return }
             
             if let error = error {
-                print("[Sync] Receive error: \(error)")
-                DispatchQueue.main.async { self.syncStatus = "Recv Error: \(error.localizedDescription)" }
+                print("[Sync] Length read error: \(error)")
+                DispatchQueue.main.async { self.syncStatus = "Len Error: \(error.localizedDescription)" }
                 return
             }
             
-            if let data = data, !data.isEmpty {
-                let hexBytes = data.prefix(4).map { String(format: "%02x", $0) }.joined(separator: " ")
-                GLOBAL_SYNC_DIAGNOSTIC = "HEAD: [ \(hexBytes) ] Size: \(data.count)b"
+            guard let data = data, data.count == 4 else {
+                if isComplete {
+                    print("[Sync] Connection closed by server")
+                    DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Disconnected" }
+                } else {
+                    self.receiveNextMessage()
+                }
+                return
+            }
+            
+            // GLOBAL DUMP: Capture the 4 bytes of the length prefix
+            let hexBytes = data.map { String(format: "%02 la", $0) }.joined(separator: " ")
+            GLOBAL_SYNC_DIAGNOSTIC = "LEN: [ \(hexBytes) ]"
+            DispatchQueue.main.async { self.syncStatus = "SINCED-V100: \(GLOBAL_SYNC_DIAGNOSTIC)" }
+            
+            let length = UInt32(bigEndian: data.withUnsafeBytes { $0.load(as: UInt32.self) })
+            
+            if length == 0 {
+                self.receiveNextMessage()
+                return
+            }
+            
+            connection?.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { (bodyData, _, _, bodyError) in
+                guard let self = self else { return }
                 
-                let jsonString = String(data: data, encoding: .utf8) ?? "invalid"
-                print("[SYNC] Body received. Length: \(data.count). Raw: \(jsonString)")
+                if let bodyError = bodyError {
+                    print("[Sync] Body read error: \(bodyError)")
+                    DispatchQueue.main.async { self.syncStatus = "Body Error" }
+                    return
+                }
+                
+                guard let bodyData = bodyData, bodyData.count == Int(length) else {
+                    print("[Sync] Body read incomplete")
+                    return
+                }
                 
                 do {
-                    DispatchQueue.main.async { self.syncStatus = "SINCED-V100: Recv \(data.count)b. Decoding..." }
-                    let packet = try JSONDecoder().decode(SyncPacket.self, from: data)
-                    print("[SYNC] Successfully decoded SyncPacket from \(packet.deviceId): \(packet.message)")
+                    let packet = try JSONDecoder().decode(SyncPacket.self, from: bodyData)
                     DispatchQueue.main.async { self.syncStatus = "Decoded: \(packet.message)" }
                     self.handleMessage(packet.message)
                 } catch {
-                    print("[SYNC] Decoding error: \(error)")
-                    print("[SYNC] Raw data that failed: \(jsonString)")
-                    DispatchQueue.main.async {
-                        self.syncStatus = "Decoding Error! (See logs)"
-                        self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
-                    }
+                    print("[Sync] Decoding error: \(error)")
+                    DispatchQueue.main.async { self.syncStatus = "Decoding Error" }
                 }
-            }
-            
-            if isComplete {
-                print("[Sync] Connection closed by server")
-                DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Server disconnected" }
-            } else {
+                
                 self.receiveNextMessage()
             }
         }
