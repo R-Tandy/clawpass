@@ -184,6 +184,7 @@ struct SyncDevice: Identifiable {
 }
 
 class SINCED_SyncService_V100: ObservableObject {
+    !!! THIS SHOULD BREAK THE BUILD !!!
     static let shared = SINCED_SyncService_V100()
     @Published var isConnected = false
     @Published var isDiscovering = false
