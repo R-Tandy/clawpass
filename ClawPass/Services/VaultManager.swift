@@ -350,15 +350,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     // MARK: - SyncServiceDelegate
     
-    func syncServiceDidConnect(_ service: SINCED_SyncService_V100) {
+    func syncServiceDidConnect(_ service: SyncService) {
         syncStatus = "Connected to desktop"
     }
     
-    func syncServiceDidDisconnect(_ service: SINCED_SyncService_V100) {
+    func syncServiceDidDisconnect(_ service: SyncService) {
         syncStatus = "Disconnected"
     }
     
-    func syncService(_ service: SINCED_SyncService_V100, didReceiveEntries incomingEntries: [VaultEntry]) {
+    func syncService(_ service: SyncService, didReceiveEntries incomingEntries: [VaultEntry]) {
         guard let db = db else {
             syncStatus = "Sync error: Vault not initialized"
             return
@@ -420,11 +420,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
     
-    func syncService(_ service: SINCED_SyncService_V100, didEncounterError error: Error) {
+    func syncService(_ service: SyncService, didEncounterError error: Error) {
         syncStatus = "Sync error: \(error.localizedDescription)"
     }
     
-    func syncService(_ service: SINCED_SyncService_V100, didDiscoverDevices devices: [SyncDevice]) {
+    func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice]) {
         // Discovery handled in UI
     }
 }

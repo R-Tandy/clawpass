@@ -304,7 +304,7 @@ class SyncService: ObservableObject {
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
         // The most primitive way to define the port to avoid compiler type errors
-        let portValue = NWEndpoint.Port(integerLiteral: Int(port))
+        let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(integerLiteral: 7878)
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
