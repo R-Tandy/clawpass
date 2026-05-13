@@ -20,6 +20,39 @@ struct SyncView: View {
             }
             .padding(.top, 40)
             
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 8) {
+                Text("🚨 ZOMBIE BUILD DETECTED 🚨")
+                    .font(.title)
+                    .fontWeight(.black)
+                    .foregroundColor(.red)
+                
+                Text("DIAG: \(GLOBAL_SYNC_DIAGNOSTIC)")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.red)
+                    .bold()
+            }
+            .padding(.top, 40)
+            
+            // RAW DATA LEAK HUD
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SINCED-V100 RAW BLOB LEAK")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.gray)
+                
+                Text(VaultManager.shared.entries.first?.encryptedPassword.map { data in
+                    data.map { String(format: "%02x", $0) }.joined(separator: " ")
+                } ?? "No data")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(8)
+            .background(Color(.systemGray6))
+            .cornerRadius(8)
+            .padding(.horizontal)
+            
             // Status HUD
             HStack {
                 Circle()
@@ -35,6 +68,7 @@ struct SyncView: View {
             .cornerRadius(12)
             
             Divider()
+
             
             // Device List
             List(syncService.discoveredDevices) { device in
