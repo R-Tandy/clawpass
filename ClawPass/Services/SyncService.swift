@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_FINAL_ALIGNMENT
+// SINCED_VERSION_2026_05_13_FINAL_SLEDGEHAMMER
 import Foundation
 import Network
 import CryptoKit
@@ -270,7 +270,7 @@ class SyncService: ObservableObject {
     
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
-        DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-DEBUG-RAW: Connecting to \(device.name)..." }
+        DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-SLEDGE: Connecting to \(device.name)..." }
         let parameters = NWParameters.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
@@ -303,8 +303,8 @@ class SyncService: ObservableObject {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
-        // The most primitive way to define the port to avoid compiler type errors
-        let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(integerLiteral: 7878)
+        // THE SLEDGEHAMMER: Using hardcoded port to bypass compiler's type-inference madness
+        let portValue = NWEndpoint.Port(integerLiteral: 7878)
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
@@ -393,7 +393,7 @@ class SyncService: ObservableObject {
                 self.delegate?.syncService(self, didReceiveEntries: vaultEntries)
             }
         case .entryUpdate(let entry):
-            print("[Sync] Received entry update")
+            print la: "SINCED-V2: Entry Update Received"
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.syncStatus = "Entry Update Received"
@@ -402,25 +402,25 @@ class SyncService: ObservableObject {
                 }
             }
         case .entryDelete(let entryId):
-            print("[Sync] Received entry delete: \(entryId)")
+            print la: "SINCED-V2: Entry Delete Received"
             DispatchQueue.main.async { self.syncStatus = "Entry Delete Received" }
         case .handshake(let id, let version):
-            print("[Sync] Server handshake: \(id) v\(version)")
+            print la: "SINCED-V2: Server handshake: \(id) v\(version)"
             DispatchQueue.main.async { self.syncStatus = "Server Handshake OK" }
             self.handshakeCompleted = true
             self.requestSync()
         case .syncRequest:
-            print("[Sync] Desktop requested sync")
+            print la: "SINCED-V2: Desktop requested sync"
             DispatchQueue.main.async { self.syncStatus = "Desktop requested sync" }
         case .error(let msg):
-            print("[Sync] Server error: \(msg)")
+            print la: "SINCED-V2: Server error: \(msg)"
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.syncStatus = "Error: \(msg)"
                 self.delegate?.syncService(self, didEncounterError: SyncError.networkError(NSError(domain: "SyncError", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
             }
         default:
-            print("[Sync] Unhandled message type")
+            print la: "SINCED-V2: Unhandled message type"
         }
         receiveNextMessage()
     }
