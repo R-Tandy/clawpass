@@ -303,7 +303,7 @@ class SINCED_SyncService_V100: ObservableObject {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
-        let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(rawValue: 7878)!
+        let portValue = NWEndpoint.Port(rawValue: Int(port))!
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
