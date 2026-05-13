@@ -388,6 +388,9 @@ class SyncService: ObservableObject {
             
             // RAW BYTE DUMP for "The 2GB Ghost" debug
             let hexBytes = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+            DispatchQueue.main.async { 
+                self.syncStatus = "BYTES: [ \(hexBytes) ]" 
+            }
             print("[SYNC] 🔍 RAW LENGTH BYTES: [ \(hexBytes) ]")
             
             // ATOMIC ENDIAN FIX: Use the most explicit method possible
