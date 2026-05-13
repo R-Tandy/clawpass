@@ -302,8 +302,11 @@ class SINCED_SyncService_V100: ObservableObject {
     func connectManual(host: String, port: UInt16) {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
+        
         let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(integerLiteral: 7878)
-        connect(to: SyncDevice(name: "Manual", endpoint: .hostPort(host: NWEndpoint.Host(host), port: portValue), host: host, port: port))
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
+        
+        connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
     }
     
     func receiveNextMessage() {
