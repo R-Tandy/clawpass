@@ -183,8 +183,10 @@ struct SyncDevice: Identifiable {
     let port: UInt16
 }
 
+// Global diagnostic buffer to bypass instance shadowing
+var GLOBAL_SYNC_DIAGNOSTIC: String = "No data yet"
+
 class SINCED_SyncService_V100: ObservableObject {
-    !!! THIS SHOULD BREAK THE BUILD !!!
     static let shared = SINCED_SyncService_V100()
     @Published var isConnected = false
     @Published var isDiscovering = false
@@ -394,14 +396,15 @@ class SINCED_SyncService_V100: ObservableObject {
                 return
             }
             
-            // RAW BYTE DUMP for "The 2GB Ghost" debug
+            // GLOBAL DUMP: Bypasses all instance logic
             let hexBytes = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+            GLOBAL_SYNC_DIAGNOSTIC = "BYTES: [ \(hexBytes) ]"
             DispatchQueue.main.async { 
-                self.syncStatus = "BYTES: [ \(hexBytes) ]" 
+                self.syncStatus = "SINCED-V100: \(GLOBAL_SYNC_DIAGNOSTIC)" 
             }
             print("[SYNC] 🔍 RAW LENGTH BYTES: [ \(hexBytes) ]")
             
-            // ATOMIC ENDIAN FIX: Use the most explicit method possible
+            // ATOMIC ENDIAN FIX
             let rawValue = data.withUnsafeBytes { $0.load(as: UInt32.self) }
             let length = UInt32(bigEndian: rawValue)
             

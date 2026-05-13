@@ -13,8 +13,8 @@ struct SyncView: View {
                     .fontWeight(.black)
                     .foregroundColor(.red)
                 
-                Text("VERSION: NUCLEAR-RED-TEST")
-                    .font(.caption)
+                Text("DIAG: \(GLOBAL_SYNC_DIAGNOSTIC)")
+                    .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.red)
                     .bold()
             }
