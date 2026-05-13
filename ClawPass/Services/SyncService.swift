@@ -271,7 +271,7 @@ class SINCED_SyncService_V100: ObservableObject {
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
         DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-DEBUG-RAW: Connecting to \(device.name)..." }
-        let parameters = NWParametersPase.tcp
+        let parameters = NWParameters.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
@@ -303,7 +303,8 @@ class SINCED_SyncService_V100: ObservableObject {
         UserDefaults.standard.set(host, forKey: "last_sync_host")
         UserDefaults.standard.set(String(port), forKey: "last_sync_port")
         
-        let portValue = NWEndpoint.Port(rawValue: Int(port)) ?? NWEndpoint.Port(integerLiteral: 7878)
+        let portInt = Int(port)
+        let portValue = NWEndpoint.Port(rawValue: portInt) ?? NWEndpoint.Port(integerLiteral: 7878)
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
         
         connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
