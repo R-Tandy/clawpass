@@ -344,17 +344,26 @@ class SyncService: ObservableObject {
                 return
             }
             
+            if length > 10 * 1024 * 1024 {
+                print("[Sync] Length too large: \(length)")
+                DispatchQueue.main.async { strongSelf.syncStatus = "SINCED-V100: Payload too large (\(length))" }
+                return
+            }
+            
             strongSelf.connection?.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { (bodyData, _, _, bodyError) in
                 guard let strongSelf = self else { return }
                 
                 if let bodyError = bodyError {
                     print("[Sync] Body read error: \(bodyError)")
-                    DispatchQueue.main.async { strongSelf.syncStatus = "Body Error" }
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Body Error: \(bodyError.localizedDescription)" }
+                    strongSelf.receiveNextMessage() // RESTART loop on error
                     return
                 }
                 
                 guard let bodyData = bodyData, bodyData.count == Int(length) else {
-                    print("[Sync] Body read incomplete")
+                    print("[Sync] Body read incomplete. Got \(bodyData?.count ?? 0), expected \(length)")
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Body Read Incomplete" }
+                    strongSelf.receiveNextMessage() // RESTART loop on error
                     return
                 }
                 
@@ -364,10 +373,10 @@ class SyncService: ObservableObject {
                     strongSelf.handleMessage(packet.message)
                 } catch {
                     print("[Sync] Decoding error: \(error)")
-                    DispatchQueue.main.async { strongSelf.syncStatus = "Decoding Error" }
+                    let errorMsg = "\(error)".prefix(30)
+                    DispatchQueue.main.async { strongSelf.syncStatus = "Decode Err: \(errorMsg)" }
+                    strongSelf.receiveNextMessage() // RESTART loop on error
                 }
-                
-                strongSelf.receiveNextMessage()
             }
         }
     }
