@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SyncView: View {
-    @ObservedObject var syncService = SINCED_SyncService_V100.shared
+    @ObservedObject var syncService = SyncService.shared
     @State private var manualHost: String = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
     @State private var manualPort: String = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
     
