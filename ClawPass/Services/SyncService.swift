@@ -386,6 +386,10 @@ class SyncService: ObservableObject {
                 return
             }
             
+            // RAW BYTE DUMP for "The 2GB Ghost" debug
+            let hexBytes = data.map { String(format: "%02x", $0) }.joined(separator: " ")
+            print("[SYNC] 🔍 RAW LENGTH BYTES: [ \(hexBytes) ]")
+            
             // ATOMIC ENDIAN FIX: Use the most explicit method possible
             let rawValue = data.withUnsafeBytes { $0.load(as: UInt32.self) }
             let length = UInt32(bigEndian: rawValue)
