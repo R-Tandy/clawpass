@@ -8,13 +8,15 @@ struct SyncView: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 8) {
-                Text("ClawPass Sync")
+                Text("🚨 ZOMBIE BUILD DETECTED 🚨")
                     .font(.title)
-                    .fontWeight(.bold)
+                    .fontWeight(.black)
+                    .foregroundColor(.red)
                 
-                Text("v1.0.1-SINCED") // VERSION STAMP
+                Text("VERSION: NUCLEAR-RED-TEST")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.red)
+                    .bold()
             }
             .padding(.top, 40)
             
