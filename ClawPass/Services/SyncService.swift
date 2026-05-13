@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_12_SENSORY_FINAL
+// SINCED_VERSION_2026_05_13_RAW_JSON_FLOW
 import Foundation
 import Network
 import CryptoKit
@@ -202,7 +202,6 @@ class SINCED_SyncService_V100: ObservableObject {
     private let serviceType = "_clawpass._tcp"
     
     init() {
-        // Load last connection
         let savedHost = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
         let savedPort = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
         print("[SINCED] Loaded last connection: \(savedHost):\(savedPort)")
@@ -291,7 +290,6 @@ class SINCED_SyncService_V100: ObservableObject {
                     self?.syncStatus = "Failed: \(error.localizedDescription)"
                     self?.delegate?.syncService(self!, didEncounterError: error)
                 case .cancelled:
-                    print("[Sync] Connection cancelled")
                     self?.isConnected = false
                     self?.syncStatus = "Disconnected"
                 default: break
@@ -299,135 +297,33 @@ class SINCED_SyncService_V100: ObservableObject {
             }
         }
         connection?.start(queue: syncQueue)
-        receiveNextMessage()
-        sendHandshake()
     }
-
+    
     func connectManual(host: String, port: UInt16) {
-        print("[SYNC] Manual connect triggered")
-        DispatchQueue.main.async { self.syncStatus = "Connecting to \(host):\(port)..." }
-        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: port))
-        let parameters = NWParameters.tcp
-        connection = NWConnection(to: endpoint, using: parameters)
-        connection?.stateUpdateHandler = { [weak self] state in
-            DispatchQueue.main.async {
-                switch state {
-                case .ready:
-                    print("[Sync] Connection ready")
-                    self?.isConnected = true
-                    self?.syncStatus = "Connected. Waiting for data..."
-                    self?.receiveNextMessage()
-                case .waiting(let error):
-                    print("[Sync] Connection waiting: \(error)")
-                    self?.syncStatus = "Waiting: \(error.localizedDescription)"
-                case .failed(let error):
-                    print("[Sync] Connection failed: \(error)")
-                    self?.isConnected = false
-                    self?.syncStatus = "Failed: \(error.localizedDescription)"
-                    self?.delegate?.syncService(self!, didEncounterError: error)
-                case .cancelled:
-                    print("[Sync] Connection cancelled")
-                    self?.isConnected = false
-                    self?.syncStatus = "Disconnected"
-                default: break
-                }
-            }
-        }
-        connection?.start(queue: syncQueue)
-        receiveNextMessage()
-        sendHandshake()
-    }
-
-    func disconnect() {
-        connection?.cancel()
-        connection = nil
-        isConnected = false
-        DispatchQueue.main.async { self.syncStatus = "Disconnected" }
-    }
-    
-    private func sendHandshake() {
-        let handshake = SyncMessage.handshake(deviceId: deviceId, version: currentProtocolVersion)
-        sendPacket(message: handshake)
-    }
-    
-    func requestSync() {
-        let request = SyncMessage.syncRequest(lastTimestamp: lastSyncTimestamp)
-        sendPacket(message: request)
-    }
-    
-    private func sendPacket(message: SyncMessage) {
-        guard let connection = connection else { return }
-        let packet = SyncPacket(deviceId: deviceId, message: message)
-        do {
-            let data = try JSONEncoder().encode(packet)
-            var finalData = Data()
-            var length = UInt32(data.count).bigEndian
-            finalData.append(UnsafeBufferPointer(start: &length, count: 1))
-            finalData.append(data)
-            connection.send(content: finalData, completion: .contentProcessed({ error in
-                if let error = error { print("[SYNC] Send error: \(error)") }
-            }))
-        } catch {
-            print("[SYNC] Encoding error: \(error)")
-        }
+        UserDefaults.standard.set(host, forKey: "last_sync_host")
+        UserDefaults.standard.set(String(port), forKey: "last_sync_port")
+        connect(to: SyncDevice(name: "Manual", endpoint: .hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: Int(port))), host: host, port: port))
     }
     
     func receiveNextMessage() {
-        guard let connection = connection else { return }
-        
-        DispatchQueue.main.async { self.syncStatus = "Listening for length (4b)..." }
-        
-        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
+        connection?.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] (data, _, isComplete, error) in
             guard let self = self else { return }
             
             if let error = error {
-                print("[SYNC] Receive length error: \(error)")
-                DispatchQueue.main.async { self.syncStatus = "Len Error: \(error.localizedDescription)" }
+                print("[Sync] Receive error: \(error)")
+                DispatchQueue.main.async { self.syncStatus = "Recv Error: \(error.localizedDescription)" }
                 return
             }
             
-            guard let data = data, data.count == 4 else {
-                if isComplete {
-                    print("[SYNC] Connection closed by server")
-                    DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Disconnected" }
-                } else {
-                    print("[SYNC] Length read incomplete: \(data?.count ?? 0) bytes")
-                }
-                return
-            }
-            
-            // GLOBAL DUMP: Bypasses all instance logic
-            let hexBytes = data.map { String(format: "%02x", $0) }.joined(separator: " ")
-            GLOBAL_SYNC_DIAGNOSTIC = "BYTES: [ \(hexBytes) ]"
-            DispatchQueue.main.async { 
-                self.syncStatus = "SINCED-V100: \(GLOBAL_SYNC_DIAGNOSTIC)" 
-            }
-            print("[SYNC] 🔍 RAW LENGTH BYTES: [ \(hexBytes) ]")
-            
-            // ATOMIC ENDIAN FIX
-            let rawValue = data.withUnsafeBytes { $0.load(as: UInt32.self) }
-            let length = UInt32(bigEndian: rawValue)
-            
-            print("[SYNC] Length received: \(length) bytes. Now fetching body...")
-            DispatchQueue.main.async { self.syncStatus = "Recv 4b ➔ Fetching \(length)b..." }
-            
-            connection.receive(minimumIncompleteLength: Int(length), maximumLength: Int(length)) { data, _, isComplete, error in
-                if let error = error {
-                    print("[SYNC] Receive body error: \(error)")
-                    DispatchQueue.main.async { self.syncStatus = "Body Error: \(error.localizedDescription)" }
-                    return
-                }
-                
-                guard let data = data, data.count == Int(length) else {
-                    print("[SYNC] Body read incomplete: \(data?.count ?? 0) of \(length) bytes")
-                    return
-                }
+            if let data = data, !data.isEmpty {
+                let hexBytes = data.prefix(4).map { String(format: "%02x", $0) }.joined(separator: " ")
+                GLOBAL_SYNC_DIAGNOSTIC = "HEAD: [ \(hexBytes) ] Size: \(data.count)b"
                 
                 let jsonString = String(data: data, encoding: .utf8) ?? "invalid"
                 print("[SYNC] Body received. Length: \(data.count). Raw: \(jsonString)")
                 
                 do {
-                    DispatchQueue.main.async { self.syncStatus = "Recv \(data.count)b. Decoding..." }
+                    DispatchQueue.main.async { self.syncStatus = "SINCED-V100: Recv \(data.count)b. Decoding..." }
                     let packet = try JSONDecoder().decode(SyncPacket.self, from: data)
                     print("[SYNC] Successfully decoded SyncPacket from \(packet.deviceId): \(packet.message)")
                     DispatchQueue.main.async { self.syncStatus = "Decoded: \(packet.message)" }
@@ -439,8 +335,14 @@ class SINCED_SyncService_V100: ObservableObject {
                         self.syncStatus = "Decoding Error! (See logs)"
                         self.delegate?.syncService(self, didEncounterError: SyncError.decodingFailed)
                     }
-                    self.receiveNextMessage()
                 }
+            }
+            
+            if isComplete {
+                print("[Sync] Connection closed by server")
+                DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Server disconnected" }
+            } else {
+                self.receiveNextMessage()
             }
         }
     }
@@ -498,5 +400,23 @@ class SINCED_SyncService_V100: ObservableObject {
             print("[Sync] Unhandled message type")
         }
         receiveNextMessage()
+    }
+    
+    func requestSync() {
+        let request = SyncMessage.syncRequest(lastTimestamp: lastSyncTimestamp)
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        
+        do {
+            let data = try JSONEncoder().encode(packet)
+            connection?.send(content: data, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("[SINCED] Failed to send sync request: \(error)")
+                } else {
+                    print("[SINCED] Sync request delivered (\(data.count) bytes)")
+                }
+            }))
+        } catch {
+            print("[SINCED] Encoding failed: \(error)")
+        }
     }
 }
