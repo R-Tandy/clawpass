@@ -183,8 +183,8 @@ struct SyncDevice: Identifiable {
     let port: UInt16
 }
 
-class SyncService: ObservableObject {
-    static let shared = SyncService()
+class SINCED_SyncService_V100: ObservableObject {
+    static let shared = SINCED_SyncService_V100()
     @Published var isConnected = false
     @Published var isDiscovering = false
     @Published var discoveredDevices: [SyncDevice] = []
@@ -197,6 +197,13 @@ class SyncService: ObservableObject {
     private let syncQueue = DispatchQueue(label: "com.clawpass.sync", qos: .userInitiated)
     private var deviceId: String { UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString }
     private let serviceType = "_clawpass._tcp"
+    
+    init() {
+        // Load last connection
+        let savedHost = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
+        let savedPort = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
+        print("[SINCED] Loaded last connection: \(savedHost):\(savedPort)")
+    }
     
     func startDiscovery() {
         isDiscovering = true

@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct SyncView: View {
-    @ObservedObject var syncService = SyncService.shared
-    @State private var manualHost: String = ""
-    @State private var manualPort: String = "7878"
+    @ObservedObject var syncService = SINCED_SyncService_V100.shared
+    @State private var manualHost: String = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
+    @State private var manualPort: String = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
     
     var body: some View {
         VStack(spacing: 20) {
