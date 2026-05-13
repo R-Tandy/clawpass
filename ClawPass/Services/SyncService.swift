@@ -432,12 +432,18 @@ class SyncService: ObservableObject {
         let packet = SyncPacket(deviceId: deviceId, message: handshake)
         
         do {
-            let data = try JSONEncoder().encode(packet)
-            connection?.send(content: data, completion: .contentProcessed({ error in
+            let jsonData = try JSONEncoder().encode(packet)
+            
+            // PREPEND 4-BYTE BIG ENDIAN LENGTH
+            var length = UInt32(jsonData.count).bigEndian
+            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            let finalPacket = lengthData + jsonData
+            
+            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
                 if let error = error {
                     print("[SINCED] Failed to send handshake: \(error)")
                 } else {
-                    print("[SINCED] Handshake delivered (\(data.count) bytes)")
+                    print("[SINCED] Handshake delivered with length prefix (\(finalPacket.count) bytes)")
                 }
             }))
         } catch {
@@ -450,12 +456,18 @@ class SyncService: ObservableObject {
         let packet = SyncPacket(deviceId: deviceId, message: request)
         
         do {
-            let data = try JSONEncoder().encode(packet)
-            connection?.send(content: data, completion: .contentProcessed({ error in
+            let jsonData = try JSONEncoder().encode(packet)
+            
+            // PREPEND 4-BYTE BIG ENDIAN LENGTH
+            var length = UInt32(jsonData.count).bigEndian
+            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            let finalPacket = lengthData + jsonData
+            
+            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
                 if let error = error {
                     print("[SINCED] Failed to send sync request: \(error)")
                 } else {
-                    print("[SINCED] Sync request delivered (\(data.count) bytes)")
+                    print("[SINCED] Sync request delivered with length prefix (\(finalPacket.count) bytes)")
                 }
             }))
         } catch {
