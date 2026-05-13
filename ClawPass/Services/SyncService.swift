@@ -279,7 +279,11 @@ class SyncService: ObservableObject {
                 case .ready:
                     print("[Sync] Connection ready")
                     self?.isConnected = true
-                    self?.syncStatus = "Connected. Waiting for data..."
+                    self?.syncStatus = "Connected. Sending Handshake..."
+                    
+                    // KICKSTART THE SEQUENCE: Send handshake immediately on connect
+                    self?.sendHandshake()
+                    
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
@@ -421,6 +425,24 @@ class SyncService: ObservableObject {
             print("[SINCED-V2] Unhandled message type")
         }
         receiveNextMessage()
+    }
+    
+    func sendHandshake() {
+        let handshake = SyncMessage.handshake(deviceId: deviceId, version: currentProtocolVersion)
+        let packet = SyncPacket(deviceId: deviceId, message: handshake)
+        
+        do {
+            let data = try JSONEncoder().encode(packet)
+            connection?.send(content: data, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("[SINCED] Failed to send handshake: \(error)")
+                } else {
+                    print("[SINCED] Handshake delivered (\(data.count) bytes)")
+                }
+            }))
+        } catch {
+            print("[SINCED] Handshake encoding failed: \(error)")
+        }
     }
     
     func requestSync() {
