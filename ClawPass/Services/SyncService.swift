@@ -166,11 +166,11 @@ enum SyncError: Error {
 }
 
 protocol SyncServiceDelegate: AnyObject {
-    func syncServiceDidConnect(_ service: SyncService)
-    func syncServiceDidDisconnect(_ service: SyncService)
-    func syncService(_ service: SyncService, didReceiveEntries entries: [VaultEntry])
-    func syncService(_ service: SyncService, didEncounterError error: Error)
-    func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
+    func syncServiceDidConnect(_ service: SINCED_SyncService_V100)
+    func syncServiceDidDisconnect(_ service: SINCED_SyncService_V100)
+    func syncService(_ service: SINCED_SyncService_V100, didReceiveEntries entries: [VaultEntry])
+    func syncService(_ service: SINCED_SyncService_V100, didEncounterError error: Error)
+    func syncService(_ service: SINCED_SyncService_V100, didDiscoverDevices devices: [SyncDevice])
 }
 
 let currentProtocolVersion: UInt32 = 1
