@@ -20,21 +20,6 @@ struct SyncView: View {
             }
             .padding(.top, 40)
             
-    var body: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 8) {
-                Text("🚨 ZOMBIE BUILD DETECTED 🚨")
-                    .font(.title)
-                    .fontWeight(.black)
-                    .foregroundColor(.red)
-                
-                Text("DIAG: \(GLOBAL_SYNC_DIAGNOSTIC)")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.red)
-                    .bold()
-            }
-            .padding(.top, 40)
-            
             // RAW DATA LEAK HUD
             VStack(alignment: .leading, spacing: 4) {
                 Text("SINCED-V100 RAW BLOB LEAK")
@@ -68,7 +53,6 @@ struct SyncView: View {
             .cornerRadius(12)
             
             Divider()
-
             
             // Device List
             List(syncService.discoveredDevices) { device in
