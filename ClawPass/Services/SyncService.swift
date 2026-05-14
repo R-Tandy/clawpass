@@ -346,6 +346,11 @@ class SyncService: ObservableObject {
     func connectManual(host: String, port: UInt16) {
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: port))
         let device = SyncDevice(name: "Manual Device", endpoint: endpoint, host: host, port: port)
+        
+        // Save for future one-button connect
+        UserDefaults.standard.set(host, forKey: "last_sync_host")
+        UserDefaults.standard.set(String(port), forKey: "last_sync_port")
+        
         connect(to: device)
     }
     

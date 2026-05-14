@@ -238,6 +238,8 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let update = entryRow.update(syncStatusColumn <- "pending_delete")
         
         try db.run(update)
+        
+        // CRITICAL: We must filter out "pending_delete" entries from the main list
         try loadData()
         
         // Attempt immediate propagation
@@ -436,7 +438,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         var loadedEntries: [VaultEntry] = []
         
-        for row in try db.prepare(entriesTable) {
+        // FILTER: Only load entries that are NOT marked for deletion
+        let query = entriesTable.filter(syncStatusColumn != "pending_delete")
+        
+        for row in try db.prepare(query) {
             let entry = VaultEntry(
                 id: UUID(uuidString: row[id])!,
                 title: row[title],
