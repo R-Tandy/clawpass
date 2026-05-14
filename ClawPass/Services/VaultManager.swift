@@ -181,7 +181,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             createdAt <- entry.createdAt,
             modifiedAt <- entry.modifiedAt,
             isFavorite <- entry.isFavorite,
-            syncStatus <- "pending_update"
+            syncStatusColumn <- "pending_update"
         )
         
         try db.run(insert)
@@ -217,7 +217,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             totpSecret <- entry.totpSecret,
             modifiedAt <- Date(),
             isFavorite <- entry.isFavorite,
-            syncStatus <- "pending_update"
+            syncStatusColumn <- "pending_update"
         )
         
         try db.run(update)
