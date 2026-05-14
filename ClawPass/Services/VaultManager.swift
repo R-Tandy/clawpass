@@ -286,6 +286,41 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
     
+    func syncCategories(_ categories: [SyncCategory]) {
+        guard let db = db else {
+            print("[Vault] Sync categories error: Vault not initialized")
+            return
+        }
+        
+        do {
+            try db.transaction {
+                for cat in categories {
+                    let query = categoriesTable.filter(catId == cat.id)
+                    if let row = try db.pluck(query) {
+                        let update = query.update(
+                            catName <- cat.name,
+                            catIcon <- cat.icon,
+                            catColor <- cat.color
+                        )
+                        try db.run(update)
+                    } else {
+                        let insert = categoriesTable.insert(
+                            catId <- cat.id,
+                            catName <- cat.name,
+                            catIcon <- cat.icon,
+                            catColor <- cat.color
+                        )
+                        try db.run(insert)
+                    }
+                }
+                try loadCategories()
+            }
+            print("[Vault] Successfully synced \(categories.count) categories")
+        } catch {
+            print("[Vault] Category sync failed: \(error)")
+        }
+    }
+    
     private func createTables() throws {
         guard let db = db else { return }
         
