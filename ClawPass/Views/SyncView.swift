@@ -26,12 +26,10 @@ struct SyncView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.gray)
                 
-                Text(VaultManager.shared.entries.first?.encryptedPassword.map { data in
-                    data.map { String(format: "%02x", $0) }.joined(separator: " ")
-                } ?? "No data")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.blue)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(getRawBlobLeak())
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.blue)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(8)
             .background(Color(.systemGray6))
@@ -122,6 +120,17 @@ struct SyncView: View {
         }
         .padding()
         .navigationTitle("Sync")
+    }
+
+    private func getRawBlobLeak() -> String {
+        guard let firstEntry = VaultManager.shared.entries.first else {
+            return "No entries in vault"
+        }
+        let data = firstEntry.encryptedPassword
+        if data.isEmpty {
+            return "Encrypted password is empty"
+        }
+        return data.map { String(format: "%02x", $0) }.joined(separator: " ")
     }
 }
 
