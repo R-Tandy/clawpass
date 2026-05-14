@@ -634,3 +634,21 @@ class SyncService: ObservableObject {
     }
 
     private func sendPacket(_ packet: SyncPacket) {
+        do {
+            let jsonData = try JSONEncoder().encode(packet)
+            var length = UInt32(jsonData.count).bigEndian
+            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            let finalPacket = lengthData + jsonData
+            
+            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("[SINCED] Outbound packet error: \(error)")
+                } else {
+                    print("[SINCED] Outbound packet delivered (\(finalPacket.count) bytes)")
+                }
+            }))
+        } catch {
+            print("[SINCED] Outbound encoding failed: \(error)")
+        }
+    }
+}
