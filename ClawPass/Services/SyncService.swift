@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_SLEDGEHAMMER_V2_FINAL
+// SINCED_VERSION_2026_05_13_SLEDGEHAMMER_V3_SLOWMO
 import Foundation
 import Network
 import CryptoKit
@@ -289,7 +289,7 @@ class SyncService: ObservableObject {
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
         DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-SLEDGE: Connecting to \(device.name)..." }
-        let parameters = NWParameters.tcp
+        let parameters = NWParametersP
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
@@ -397,14 +397,19 @@ class SyncService: ObservableObject {
         switch message {
         case .ack:
             print("[Sync] Handshake ACK received")
-            DispatchQueue.main.async { self.syncStatus = "ACK Received ➔ Requesting Salt..." }
+            DispatchQueue.main.async { self.syncStatus = "SINCED: ACK Received ➔ Requesting Salt..." }
             self.handshakeCompleted = true
             self.requestSalt()
         case .saltResponse(let salt):
             print("[SINCED] Salt received (\(salt.count) bytes)")
-            DispatchQueue.main.async { self.syncStatus = "Salt Received ➔ Updating Key..." }
+            DispatchQueue.main.async { self.syncStatus = "SINCED: Salt Received ➔ Re-Keying..." }
             VaultManager.shared.updateSaltAndReKey(salt: salt)
-            self.requestSync()
+            
+            // SLOW-MO: Delay the sync request so the user can see the key validation status
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                print("[SINCED] Slow-mo delay finished, requesting sync...")
+                self.requestSync()
+            }
         case .pong:
             print("[Sync] Received pong")
             DispatchQueue.main.async { self.syncStatus = "Pong received" }
@@ -494,7 +499,7 @@ class SyncService: ObservableObject {
                 if let error = error {
                     print("[SINCED] Failed to request salt: \(error)")
                 } else {
-                    print("[SINCED] Salt request delivered (\(finalPacket.count) bytes)")
+                    print("[SINCED] Salt request delivered with length prefix (\(finalPacket.count) bytes)")
                 }
             }))
         } catch {
