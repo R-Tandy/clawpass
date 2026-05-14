@@ -164,6 +164,7 @@ struct CredentialRow: View {
 struct EditEntryView: View {
     let entry: VaultEntry
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var vaultManager = VaultManager.shared
     
     @State private var title: String
     @State private var username: String
@@ -176,9 +177,9 @@ struct EditEntryView: View {
         self.entry = entry
         _title = State(initialValue: entry.title)
         _username = State(initialValue: entry.username)
-        _password = State(initialValue: "") // Will load decrypted
+        _password = State(initialValue: "")
         _url = State(initialValue: entry.url ?? "")
-        _notes = State(initialValue: "") // Will load decrypted
+        _notes = State(initialValue: "")
         _isFavorite = State(initialValue: entry.isFavorite)
     }
     
@@ -217,6 +218,18 @@ struct EditEntryView: View {
                     Button("Save") { saveChanges() }
                 }
             }
+            .onAppear {
+                loadCurrentValues()
+            }
+        }
+    }
+    
+    private func loadCurrentValues() {
+        do {
+            password = try vaultManager.decryptPassword(for: entry)
+            notes = try vaultManager.decryptNotes(for: entry) ?? ""
+        } catch {
+            print("Failed to load values for editing: \(error)")
         }
     }
     
