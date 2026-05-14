@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_SLEDGEHAMMER_S la_FIX
+// SINCED_VERSION_2026_05_13_SLEDGEHAMMER_V2_FINAL
 import Foundation
 import Network
 import CryptoKit
@@ -17,7 +17,7 @@ struct SyncPacket: Codable {
 
 // MARK: - Sync Message Protocol (Matches Desktop)
 enum SyncMessage: Codable {
-    case handshake(deviceId: String, version: UInt32)
+    case handshake(deviceId: String, version: UInt32, vaultId: String)
     case syncRequest(lastTimestamp: Int64)
     case syncResponse(entries: [SyncVaultEntry], timestamp: Int64)
     case entryUpdate(entry: SyncVaultEntry)
@@ -26,26 +26,31 @@ enum SyncMessage: Codable {
     case ping
     case pong
     case error(message: String)
+    case requestSalt(vaultId: String)
+    case saltResponse(salt: [UInt8])
     
     enum CodingKeys: String, CodingKey {
         case type
         case device_id = "device_id"
         case version
+        case vault_id = "vault_id"
         case last_timestamp = "last_timestamp"
         case entries
         case timestamp
         case entry
         case entry_id = "entry_id"
+        case salt
         case message
     }
     
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .handshake(let deviceId, let version):
+        case .handshake(let deviceId, let version, let vaultId):
             try container.encode("handshake", forKey: .type)
             try container.encode(deviceId, forKey: .device_id)
             try container.encode(version, forKey: .version)
+            try container.encode(vaultId, forKey: .vault_id)
         case .syncRequest(let lastTimestamp):
             try container.encode("sync_request", forKey: .type)
             try container.encode(lastTimestamp, forKey: .last_timestamp)
@@ -68,6 +73,12 @@ enum SyncMessage: Codable {
         case .error(let message):
             try container.encode("error", forKey: .type)
             try container.encode(message, forKey: .message)
+        case .requestSalt(let vaultId):
+            try container.encode("request_salt", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .saltResponse(let salt):
+            try container.encode("salt_response", forKey: .type)
+            try container.encode(salt, forKey: .salt)
         }
     }
     
@@ -78,7 +89,8 @@ enum SyncMessage: Codable {
         case "handshake":
             let deviceId = try container.decode(String.self, forKey: .device_id)
             let version = try container.decode(UInt32.self, forKey: .version)
-            self = .handshake(deviceId: deviceId, version: version)
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .handshake(deviceId: deviceId, version: version, vaultId: vaultId)
         case "sync_request":
             let lastTimestamp = try container.decode(Int64.self, forKey: .last_timestamp)
             self = .syncRequest(lastTimestamp: lastTimestamp)
@@ -101,6 +113,12 @@ enum SyncMessage: Codable {
         case "error":
             let message = try container.decode(String.self, forKey: .message)
             self = .error(message: message)
+        case "request_salt":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .requestSalt(vaultId: vaultId)
+        case "salt_response":
+            let salt = try container.decode([UInt8].self, forKey: .salt)
+            self = .saltResponse(salt: salt)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(type)")
         }
@@ -280,20 +298,18 @@ class SyncService: ObservableObject {
                     print("[Sync] Connection ready")
                     self?.isConnected = true
                     self?.syncStatus = "Connected. Sending Handshake..."
-                    
-                    // KICKSTART THE SEQUENCE: Send handshake immediately on connect
                     self?.sendHandshake()
-                    
                     self?.receiveNextMessage()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
+                    self?.isConnected = false
                     self?.syncStatus = "Waiting: \(error.localizedDescription)"
                 case .failed(let error):
                     print("[Sync] Connection failed: \(error)")
                     self?.isConnected = false
                     self?.syncStatus = "Failed: \(error.localizedDescription)"
-                    self?.delegate?.syncService(self!, didEncounterError: error)
                 case .cancelled:
+                    print("[Sync] Connection cancelled")
                     self?.isConnected = false
                     self?.syncStatus = "Disconnected"
                 default: break
@@ -304,16 +320,12 @@ class SyncService: ObservableObject {
     }
     
     func connectManual(host: String, port: UInt16) {
-        UserDefaults.standard.set(host, forKey: "last_sync_host")
-        UserDefaults.standard.set(String(port), forKey: "last_sync_port")
-        
-        let portValue = NWEndpoint.Port(integerLiteral: 7878)
-        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
-        
-        connect(to: SyncDevice(name: "Manual", endpoint: endpoint, host: host, port: port))
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: port))
+        let device = SyncDevice(name: "Manual Device", endpoint: endpoint, host: host, port: port)
+        connect(to: device)
     }
     
-    func receiveNextMessage() {
+    private func receiveNextMessage() {
         connection?.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] (data, _, isComplete, error) in
             guard let strongSelf = self else { return }
             
@@ -356,14 +368,14 @@ class SyncService: ObservableObject {
                 if let bodyError = bodyError {
                     print("[Sync] Body read error: \(bodyError)")
                     DispatchQueue.main.async { strongSelf.syncStatus = "Body Error: \(bodyError.localizedDescription)" }
-                    strongSelf.receiveNextMessage() // RESTART loop on error
+                    strongSelf.receiveNextMessage()
                     return
                 }
                 
                 guard let bodyData = bodyData, bodyData.count == Int(length) else {
-                    print("[Sync] Body read incomplete. Got \(bodyData?.count ?? 0), expected \(length)")
+                    print("[Sync] Body read incomplete")
                     DispatchQueue.main.async { strongSelf.syncStatus = "Body Read Incomplete" }
-                    strongSelf.receiveNextMessage() // RESTART loop on error
+                    strongSelf.receiveNextMessage()
                     return
                 }
                 
@@ -375,7 +387,7 @@ class SyncService: ObservableObject {
                     print("[Sync] Decoding error: \(error)")
                     let errorMsg = "\(error)".prefix(30)
                     DispatchQueue.main.async { strongSelf.syncStatus = "Decode Err: \(errorMsg)" }
-                    strongSelf.receiveNextMessage() // RESTART loop on error
+                    strongSelf.receiveNextMessage()
                 }
             }
         }
@@ -385,8 +397,13 @@ class SyncService: ObservableObject {
         switch message {
         case .ack:
             print("[Sync] Handshake ACK received")
-            DispatchQueue.main.async { self.syncStatus = "ACK Received ➔ Requesting Sync..." }
+            DispatchQueue.main.async { self.syncStatus = "ACK Received ➔ Requesting Salt..." }
             self.handshakeCompleted = true
+            self.requestSalt()
+        case .saltResponse(let salt):
+            print("[SINCED] Salt received (\(salt.count) bytes)")
+            DispatchQueue.main.async { self.syncStatus = "Salt Received ➔ Updating Key..." }
+            VaultManager.shared.updateSaltAndReKey(salt: salt)
             self.requestSync()
         case .pong:
             print("[Sync] Received pong")
@@ -415,14 +432,17 @@ class SyncService: ObservableObject {
         case .entryDelete(let entryId):
             print("[SINCED-V2] Entry Delete Received")
             DispatchQueue.main.async { self.syncStatus = "Entry Delete Received" }
-        case .handshake(let id, let version):
-            print("[SINCED-V2] Server handshake: \(id) v\(version)")
+        case .handshake(let id, let version, let vaultId):
+            print("[SINCED-V2] Server handshake: \(id) v\(version) Vault:\(vaultId)")
             DispatchQueue.main.async { self.syncStatus = "Server Handshake OK" }
             self.handshakeCompleted = true
             self.requestSync()
         case .syncRequest:
             print("[SINCED-V2] Desktop requested sync")
             DispatchQueue.main.async { self.syncStatus = "Desktop requested sync" }
+        case .requestSalt:
+            print("[SINCED-V2] Server requested salt")
+            DispatchQueue.main.async { self.syncStatus = "Server requested salt" }
         case .error(let msg):
             print("[SINCED-V2] Server error: \(msg)")
             DispatchQueue.main.async { [weak self] in
@@ -437,13 +457,12 @@ class SyncService: ObservableObject {
     }
     
     func sendHandshake() {
-        let handshake = SyncMessage.handshake(deviceId: deviceId, version: currentProtocolVersion)
+        let vaultId = "default-vault"
+        let handshake = SyncMessage.handshake(deviceId: deviceId, version: currentProtocolVersion, vaultId: vaultId)
         let packet = SyncPacket(deviceId: deviceId, message: handshake)
         
         do {
             let jsonData = try JSONEncoder().encode(packet)
-            
-            // PREPEND 4-BYTE BIG ENDIAN LENGTH
             var length = UInt32(jsonData.count).bigEndian
             let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
             let finalPacket = lengthData + jsonData
@@ -460,14 +479,35 @@ class SyncService: ObservableObject {
         }
     }
     
+    func requestSalt() {
+        let vaultId = "default-vault"
+        let request = SyncMessage.requestSalt(vaultId: vaultId)
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        
+        do {
+            let jsonData = try JSONEncoder().encode(packet)
+            var length = UInt32(jsonData.count).bigEndian
+            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            let finalPacket = lengthData + jsonData
+            
+            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("[SINCED] Failed to request salt: \(error)")
+                } else {
+                    print("[SINCED] Salt request delivered (\(finalPacket.count) bytes)")
+                }
+            }))
+        } catch {
+            print("[SINCED] Salt encoding failed: \(error)")
+        }
+    }
+    
     func requestSync() {
         let request = SyncMessage.syncRequest(lastTimestamp: lastSyncTimestamp)
         let packet = SyncPacket(deviceId: deviceId, message: request)
         
         do {
             let jsonData = try JSONEncoder().encode(packet)
-            
-            // PREPEND 4-BYTE BIG ENDIAN LENGTH
             var length = UInt32(jsonData.count).bigEndian
             let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
             let finalPacket = lengthData + jsonData

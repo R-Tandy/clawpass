@@ -242,6 +242,23 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     // MARK: - Private Methods
     
+    func updateSaltAndReKey(salt: [UInt8]) {
+        guard let password = UserDefaults.standard.string(forKey: "vault_master_password") else {
+            print("[Vault] Error: No master password found in storage for re-keying")
+            return
+        }
+        
+        do {
+            let saltData = Data(salt)
+            let key = try cryptoService.deriveKey(from: password, salt: saltData)
+            self.encryptionKey = key
+            print("[Vault] SUCCESS: Key re-derived using synced salt")
+            try loadData()
+        } catch {
+            print("[Vault] FATAL: Re-keying failed: \(error)")
+        }
+    }
+    
     private func createTables() throws {
         guard let db = db else { return }
         
