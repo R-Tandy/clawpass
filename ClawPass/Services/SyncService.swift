@@ -609,21 +609,17 @@ class SyncService: ObservableObject {
         
         print("[Sync] 📦 Flushing Offline Outbox...")
         
-        // We need the pending entries from VaultManager
-        // Since VaultManager.shared owns the DB connection, we call a method there
         VaultManager.shared.getPendingEntries { [weak self] (updates, deletes) in
             guard let self = self else { return }
             
             var processedCount = 0
             
-            // 1. Process Updates
             for entry in updates {
                 self.sendEntryUpdate(entry: entry)
                 VaultManager.shared.markAsSynced(entryId: entry.id.uuidString)
                 processedCount += 1
             }
             
-            // 2. Process Deletes
             for entryId in deletes {
                 self.sendEntryDelete(entryId: entryId)
                 VaultManager.shared.finalizeDelete(entryId: entryId)
@@ -636,21 +632,5 @@ class SyncService: ObservableObject {
             }
         }
     }
-        do {
-            let jsonData = try JSONEncoder().encode(packet)
-            var length = UInt32(jsonData.count).bigEndian
-            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
-            let finalPacket = lengthData + jsonData
-            
-            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
-                if let error = error {
-                    print("[SINCED] Outbound packet error: \(error)")
-                } else {
-                    print("[SINCED] Outbound packet delivered (\(finalPacket.count) bytes)")
-                }
-            }))
-        } catch {
-            print("[SINCED] Outbound encoding failed: \(error)")
-        }
-    }
-}
+
+    private func sendPacket(_ packet: SyncPacket) {

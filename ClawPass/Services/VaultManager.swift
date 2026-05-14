@@ -19,6 +19,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     @Published private(set) var entries: [VaultEntry] = []
     @Published private(set) var categories: [Category] = []
     @Published var syncStatus: String = ""
+    @Published private(set) var vaultSyncStatus: String = ""
     
     private var db: Connection?
     private var encryptionKey: SymmetricKey?
@@ -42,7 +43,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     private let createdAt = Expression<Date>("created_at")
     private let modifiedAt = Expression<Date>("modified_at")
     private let isFavorite = Expression<Bool>("is_favorite")
-    private let syncStatus = Expression<String>("sync_status")
+    private let syncStatusColumn = Expression<String>("sync_status")
     
     private let catId = Expression<String>("id")
     private let catName = Expression<String>("name")
@@ -84,7 +85,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         // Add sync_status column if it doesn't exist (Migration)
         do {
-            try db?.run(entriesTable.addColumn(syncStatus, defaultValue: "synced"))
+            try db?.run(entriesTable.addColumn(syncStatusColumn, defaultValue: "synced"))
         } catch {
             print("[Vault] Sync status column already exists or migration failed: \(error)")
         }
@@ -234,7 +235,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         // Soft delete: mark as pending_delete instead of immediate removal
         let entryRow = entriesTable.filter(id == entry.id.uuidString)
-        let update = entryRow.update(syncStatus <- "pending_delete")
+        let update = entryRow.update(syncStatusColumn <- "pending_delete")
         
         try db.run(update)
         try loadData()
@@ -282,7 +283,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             var deletes: [String] = []
             
             // Find pending updates
-            let updateQuery = entriesTable.filter(syncStatus == "pending_update")
+            let updateQuery = entriesTable.filter(syncStatusColumn == "pending_update")
             for row in try db.prepare(updateQuery) {
                 let entry = VaultEntry(
                     id: UUID(uuidString: row[id])!,
@@ -304,7 +305,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
             
             // Find pending deletes
-            let deleteQuery = entriesTable.filter(syncStatus == "pending_delete")
+            let deleteQuery = entriesTable.filter(syncStatusColumn == "pending_delete")
             for row in try db.prepare(deleteQuery) {
                 deletes.append(row[id])
             }
@@ -320,7 +321,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         guard let db = db else { return }
         do {
             let row = entriesTable.filter(id == entryId)
-            try db.run(row.update(syncStatus <- "synced"))
+            try db.run(row.update(syncStatusColumn <- "synced"))
         } catch {
             print("[Vault] Error marking as synced: \(error)")
         }
