@@ -42,6 +42,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     private let createdAt = Expression<Date>("created_at")
     private let modifiedAt = Expression<Date>("modified_at")
     private let isFavorite = Expression<Bool>("is_favorite")
+    private let syncStatus = Expression<String>("sync_status")
     
     private let catId = Expression<String>("id")
     private let catName = Expression<String>("name")
@@ -80,6 +81,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         // Create tables
         try createTables()
+        
+        // Add sync_status column if it doesn't exist (Migration)
+        do {
+            try db?.run(entriesTable.addColumn(syncStatus, defaultValue: "synced"))
+        } catch {
+            print("[Vault] Sync status column already exists or migration failed: \(error)")
+        }
         
         // Add default category
         let defaultCategory = Category.default
@@ -171,13 +179,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             totpSecret <- entry.totpSecret,
             createdAt <- entry.createdAt,
             modifiedAt <- entry.modifiedAt,
-            isFavorite <- entry.isFavorite
+            isFavorite <- entry.isFavorite,
+            syncStatus <- "pending_update"
         )
         
         try db.run(insert)
         try loadData()
         
-        // PHASE 1: Immediate propagation
+        // Attempt immediate propagation, but the "pending_update" status ensures it's caught by the outbox if this fails
         syncService.sendEntryUpdate(entry: entry)
     }
     
@@ -206,13 +215,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             categoryID <- entry.categoryID?.uuidString,
             totpSecret <- entry.totpSecret,
             modifiedAt <- Date(),
-            isFavorite <- entry.isFavorite
+            isFavorite <- entry.isFavorite,
+            syncStatus <- "pending_update"
         )
         
         try db.run(update)
         try loadData()
         
-        // PHASE 1: Immediate propagation
+        // Attempt immediate propagation
         var updatedEntry = entry
         updatedEntry.encryptedPassword = encryptedPwd
         updatedEntry.encryptedNotes = encryptedNts
@@ -222,11 +232,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func deleteEntry(_ entry: VaultEntry) throws {
         guard let db = db else { throw VaultError.notInitialized }
         
+        // Soft delete: mark as pending_delete instead of immediate removal
         let entryRow = entriesTable.filter(id == entry.id.uuidString)
-        try db.run(entryRow.delete())
+        let update = entryRow.update(syncStatus <- "pending_delete")
+        
+        try db.run(update)
         try loadData()
         
-        // PHASE 1: Immediate propagation
+        // Attempt immediate propagation
         syncService.sendEntryDelete(entryId: entry.id.uuidString)
     }
     
@@ -256,7 +269,73 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         try loadCategories()
     }
     
-    // MARK: - Private Methods
+    // MARK: - Outbox Management
+    
+    func getPendingEntries(completion: @escaping ([VaultEntry], [String]) -> Void) {
+        guard let db = db else {
+            completion([], [])
+            return
+        }
+        
+        do {
+            var updates: [VaultEntry] = []
+            var deletes: [String] = []
+            
+            // Find pending updates
+            let updateQuery = entriesTable.filter(syncStatus == "pending_update")
+            for row in try db.prepare(updateQuery) {
+                let entry = VaultEntry(
+                    id: UUID(uuidString: row[id])!,
+                    title: row[title],
+                    username: row[username],
+                    password: "", // Encrypted in DB
+                    url: row[url],
+                    notes: nil,
+                    categoryID: row[categoryID].flatMap { UUID(uuidString: $0) },
+                    totpSecret: row[totpSecret],
+                    isFavorite: row[isFavorite]
+                )
+                var entryWithData = entry
+                entryWithData.encryptedPassword = row[encryptedPassword]
+                entryWithData.encryptedNotes = row[encryptedNotes]
+                entryWithData.createdAt = row[createdAt]
+                entryWithData.modifiedAt = row[modifiedAt]
+                updates.append(entryWithData)
+            }
+            
+            // Find pending deletes
+            let deleteQuery = entriesTable.filter(syncStatus == "pending_delete")
+            for row in try db.prepare(deleteQuery) {
+                deletes.append(row[id])
+            }
+            
+            completion(updates, deletes)
+        } catch {
+            print("[Vault] Error fetching pending entries: \(error)")
+            completion([], [])
+        }
+    }
+    
+    func markAsSynced(entryId: String) {
+        guard let db = db else { return }
+        do {
+            let row = entriesTable.filter(id == entryId)
+            try db.run(row.update(syncStatus <- "synced"))
+        } catch {
+            print("[Vault] Error marking as synced: \(error)")
+        }
+    }
+    
+    func finalizeDelete(entryId: String) {
+        guard let db = db else { return }
+        do {
+            let row = entriesTable.filter(id == entryId)
+            try db.run(row.delete()) // Actually remove from DB now that server knows
+            try loadData()
+        } catch {
+            print("[Vault] Error finalizing delete: \(error)")
+        }
+    }
     
     func updateSaltAndReKey(salt: [UInt8]) {
         DispatchQueue.main.async { self.syncStatus = "Re-keying: Fetching password..." }

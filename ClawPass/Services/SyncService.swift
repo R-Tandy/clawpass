@@ -322,6 +322,8 @@ class SyncService: ObservableObject {
                     self?.syncStatus = "Connected. Sending Handshake..."
                     self?.sendHandshake()
                     self?.receiveNextMessage()
+                    // Trigger Outbox Flush when connection is established
+                    self?.flushOutbox()
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
                     self?.isConnected = false
@@ -599,7 +601,41 @@ class SyncService: ObservableObject {
         sendPacket(packet)
     }
 
-    private func sendPacket(_ packet: SyncPacket) {
+    func flushOutbox() {
+        guard isConnected else {
+            print("[Sync] Outbox flush skipped: Not connected")
+            return
+        }
+        
+        print("[Sync] 📦 Flushing Offline Outbox...")
+        
+        // We need the pending entries from VaultManager
+        // Since VaultManager.shared owns the DB connection, we call a method there
+        VaultManager.shared.getPendingEntries { [weak self] (updates, deletes) in
+            guard let self = self else { return }
+            
+            var processedCount = 0
+            
+            // 1. Process Updates
+            for entry in updates {
+                self.sendEntryUpdate(entry: entry)
+                VaultManager.shared.markAsSynced(entryId: entry.id.uuidString)
+                processedCount += 1
+            }
+            
+            // 2. Process Deletes
+            for entryId in deletes {
+                self.sendEntryDelete(entryId: entryId)
+                VaultManager.shared.finalizeDelete(entryId: entryId)
+                processedCount += 1
+            }
+            
+            print("[Sync] 📦 Outbox flush complete. Processed \(processedCount) changes.")
+            DispatchQueue.main.async {
+                self.syncStatus = "Outbox Flushed (\(processedCount) items)"
+            }
+        }
+    }
         do {
             let jsonData = try JSONEncoder().encode(packet)
             var length = UInt32(jsonData.count).bigEndian
