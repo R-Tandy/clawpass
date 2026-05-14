@@ -243,8 +243,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     // MARK: - Private Methods
     
     func updateSaltAndReKey(salt: [UInt8]) {
+        DispatchQueue.main.async { self.syncStatus = "Re-keying: Fetching password..." }
+        
         guard let password = UserDefaults.standard.string(forKey: "vault_master_password") else {
             print("[Vault] Error: No master password found in storage for re-keying")
+            DispatchQueue.main.async { self.syncStatus = "Re-key Error: No Master PWD" }
             return
         }
         
@@ -253,9 +256,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             let key = try cryptoService.deriveKey(from: password, salt: saltData)
             self.encryptionKey = key
             print("[Vault] SUCCESS: Key re-derived using synced salt")
+            DispatchQueue.main.async { self.syncStatus = "SINCED: Key Validated ✅" }
             try loadData()
         } catch {
             print("[Vault] FATAL: Re-keying failed: \(error)")
+            DispatchQueue.main.async { self.syncStatus = "Re-key Fatal: \(error.localizedDescription)" }
         }
     }
     
