@@ -128,6 +128,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             try loadData()
             isUnlocked = true
             
+            // BRIDGE: Save password to UserDefaults for SyncService re-keying
+            UserDefaults.standard.set(password, forKey: "vault_master_password")
+            print("[Vault] Master password bridged to UserDefaults for sync")
+            
             // Set up sync delegate
             syncService.delegate = self
         } catch {
