@@ -507,6 +507,37 @@ class SyncService: ObservableObject {
         }
     }
     
+    func sendEntryUpdate(entry: VaultEntry) {
+        let updateMsg = SyncMessage.entryUpdate(entry: SyncVaultEntry(from: entry, vaultKey: SymmetricKey(data: Data()))) // Key not needed for transport encoding
+        let packet = SyncPacket(deviceId: deviceId, message: updateMsg)
+        sendPacket(packet)
+    }
+    
+    func sendEntryDelete(entryId: String) {
+        let deleteMsg = SyncMessage.entryDelete(entryId: entryId)
+        let packet = SyncPacket(deviceId: deviceId, message: deleteMsg)
+        sendPacket(packet)
+    }
+    
+    private func sendPacket(_ packet: SyncPacket) {
+        do {
+            let jsonData = try JSONEncoder().encode(packet)
+            var length = UInt32(jsonData.count).bigEndian
+            let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+            let finalPacket = lengthData + jsonData
+            
+            connection?.send(content: finalPacket, completion: .contentProcessed({ error in
+                if let error = error {
+                    print("[SINCED] Outbound packet error: \(error)")
+                } else {
+                    print("[SINCED] Outbound packet delivered (\(finalPacket.count) bytes)")
+                }
+            }))
+        } catch {
+            print("[SINCED] Outbound encoding failed: \(error)")
+        }
+    }
+    
     func requestSync() {
         let request = SyncMessage.syncRequest(lastTimestamp: lastSyncTimestamp)
         let packet = SyncPacket(deviceId: deviceId, message: request)

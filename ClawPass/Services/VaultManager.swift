@@ -176,6 +176,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         try db.run(insert)
         try loadData()
+        
+        // PHASE 1: Immediate propagation
+        syncService.sendEntryUpdate(entry: entry)
     }
     
     func updateEntry(_ entry: VaultEntry, newPassword: String? = nil, newNotes: String? = nil) throws {
@@ -208,6 +211,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         try db.run(update)
         try loadData()
+        
+        // PHASE 1: Immediate propagation
+        var updatedEntry = entry
+        updatedEntry.encryptedPassword = encryptedPwd
+        updatedEntry.encryptedNotes = encryptedNts
+        syncService.sendEntryUpdate(entry: updatedEntry)
     }
     
     func deleteEntry(_ entry: VaultEntry) throws {
@@ -216,6 +225,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let entryRow = entriesTable.filter(id == entry.id.uuidString)
         try db.run(entryRow.delete())
         try loadData()
+        
+        // PHASE 1: Immediate propagation
+        syncService.sendEntryDelete(entryId: entry.id.uuidString)
     }
     
     func decryptPassword(for entry: VaultEntry) throws -> String {
