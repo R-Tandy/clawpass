@@ -254,6 +254,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         do {
             let saltData = Data(salt)
             let key = try cryptoService.deriveKey(from: password, salt: saltData)
+            
+            // KEY LEAK DIAGNOSTIC: Log the derived key to verify against server
+            let keyHex = key.withUnsafeBytes { Data($0).map { String(format: "%02x", $0) }.joined(separator: "") }
+            print("[SINCED-KEY-LEAK] Derived Key: \(keyHex)")
+            DispatchQueue.main.async { self.syncStatus = "Key: \(keyHex.prefix(16))..." }
+            
             self.encryptionKey = key
             print("[Vault] SUCCESS: Key re-derived using synced salt")
             DispatchQueue.main.async { self.syncStatus = "SINCED: Key Validated ✅" }
