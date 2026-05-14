@@ -26,15 +26,33 @@ struct SyncView: View {
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.gray)
                 
-                Text(getRawBlobLeak())
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(VaultManager.shared.entries.first?.encryptedPassword.map { data in
+                    data.map { String(format: "%02x", $0) }.joined(separator: " ")
+                } ?? "No data")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(8)
             .background(Color(.systemGray6))
             .cornerRadius(8)
             .padding(.horizontal)
+            
+            Button("Test Decrypt First Entry") {
+                if let entry = VaultManager.shared.entries.first {
+                    do {
+                        let pwd = try VaultManager.shared.decryptPassword(for: entry)
+                        syncService.syncStatus = "Decrypted: \(pwd)"
+                    } catch {
+                        syncService.syncStatus = "Decrypt Fail: \(error.localizedDescription)"
+                    }
+                } else {
+                    syncService.syncStatus = "No entry to decrypt"
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .foregroundColor(.blue)
             
             // Status HUD
             HStack {
@@ -104,17 +122,6 @@ struct SyncView: View {
         }
         .padding()
         .navigationTitle("Sync")
-    }
-
-    private func getRawBlobLeak() -> String {
-        guard let firstEntry = VaultManager.shared.entries.first else {
-            return "No entries in vault"
-        }
-        let data = firstEntry.encryptedPassword
-        if data.isEmpty {
-            return "Encrypted password is empty"
-        }
-        return data.map { String(format: "%02x", $0) }.joined(separator: " ")
     }
 }
 
