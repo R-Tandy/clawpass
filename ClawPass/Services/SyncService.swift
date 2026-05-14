@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_05_13_SLEDGEHAMMER_V3_SLOWMO
+// SINCED_VERSION_2026_05_14_CATEGORIES_SLEDGEHAMMER
 import Foundation
 import Network
 import CryptoKit
@@ -28,6 +28,8 @@ enum SyncMessage: Codable {
     case error(message: String)
     case requestSalt(vaultId: String)
     case saltResponse(salt: [UInt8])
+    case requestCategories(vaultId: String)
+    case categoriesResponse(categories: [SyncCategory])
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -40,6 +42,7 @@ enum SyncMessage: Codable {
         case entry
         case entry_id = "entry_id"
         case salt
+        case categories
         case message
     }
     
@@ -79,6 +82,12 @@ enum SyncMessage: Codable {
         case .saltResponse(let salt):
             try container.encode("salt_response", forKey: .type)
             try container.encode(salt, forKey: .salt)
+        case .requestCategories(let vaultId):
+            try container.encode("request_categories", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .categoriesResponse(let categories):
+            try container.encode("categories_response", forKey: .type)
+            try container.encode(categories, forKey: .categories)
         }
     }
     
@@ -119,10 +128,23 @@ enum SyncMessage: Codable {
         case "salt_response":
             let salt = try container.decode([UInt8].self, forKey: .salt)
             self = .saltResponse(salt: salt)
+        case "request_categories":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .requestCategories(vaultId: vaultId)
+        case "categories_response":
+            let categories = try container.decode([SyncCategory].self, forKey: .categories)
+            self = .categoriesResponse(categories: categories)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(type)")
         }
     }
+}
+
+struct SyncCategory: Codable {
+    let id: String
+    let name: String
+    let icon: String
+    let color: String
 }
 
 struct SyncVaultEntry: Codable {
@@ -405,9 +427,16 @@ class SyncService: ObservableObject {
             DispatchQueue.main.async { self.syncStatus = "SINCED: Salt Received ➔ Re-Keying..." }
             VaultManager.shared.updateSaltAndReKey(salt: salt)
             
-            // SLOW-MO: Delay the sync request so the user can see the key validation status
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                print("[SINCED] Slow-mo delay finished, requesting sync...")
+                print("[SINCED] Slow-mo delay finished, requesting categories...")
+                self.requestCategories()
+            }
+        case .categoriesResponse(let categories):
+            print("[SINCED] Categories received (\(categories.count) items)")
+            DispatchQueue.main.async { self.syncStatus = "Categories Received ➔ Requesting Sync..." }
+            VaultManager.shared.syncCategories(categories)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.requestSync()
             }
         case .pong:
@@ -507,23 +536,11 @@ class SyncService: ObservableObject {
         }
     }
     
-    func sendEntryUpdate(entry: VaultEntry) {
-        do {
-            let updateMsg = SyncMessage.entryUpdate(entry: try SyncVaultEntry(from: entry, vaultKey: SymmetricKey(data: Data()))) // Key not needed for transport encoding
-            let packet = SyncPacket(deviceId: deviceId, message: updateMsg)
-            sendPacket(packet)
-        } catch {
-            print("[SINCED] Failed to prepare entry update: \(error)")
-        }
-    }
-    
-    func sendEntryDelete(entryId: String) {
-        let deleteMsg = SyncMessage.entryDelete(entryId: entryId)
-        let packet = SyncPacket(deviceId: deviceId, message: deleteMsg)
-        sendPacket(packet)
-    }
-    
-    private func sendPacket(_ packet: SyncPacket) {
+    func requestCategories() {
+        let vaultId = "default-vault"
+        let request = SyncMessage.requestCategories(vaultId: vaultId)
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        
         do {
             let jsonData = try JSONEncoder().encode(packet)
             var length = UInt32(jsonData.count).bigEndian
@@ -532,13 +549,13 @@ class SyncService: ObservableObject {
             
             connection?.send(content: finalPacket, completion: .contentProcessed({ error in
                 if let error = error {
-                    print("[SINCED] Outbound packet error: \(error)")
+                    print("[SINCED] Failed to request categories: \(error)")
                 } else {
-                    print("[SINCED] Outbound packet delivered (\(finalPacket.count) bytes)")
+                    print("[SINCED] Category request delivered with length prefix (\(finalPacket.count) bytes)")
                 }
             }))
         } catch {
-            print("[SINCED] Outbound encoding failed: \(error)")
+            print("[SINCED] Category encoding failed: \(error)")
         }
     }
     
