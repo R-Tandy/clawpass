@@ -289,7 +289,7 @@ class SyncService: ObservableObject {
     func connect(to device: SyncDevice) {
         print("[SYNC] 🚨 CONNECT METHOD TRIGGERED")
         DispatchQueue.main.async { self.syncStatus = "🚀 SINCED-V100-SLEDGE: Connecting to \(device.name)..." }
-        let parameters = NWParametersP
+        let parameters = NWParameters.tcp
         connection = NWConnection(to: device.endpoint, using: parameters)
         connection?.stateUpdateHandler = { [weak self] state in
             DispatchQueue.main.async {
