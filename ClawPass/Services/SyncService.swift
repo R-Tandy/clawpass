@@ -191,7 +191,7 @@ protocol SyncServiceDelegate: AnyObject {
     func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
 }
 
-let currentProtocolVersion: UInt32 = 1
+let currentProtocolVersion: UInt32 = 2
 
 struct SyncDevice: Identifiable {
     let id = UUID()

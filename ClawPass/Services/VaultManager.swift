@@ -421,12 +421,21 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                         
                         if incoming.modifiedAt >= localModifiedAt {
                             // Incoming is newer or same - update local
+                            // SAFETY CHECK: Do not overwrite a local password with an empty one from server
+                            let newEncryptedPassword = (incoming.encryptedPassword.isEmpty && !localRow[encryptedPassword].isEmpty) 
+                                ? localRow[encryptedPassword] 
+                                : incoming.encryptedPassword
+                            
+                            let newEncryptedNotes = (incoming.encryptedNotes == nil && localRow[encryptedNotes] != nil)
+                                ? localRow[encryptedNotes]
+                                : incoming.encryptedNotes
+
                             let update = query.update(
                                 title <- incoming.title,
                                 username <- incoming.username,
-                                encryptedPassword <- incoming.encryptedPassword,
+                                encryptedPassword <- newEncryptedPassword,
                                 url <- incoming.url,
-                                encryptedNotes <- incoming.encryptedNotes,
+                                encryptedNotes <- newEncryptedNotes,
                                 categoryID <- incoming.categoryID?.uuidString,
                                 totpSecret <- incoming.totpSecret,
                                 modifiedAt <- incoming.modifiedAt,
