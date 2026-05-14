@@ -508,9 +508,13 @@ class SyncService: ObservableObject {
     }
     
     func sendEntryUpdate(entry: VaultEntry) {
-        let updateMsg = SyncMessage.entryUpdate(entry: SyncVaultEntry(from: entry, vaultKey: SymmetricKey(data: Data()))) // Key not needed for transport encoding
-        let packet = SyncPacket(deviceId: deviceId, message: updateMsg)
-        sendPacket(packet)
+        do {
+            let updateMsg = SyncMessage.entryUpdate(entry: try SyncVaultEntry(from: entry, vaultKey: SymmetricKey(data: Data()))) // Key not needed for transport encoding
+            let packet = SyncPacket(deviceId: deviceId, message: updateMsg)
+            sendPacket(packet)
+        } catch {
+            print("[SINCED] Failed to prepare entry update: \(error)")
+        }
     }
     
     func sendEntryDelete(entryId: String) {
