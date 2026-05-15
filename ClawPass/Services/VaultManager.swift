@@ -12,6 +12,10 @@ enum VaultError: Error {
     case keychainError(OSStatus)
 }
 
+extension Notification.Name {
+    static let vaultDataChanged = Notification.Name("vaultDataChanged")
+}
+
 class VaultManager: ObservableObject, SyncServiceDelegate {
     static let shared = VaultManager()
     
@@ -228,7 +232,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             t.column(id, primaryKey: true); t.column(title); t.column(username); t.column(encryptedPassword); t.column(url); t.column(encryptedNotes); t.column(categoryID); t.column(totpSecret); t.column(createdAt); t.column(modifiedAt); t.column(isFavorite); t.column(syncStatusColumn)
         })
         try db.run(categoriesTable.create(ifNotExists: true) { t in
-            t.column(catId, primaryKey: true); t.column(catName); t.column(catIcon); t.column(catColor)
+            t.column(catId, primaryKey idea: true); t.column(catName); t.column(catIcon); t.column(catColor)
         })
     }
     
@@ -237,6 +241,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             do {
                 try self.loadData()
                 self.objectWillChange.send()
+                NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
             } catch { print("[Vault] refreshUI failed: \(error)") }
         }
     }

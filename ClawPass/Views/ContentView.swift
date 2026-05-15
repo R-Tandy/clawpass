@@ -178,6 +178,10 @@ struct VaultView: View {
             .sheet(isPresented: $showingSync) {
                 SyncView()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .vaultDataChanged)) { _ in
+                // Force the view to re-evaluate filteredEntries and redraw the List
+                vaultManager.objectWillChange.send()
+            }
         }
     }
 }
