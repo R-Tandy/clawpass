@@ -160,13 +160,19 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func addEntry(_ entry: VaultEntry, password: String, notes: String?) throws {
         guard let db = db, let key = encryptionKey else {
+            print("[Vault-ERR] addEntry failed: Vault not initialized or key missing")
             throw VaultError.notInitialized
         }
         
         var entry = entry
-        entry.encryptedPassword = try cryptoService.encrypt(password, using: key)
-        if let notes = notes {
-            entry.encryptedNotes = try cryptoService.encrypt(notes, using: key)
+        do {
+            entry.encryptedPassword = try cryptoService.encrypt(password, using: key)
+            if let notes = notes {
+                entry.encryptedNotes = try cryptoService.encrypt(notes, using: key)
+            }
+        } catch {
+            print("[Vault-ERR] Encryption failed in addEntry: \(error)")
+            throw error
         }
         
         let insert = entriesTable.insert(
@@ -184,26 +190,37 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             syncStatusColumn <- "pending_update"
         )
         
-        try db.run(insert)
-        try loadData()
+        do {
+            try db.run(insert)
+            print("[Vault-SUCCESS] Entry \(entry.id.uuidString) inserted into DB")
+            try loadData()
+        } catch {
+            print("[Vault-FATAL] SQLite Insert Error: \(error)")
+            throw VaultError.databaseError(error)
+        }
         
-        // Attempt immediate propagation, but the "pending_update" status ensures it's caught by the outbox if this fails
         syncService.sendEntryUpdate(entry: entry)
     }
     
     func updateEntry(_ entry: VaultEntry, newPassword: String? = nil, newNotes: String? = nil) throws {
         guard let db = db, let key = encryptionKey else {
+            print("[Vault-ERR] updateEntry failed: Vault not initialized or key missing")
             throw VaultError.notInitialized
         }
         
         var encryptedPwd = entry.encryptedPassword
         var encryptedNts = entry.encryptedNotes
         
-        if let newPassword = newPassword {
-            encryptedPwd = try cryptoService.encrypt(newPassword, using: key)
-        }
-        if let newNotes = newNotes {
-            encryptedNts = try cryptoService.encrypt(newNotes, using: key)
+        do {
+            if let newPassword = newPassword {
+                encryptedPwd = try cryptoService.encrypt(newPassword, using: key)
+            }
+            if let newNotes = newNotes {
+                encryptedNts = try cryptoService.encrypt(newNotes, using: key)
+            }
+        } catch {
+            print("[Vault-ERR] Encryption failed in updateEntry: \(error)")
+            throw error
         }
         
         let entryRow = entriesTable.filter(id == entry.id.uuidString)
@@ -220,10 +237,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             syncStatusColumn <- "pending_update"
         )
         
-        try db.run(update)
-        try loadData()
+        do {
+            try db.run(update)
+            print("[Vault-SUCCESS] Entry \(entry.id.uuidString) updated in DB")
+            try loadData()
+        } catch {
+            print("[Vault-FATAL] SQLite Update Error: \(error)")
+            throw VaultError.databaseError(error)
+        }
         
-        // Attempt immediate propagation
         var updatedEntry = entry
         updatedEntry.encryptedPassword = encryptedPwd
         updatedEntry.encryptedNotes = encryptedNts
