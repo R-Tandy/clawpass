@@ -285,7 +285,8 @@ struct SetupView: View {
             try VaultManager.shared.initialize(with: password)
             onComplete()
         } catch {
-            errorMessage = "Failed to create vault: \(error.localizedDescription)"
+            // UI-based error reporting since we can't see the console
+            errorMessage = "CRITICAL ERROR: \(error.localizedDescription)\nCheck if vault.db already exists or keychain is locked."
             showingError = true
         }
     }
