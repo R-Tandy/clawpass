@@ -342,18 +342,31 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 for entry in incoming {
                     let query = entriesTable.filter(id == entry.id.uuidString)
                     if let local = try db.pluck(query) {
-                        if entry.modifiedAt >= local[modifiedAt] && local[syncStatusColumn] != "pending_delete" {
+                        // AGGRESSIVE DELETE PROTECTION:
+                        // If local is pending_delete, NEVER let a server update resurrect it.
+                        if local[syncStatusColumn] == "pending_delete" {
+                            print("[Vault] Ignoring server update for locally deleted entry: \(entry.id.uuidString)")
+                            continue
+                        }
+                        
+                        if entry.modifiedAt >= local[modifiedAt] {
                             try db.run(query.update(title <- entry.title, username <- entry.username, encryptedPassword <- entry.encryptedPassword, url <- entry.url, encryptedNotes <- entry.encryptedNotes, categoryID <- entry.categoryID?.uuidString, totpSecret <- entry.totpSecret, modifiedAt <- entry.modifiedAt, isFavorite <- entry.isFavorite, syncStatusColumn <- "synced"))
                         }
                     } else if try db.pluck(query) == nil {
                         try db.run(entriesTable.insert(id <- entry.id.uuidString, title <- entry.title, username <- entry.username, encryptedPassword <- entry.encryptedPassword, url <- entry.url, encryptedNotes <- entry.encryptedNotes, categoryID <- entry.categoryID?.uuidString, totpSecret <- entry.totpSecret, createdAt <- entry.createdAt, modifiedAt <- entry.modifiedAt, isFavorite <- entry.isFavorite, syncStatusColumn <- "synced"))
                     }
                 }
-                refreshUI()
             }
-            DispatchQueue.main.async { self.syncStatus = "Sync Complete" }
+            
+            // CRITICAL: Force a synchronous data load and UI update on the Main Thread
+            // after the transaction is fully committed.
+            DispatchQueue.main.async {
+                self.refreshUI()
+                self.syncStatus = "Sync Complete"
+            }
         } catch {
             print("[Vault] Sync Merge Error: \(error)")
+            DispatchQueue.main.async { self.syncStatus = "Error: \(error.localizedDescription)" }
         }
     }
     
