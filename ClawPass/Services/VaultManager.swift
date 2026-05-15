@@ -383,6 +383,8 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             self.encryptionKey = key
             print("[Vault] SUCCESS: Key re-derived using synced salt")
             DispatchQueue.main.async { self.syncStatus = "SINCED: Key Validated ✅" }
+            
+            // FORCE RE-LOAD: Now that we have the correct key, reload the data from DB
             try loadData()
         } catch {
             print("[Vault] FATAL: Re-keying failed: \(error)")
