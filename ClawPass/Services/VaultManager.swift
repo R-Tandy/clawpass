@@ -418,6 +418,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             t.column(createdAt)
             t.column(modifiedAt)
             t.column(isFavorite)
+            t.column(syncStatusColumn)
         })
         
         try db.run(categoriesTable.create(ifNotExists: true) { t in
