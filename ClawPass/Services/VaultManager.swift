@@ -120,7 +120,6 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         
         do {
-            // Try to decrypt the first entry as a canary
             if let firstEntry = try db.pluck(entriesTable.filter(syncStatusColumn != "pending_delete")) {
                 let encryptedPwd = firstEntry[encryptedPassword]
                 _ = try cryptoService.decrypt(encryptedPwd, using: key)
@@ -237,9 +236,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func updateSaltAndReKey(salt: [UInt8]) {
         guard let password = UserDefaults.standard.string(forKey: "vault_master_password") else { return }
         do {
-            let key = try cryptoService.deriveKey(from: password, salt: Data(salt))
+            let saltData = Data(salt)
+            let key = try cryptoService.deriveKey(from: password, salt: saltData)
+            let verifyHash = cryptoService.sha256(key)
+            
+            var saltWithHash = saltData
+            saltWithHash.append(verifyHash)
+            
+            // CRITICAL: Persist the updated salt to keychain so it survives restarts
+            try storeSalt(saltWithHash)
+            
             self.encryptionKey = key
-            print("[Vault] Key re-derived via sync salt")
+            print("[Vault] Key re-derived and salt persisted via sync salt")
             verifyCurrentKey()
             refreshUI()
         } catch { print("[Vault] Re-key failed: \(error)") }
