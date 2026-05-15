@@ -143,10 +143,25 @@ struct VaultView: View {
     
     var body: some View {
         NavigationView {
-            List {
-                ForEach(filteredEntries) { entry in
-                    NavigationLink(destination: EntryDetailView(entry: entry)) {
-                        EntryRowView(entry: entry)
+            VStack {
+                // Key Status Banner
+                if vaultManager.keyStatus != "Key Valid" && vaultManager.keyStatus != "Empty Vault" {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("Key Status: \(vaultManager.keyStatus)")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.2))
+                }
+                
+                List {
+                    ForEach(filteredEntries) { entry in
+                        NavigationLink(destination: EntryDetailView(entry: entry)) {
+                            EntryRowView(entry: entry)
+                        }
                     }
                 }
             }
@@ -179,7 +194,6 @@ struct VaultView: View {
                 SyncView()
             }
             .onReceive(NotificationCenter.default.publisher(for: .vaultDataChanged)) { _ in
-                // Force the view to re-evaluate filteredEntries and redraw the List
                 vaultManager.objectWillChange.send()
             }
         }
@@ -289,7 +303,6 @@ struct SetupView: View {
             try VaultManager.shared.initialize(with: password)
             onComplete()
         } catch {
-            // UI-based error reporting since we can't see the console
             errorMessage = "CRITICAL ERROR: \(error.localizedDescription)\nCheck if vault.db already exists or keychain is locked."
             showingError = true
         }

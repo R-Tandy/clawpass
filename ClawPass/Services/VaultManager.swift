@@ -10,6 +10,7 @@ enum VaultError: Error {
     case databaseError(Error)
     case entryNotFound
     case keychainError(OSStatus)
+    case decryptionFailed
 }
 
 extension Notification.Name {
@@ -24,6 +25,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     @Published private(set) var categories: [Category] = []
     @Published var syncStatus: String = ""
     @Published private(set) var vaultSyncStatus: String = ""
+    @Published var keyStatus: String = "Unknown"
     
     private var db: Connection?
     private var encryptionKey: SymmetricKey?
@@ -94,6 +96,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             isUnlocked = true
             UserDefaults.standard.set(password, forKey: "vault_master_password")
             syncService.delegate = self
+            
+            // Verify key immediately
+            verifyCurrentKey()
         } catch {
             throw VaultError.invalidPassword
         }
@@ -105,6 +110,28 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         entries = []
         categories = []
         isUnlocked = false
+    }
+    
+    // MARK: - Key Validation
+    func verifyCurrentKey() {
+        guard let db = db, let key = encryptionKey else { 
+            DispatchQueue.main.async { self.keyStatus = "No Key" }
+            return 
+        }
+        
+        do {
+            // Try to decrypt the first entry as a canary
+            if let firstEntry = try db.pluck(entriesTable.filter(syncStatusColumn != "pending_delete")) {
+                let encryptedPwd = firstEntry[encryptedPassword]
+                _ = try cryptoService.decrypt(encryptedPwd, using: key)
+                DispatchQueue.main.async { self.keyStatus = "Key Valid" }
+            } else {
+                DispatchQueue.main.async { self.keyStatus = "Empty Vault" }
+            }
+        } catch {
+            print("[Vault] Key Validation Failed: \(error)")
+            DispatchQueue.main.async { self.keyStatus = "Key Mismatch" }
+        }
     }
     
     // MARK: - CRUD
@@ -154,8 +181,16 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func decryptPassword(for entry: VaultEntry) throws -> String {
-        guard let key = encryptionKey else { throw VaultError.notInitialized }
-        return try cryptoService.decrypt(entry.encryptedPassword, using: key)
+        guard let key = encryptionKey else { 
+            print("[Vault] Decrypt failed: No key")
+            throw VaultError.notInitialized 
+        }
+        do {
+            return try cryptoService.decrypt(entry.encryptedPassword, using: key)
+        } catch {
+            print("[Vault] Decryption failed for entry \(entry.id)")
+            throw VaultError.decryptionFailed
+        }
     }
     
     func decryptNotes(for entry: VaultEntry) throws -> String? {
@@ -205,6 +240,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             let key = try cryptoService.deriveKey(from: password, salt: Data(salt))
             self.encryptionKey = key
             print("[Vault] Key re-derived via sync salt")
+            verifyCurrentKey()
             refreshUI()
         } catch { print("[Vault] Re-key failed: \(error)") }
     }
