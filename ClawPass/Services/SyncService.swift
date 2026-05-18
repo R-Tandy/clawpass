@@ -445,6 +445,7 @@ class SyncService: ObservableObject {
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.requestSync()
+                self.flushOutbox()
             }
         case .pong:
             print("[Sync] Received pong")
