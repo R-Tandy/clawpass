@@ -172,6 +172,7 @@ struct EditEntryView: View {
     @State private var url: String
     @State private var notes: String
     @State private var isFavorite: Bool
+    @State private var selectedCategory: Category?
     
     init(entry: VaultEntry) {
         self.entry = entry
@@ -181,6 +182,7 @@ struct EditEntryView: View {
         _url = State(initialValue: entry.url ?? "")
         _notes = State(initialValue: "")
         _isFavorite = State(initialValue: entry.isFavorite)
+        _selectedCategory = State(initialValue: VaultManager.shared.categories.first { $0.id.uuidString == entry.categoryID?.uuidString })
     }
     
     var body: some View {
@@ -196,6 +198,13 @@ struct EditEntryView: View {
                     TextField("Website URL", text: $url)
                         .textContentType(.URL)
                         .autocapitalization(.none)
+                    
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("None").tag(Category?.none)
+                        ForEach(vaultManager.categories) { cat in
+                            Text(cat.name).tag(Optional(cat))
+                        }
+                    }
                 }
                 
                 Section("Notes") {
@@ -239,6 +248,7 @@ struct EditEntryView: View {
         updatedEntry.username = username
         updatedEntry.url = url.isEmpty ? nil : url
         updatedEntry.isFavorite = isFavorite
+        updatedEntry.categoryID = selectedCategory?.id
         
         do {
             try VaultManager.shared.updateEntry(

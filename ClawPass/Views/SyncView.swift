@@ -7,64 +7,26 @@ struct SyncView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            VStack(spacing: 8) {
-                Text("🚨 ZOMBIE BUILD DETECTED 🚨")
-                    .font(.title)
-                    .fontWeight(.black)
-                    .foregroundColor(.red)
-                
-                Text("DIAG: \(GLOBAL_SYNC_DIAGNOSTIC)")
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.red)
-                    .bold()
-            }
-            .padding(.top, 40)
-            
-            // RAW DATA LEAK HUD
-            VStack(alignment: .leading, spacing: 4) {
-                Text("SINCED-V100 RAW BLOB LEAK")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.gray)
-                
-                Text(getRawBlobLeak())
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(8)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
-            .padding(.horizontal)
-            
-            Button("Test Decrypt First Entry") {
-                if let entry = VaultManager.shared.entries.first {
-                    do {
-                        let pwd = try VaultManager.shared.decryptPassword(for: entry)
-                        syncService.syncStatus = "Decrypted: \(pwd)"
-                    } catch {
-                        syncService.syncStatus = "Decrypt Fail: \(error.localizedDescription)"
-                    }
-                } else {
-                    syncService.syncStatus = "No entry to decrypt"
+            VStack(spacing: 12) {
+                HStack {
+                    Circle()
+                        .fill(syncService.isConnected ? Color.green : Color.gray)
+                        .frame(width: 12, height: 12)
+                    
+                    Text(syncService.isConnected ? "Connected" : "Disconnected")
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    Text(syncService.syncStatus)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .foregroundColor(.blue)
-            
-            // Status HUD
-            HStack {
-                Circle()
-                    .fill(syncService.isConnected ? Color.green : Color.gray)
-                    .frame(width: 12, height: 12)
-                
-                Text(syncService.syncStatus)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .padding(.top, 20)
             
             Divider()
             
