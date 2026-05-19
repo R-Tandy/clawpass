@@ -322,8 +322,7 @@ class SyncService: ObservableObject {
                     self?.syncStatus = "Connected. Sending Handshake..."
                     self?.sendHandshake()
                     self?.receiveNextMessage()
-                    // Trigger Outbox Flush when connection is established
-                    self?.flushOutbox()
+                    // Outbox flush is now handled in handleMessage after session setup
                 case .waiting(let error):
                     print("[Sync] Connection waiting: \(error)")
                     self?.isConnected = false
