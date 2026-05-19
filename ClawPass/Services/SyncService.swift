@@ -612,26 +612,30 @@ class SyncService: ObservableObject {
             return
         }
         
-        print("[Sync] 📦 Flushing Offline Outbox...")
+        print("[SINCED-DIAG] 📦 Initiating Outbox Flush...")
         
         VaultManager.shared.getPendingEntries { [weak self] (updates, deletes) in
             guard let self = self else { return }
             
+            print("[SINCED-DIAG] Outbox state: \(updates.count) updates, \(deletes.count) deletes")
+            
             var processedCount = 0
             
             for entry in updates {
+                print("[SINCED-DIAG] Sending update for: \(entry.title) (\(entry.id))")
                 self.sendEntryUpdate(entry: entry)
                 VaultManager.shared.markAsSynced(entryId: entry.id.uuidString)
                 processedCount += 1
             }
             
             for entryId in deletes {
+                print("[SINCED-DIAG] Sending delete for: \(entryId)")
                 self.sendEntryDelete(entryId: entryId)
                 VaultManager.shared.finalizeDelete(entryId: entryId)
                 processedCount += 1
             }
             
-            print("[Sync] 📦 Outbox flush complete. Processed \(processedCount) changes.")
+            print("[SINCED-DIAG] 📦 Outbox flush complete. Total processed: \(processedCount)")
             DispatchQueue.main.async {
                 self.syncStatus = "Outbox Flushed (\(processedCount) items)"
             }
