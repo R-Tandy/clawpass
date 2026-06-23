@@ -1,0 +1,13 @@
+# Ignore the desktop project entirely
+desktop/
+
+# Ignore build artifacts and debug files
+*.pdb
+*.rlib
+*.rmeta
+target/
+build/
+
+# OS specific
+.DS_Store
+Thumbs.db
