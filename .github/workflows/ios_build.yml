@@ -24,7 +24,7 @@ jobs:
         cd ios
         xcodebuild build \
           -scheme ClawPass \
-          -destination 'generic/iphone' \
+          -destination 'platform=iOS' \
           -derivedDataPath DerivedData \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO
