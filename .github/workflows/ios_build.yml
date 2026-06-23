@@ -13,14 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Select Xcode version
-      run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+    # Removed the hardcoded /Applications/Xcode_15.0.app path which is causing the error.
+    # macos-latest already has a default Xcode version selected.
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
     
     - name: Build Swift Package for iOS
       run: |
         cd ios
-        # Build the package for the arm64 simulator as a smoke test
-        swift build -c debug --triple arm64-apple-ios-simulator
+        swift build -c release --triple arm64-apple-ios15.0-macosx
     
     - name: Build .app Bundle via xcodebuild (Package Mode)
       run: |
@@ -31,6 +33,17 @@ jobs:
           -derivedDataPath DerivedData \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO
+    
+    - name: Strip Binary (Prevent Developer 35/64 errors)
+      run: |
+        # Find the binary in DerivedData and strip debug symbols
+        BINARY_PATH=$(find ios/DerivedData -name "ClawPass" -type f | head -n 1)
+        if [ -n "$BINARY_PATH" ]; then
+          echo "Stripping binary at $BINARY_PATH"
+          strip -x "$BINARY_PATH"
+        else
+          echo "Binary not found, skipping strip."
+        fi
     
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master'
