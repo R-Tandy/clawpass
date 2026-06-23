@@ -22,7 +22,7 @@ jobs:
     - name: Build Binary via Swift Package
       run: |
         cd ios
-        swift build -c release --triple arm64-apple-ios15.0
+        swift build -c release -sdk $(xcrun --show-sdk-path --sdk iphoneos) --triple arm64-apple-ios15.0
     
     - name: Package as .app Bundle
       run: |
