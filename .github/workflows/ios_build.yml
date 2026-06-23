@@ -19,24 +19,18 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Build Swift Package for iOS
-      run: |
-        cd ios
-        swift build -c release --triple arm64-apple-ios15.0-macosx
-    
-    - name: Build .app Bundle via xcodebuild (Package Mode)
+    - name: Build .app Bundle via xcodebuild
       run: |
         cd ios
         xcodebuild build \
           -scheme ClawPass \
-          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          -destination 'generic/iphone' \
           -derivedDataPath DerivedData \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO
     
     - name: Strip Binary (Prevent Developer 35/64 errors)
       run: |
-        # Find the binary in DerivedData and strip debug symbols
         BINARY_PATH=$(find ios/DerivedData -name "ClawPass" -type f | head -n 1)
         if [ -n "$BINARY_PATH" ]; then
           echo "Stripping binary at $BINARY_PATH"
@@ -46,8 +40,8 @@ jobs:
         fi
     
     - name: Upload Artifact
-      if: github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS-Simulator
-        path: ClawPass/ios/DerivedData/Build/Products/Debug-iphonesimulator/ClawPass.app
+        name: ClawPass-iOS
+        path: ios/DerivedData/Build/Products/Release-iphoneos/*.app
