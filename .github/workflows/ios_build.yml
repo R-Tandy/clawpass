@@ -19,29 +19,62 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Build .app Bundle via xcodebuild
+    - name: Build Binary via Swift Package
       run: |
         cd ios
-        xcodebuild build \
-          -scheme ClawPass \
-          -destination 'platform=iOS' \
-          -derivedDataPath DerivedData \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+        swift build -c release --triple arm64-apple-ios15.0
     
-    - name: Strip Binary (Prevent Developer 35/64 errors)
+    - name: Package as .app Bundle
       run: |
-        BINARY_PATH=$(find ios/DerivedData -name "ClawPass" -type f | head -n 1)
+        # Create the app bundle structure manually since pbxproj is corrupted
+        mkdir -p ios/Build/ClawPass.app/Contents/MacOS
+        
+        # Find the compiled binary
+        BINARY_PATH=$(find ios/.build/release -name "ClawPass" -type f | head -n 1)
+        
         if [ -n "$BINARY_PATH" ]; then
-          echo "Stripping binary at $BINARY_PATH"
-          strip -x "$BINARY_PATH"
+          echo "Found binary at $BINARY_PATH, copying to bundle..."
+          cp "$BINARY_PATH" ios/Build/ClawPass.app/Contents/MacOS/ClawPass
+          chmod +x ios/Build/ClawPass.app/Contents/MacOS/ClawPass
         else
-          echo "Binary not found, skipping strip."
+          echo "Binary not found!"
+          exit 1
+        fi
+        
+        # Create a basic Info.plist for the bundle
+        cat <<EOF > ios/Build/ClawPass.app/Contents/Info.plist
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>ClawPass</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.reno.clawpass.v3</string>
+            <key>CFBundleName</key>
+            <string>ClawPass</string>
+            <key>CFBundlePackageType</key>
+            <string>BNDL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+    
+    - name: Strip Binary
+      run: |
+        BINARY_PATH=$(find ios/Build/ClawPass.app -name "ClawPass" -type f | head -n 1)
+        if [ -n "$BINARY_PATH" ]; then
+          strip -x "$BINARY_PATH"
         fi
     
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS
-        path: ios/DerivedData/Build/Products/Release-iphoneos/*.app
+        name: ClawPass-iOS-Bundle
+        path: ios/Build/ClawPass.app
