@@ -33,29 +33,29 @@ jobs:
         fi
         cp "$BINARY_PATH" ios/Payload/ClawPass.app/ClawPass
         cat <<EOF > ios/Payload/ClawPass.app/Info.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>ClawPass</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.reno.clawpass.v3</string>
-    <key>CFBundleName</key>
-    <string>ClawPass</string>
-    <key>CFBundlePackageType</key>
-    <string>BNDL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSRequiresIPhoneOS</key>
-    <true/>
-    <key>UILaunchStoryboardName</key>
-    <string>LaunchScreen</string>
-</dict>
-</plist>
-EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          <key>CFBundleExecutable</key>
+          <string>ClawPass</string>
+          <key>CFBundleIdentifier</key>
+          <string>com.reno.clawpass.v3</string>
+          <key>CFBundleName</key>
+          <string>ClawPass</string>
+          <key>CFBundlePackageType</key>
+          <string>BNDL</string>
+          <key>CFBundleShortVersionString</key>
+          <string>1.0</string>
+          <key>CFBundleVersion</key>
+          <string>1</string>
+          <key>LSRequiresIPhoneOS</key>
+          <true/>
+          <key>UILaunchStoryboardName</key>
+          <string>LaunchScreen</string>
+          </dict>
+        </plist>
+        EOF
         if [ -d "ios/Assets.xcassets" ]; then
           cp -R ios/Assets.xcassets ios/Payload/ClawPass.app/
         fi
