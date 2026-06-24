@@ -9,21 +9,19 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            Group {
-                if vaultManager.isUnlocked {
-                    VaultView()
-                } else if vaultManager.isFirstPopulationPending {
-                    // While we are waiting for the server to respond to our identity request
-                    IdentificationView()
-                } else if !vaultManager.hasAnyVault() {
-                    // If no DB exists and we aren't currently identifying, go to Setup
-                    SetupView(onComplete: {
-                        // Transition handled by vaultManager.isUnlocked
-                    })
-                } else {
-                    // DB exists, we need a password to derive identity and unlock
-                    UnlockView()
-                }
+            if vaultManager.isUnlocked {
+                VaultView()
+            } else if vaultManager.isFirstPopulationPending {
+                // While we are waiting for the server to respond to our identity request
+                IdentificationView()
+            } else if !vaultManager.hasAnyVault() {
+                // If no DB exists and we aren't currently identifying, go to Setup
+                SetupView(onComplete: {
+                    // Transition handled by vaultManager.isUnlocked
+                })
+            } else {
+                // DB exists, we need a password to derive identity and unlock
+                UnlockView()
             }
             
             // State Monitor Removed for Production

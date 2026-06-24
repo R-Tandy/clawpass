@@ -189,6 +189,21 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
 
+    func getDebugInfo(password: String) {
+        let derivedVaultId = cryptoService.deriveVaultId(password: password)
+        guard let storedSalt = try? retrieveSalt(for: derivedVaultId) else {
+            self.debugSaltHex = "NONE"; self.debugKeyHash = "NONE"; return
+        }
+        let key = try? cryptoService.deriveKey(from: password, salt: storedSalt)
+        self.debugSaltHex = storedSalt.map { String(format: "%02x", $0) }.joined()
+        if let k = key {
+            let keyData = k.withUnsafeBytes { Data($0) }
+            self.debugKeyHash = cryptoService.sha256(keyData).map { String(format: "%02x", $0) }.joined()
+        } else {
+            self.debugKeyHash = "DERIVATION_FAILED"
+        }
+    }
+
     func lock(silent: Bool = false) {
         syncService.disconnect()
         db = nil
