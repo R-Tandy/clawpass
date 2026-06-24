@@ -22,7 +22,7 @@ jobs:
         swift build -c release \
           --sdk $(xcrun --show-sdk-path --sdk iphoneos) \
           --triple arm64-apple-ios15.0 \
-          -Xswiftc -Xfrontend -target arm64-apple-ios15.0
+          -Xswiftc -Xfrontend --target arm64-apple-ios15.0
     
     - name: Package as .app Bundle
       run: |
