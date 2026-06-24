@@ -26,11 +26,16 @@ jobs:
     - name: Assemble IPA Payload
       run: |
         mkdir -p ios/Payload/ClawPass.app
-        # Search the entire .build directory for the binary named 'ClawPass'
-        BINARY_PATH=$(find ios/.build -name "ClawPass" -type f | head -n 1)
+        # Search for the binary in the Xcode derived data folder
+        BINARY_PATH=$(find . -name "ClawPass" -type f | grep "Build/Products" | head -n 1)
         if [ -z "$BINARY_PATH" ]; then
-          echo "Error: Binary not found in .build directory. Listing directory contents for debug:"
-          ls -R ios/.build
+          # Fallback to a broader search if the refined one fails
+          BINARY_PATH=$(find . -name "ClawPass" -type f | head -n 1)
+        fi
+        
+        if [ -z "$BINARY_PATH" ]; then
+          echo "Error: Binary not found. Listing all files for debug:"
+          find . -type f
           exit 1
         fi
         cp "$BINARY_PATH" ios/Payload/ClawPass.app/ClawPass
