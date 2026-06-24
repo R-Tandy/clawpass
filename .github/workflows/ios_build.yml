@@ -29,15 +29,16 @@ jobs:
         # Create the app bundle structure manually since pbxproj is corrupted
         mkdir -p ios/Build/ClawPass.app/Contents/MacOS
         
-        # Find the compiled binary
-        BINARY_PATH=$(find ios/.build/release -name "ClawPass" -type f | head -n 1)
+        # Search the entire .build directory recursively for the binary
+        BINARY_PATH=$(find ios/.build -name "ClawPass" -type f | head -n 1)
         
         if [ -n "$BINARY_PATH" ]; then
           echo "Found binary at $BINARY_PATH, copying to bundle..."
           cp "$BINARY_PATH" ios/Build/ClawPass.app/Contents/MacOS/ClawPass
           chmod +x ios/Build/ClawPass.app/Contents/MacOS/ClawPass
         else
-          echo "Binary not found!"
+          echo "Binary not found! Listing .build directory for debugging..."
+          ls -R ios/.build
           exit 1
         fi
         
