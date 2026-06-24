@@ -218,6 +218,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
 
+    func hasAnyVault() -> Bool {
+        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        do {
+            let files = try FileManager.default.contentsOfDirectory(atPath: docDir.path)
+            return files.contains { $0.hasPrefix("vault_") && $0.hasSuffix(".db") }
+        } catch { return false }
+    }
+
     func nuclearReset() {
         lock()
         do {
