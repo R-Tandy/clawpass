@@ -21,7 +21,7 @@ jobs:
         cd ios
         xcodebuild archive \
           -scheme ClawPass \
-          -destination "generic/iphoneos" \
+          -destination generic/iphoneos \
           -archivePath ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
