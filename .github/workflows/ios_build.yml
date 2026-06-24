@@ -16,32 +16,32 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Build Binary via Swift Package
+    - name: Build .app Bundle via xcodebuild
       run: |
         cd ios
-        swift build -c release \
-          --sdk $(xcrun --show-sdk-path --sdk iphoneos) \
-          --triple arm64-apple-ios15.0 \
-          -Xswiftc -Xfrontend --target arm64-apple-ios15.0
+        xcodebuild build \
+          -scheme ClawPass \
+          -destination 'generic/iphoneos' \
+          -derivedDataPath DerivedData \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          -quiet
     
     - name: Package as .app Bundle
       run: |
-        # Create a flat iOS app bundle structure
         mkdir -p ios/Build/ClawPass.app
         
-        # Find the compiled binary
-        BINARY_PATH=$(find ios/.build -name "ClawPass" -type f | head -n 1)
+        BINARY_PATH=$(find ios/DerivedData -name "ClawPass" -type f | head -n 1)
         
         if [ -n "$BINARY_PATH" ]; then
           echo "Found binary at $BINARY_PATH, copying to bundle root..."
           cp "$BINARY_PATH" ios/Build/ClawPass.app/ClawPass
           chmod +x ios/Build/ClawPass.app/ClawPass
         else
-          echo "Binary not found!"
+          echo "Binary not found in DerivedData!"
           exit 1
         fi
         
-        # Create a basic Info.plist in the bundle root
         cat <<EOF > ios/Build/ClawPass.app/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -67,7 +67,6 @@ jobs:
     
     - name: Create IPA
       run: |
-        # IPA is just a zip of a 'Payload' folder containing the .app
         mkdir -p ios/Build/Payload
         cp -R ios/Build/ClawPass.app ios/Build/Payload/
         cd ios/Build
