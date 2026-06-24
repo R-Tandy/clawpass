@@ -16,31 +16,62 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Archive App
+    - name: Build Binary via Swift Package
       run: |
         cd ios
-        xcodebuild archive \
-          -scheme ClawPass \
-          -destination 'generic/platform=iOS' \
-          -archivePath ClawPass.xcarchive \
-          PRODUCT_BUNDLE_IDENTIFIER=com.reno.clawpass.v3 \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          -quiet
+        swift build -c release --sdk $(xcrun --show-sdk-path --sdk iphoneos) --triple arm64-apple-ios15.0
     
-    - name: Export IPA
+    - name: Package as .app Bundle
       run: |
-        cd ios
-        xcodebuild -exportArchive \
-          -archivePath ClawPass.xcarchive \
-          -exportPath Build \
-          -exportOptionsPlist ExportOptions.plist \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO
+        # Create the app bundle structure manually since pbxproj is corrupted
+        mkdir -p ios/Build/ClawPass.app/Contents/MacOS
+        
+        # Find the compiled binary
+        BINARY_PATH=$(find ios/.build/release -name "ClawPass" -type f | head -n 1)
+        
+        if [ -n "$BINARY_PATH" ]; then
+          echo "Found binary at $BINARY_PATH, copying to bundle..."
+          cp "$BINARY_PATH" ios/Build/ClawPass.app/Contents/MacOS/ClawPass
+          chmod +x ios/Build/ClawPass.app/Contents/MacOS/ClawPass
+        else
+          echo "Binary not found!"
+          exit 1
+        fi
+        
+        # Create a basic Info.plist for the bundle
+        cat <<EOF > ios/Build/ClawPass.app/Contents/Info.plist
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>ClawPass</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.reno.clawpass.v3</string>
+            <key>CFBundleName</key>
+            <string>ClawPass</string>
+            <key>CFBundlePackageType</key>
+            <string>BNDL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1</string>
+            <key>LSRequiresIPhoneOS</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+    
+    - name: Strip Binary
+      run: |
+        BINARY_PATH=$(find ios/Build/ClawPass.app -name "ClawPass" -type f | head -n 1)
+        if [ -n "$BINARY_PATH" ]; then
+          strip -x "$BINARY_PATH"
+        fi
     
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
-        name: ClawPass-iOS-IPA
-        path: ios/Build/ClawPass.ipa
+        name: ClawPass-iOS-Bundle
+        path: ios/Build/ClawPass.app

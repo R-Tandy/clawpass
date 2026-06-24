@@ -1,0 +1,46 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Show Xcode version
+      run: xcodebuild -version
+    
+    - name: Archive App
+      run: |
+        cd ios
+        xcodebuild archive \
+          -scheme ClawPass \
+          -destination 'generic/platform=iOS' \
+          -archivePath ClawPass.xcarchive \
+          PRODUCT_BUNDLE_IDENTIFIER=com.reno.clawpass.v3 \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          -quiet
+    
+    - name: Export IPA
+      run: |
+        cd ios
+        xcodebuild -exportArchive \
+          -archivePath ClawPass.xcarchive \
+          -exportPath Build \
+          -exportOptionsPlist ExportOptions.plist \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
+    
+    - name: Upload Artifact
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ClawPass-iOS-IPA
+        path: ios/Build/ClawPass.ipa
