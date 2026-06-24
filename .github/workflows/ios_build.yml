@@ -13,9 +13,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # Removed the hardcoded /Applications/Xcode_15.0.app path which is causing the error.
-    # macos-latest already has a default Xcode version selected.
-    
     - name: Show Xcode version
       run: xcodebuild -version
     
@@ -26,24 +23,23 @@ jobs:
     
     - name: Package as .app Bundle
       run: |
-        # Create the app bundle structure manually since pbxproj is corrupted
-        mkdir -p ios/Build/ClawPass.app/Contents/MacOS
+        # Create a flat iOS app bundle structure
+        mkdir -p ios/Build/ClawPass.app
         
-        # Search the entire .build directory recursively for the binary
+        # Find the compiled binary
         BINARY_PATH=$(find ios/.build -name "ClawPass" -type f | head -n 1)
         
         if [ -n "$BINARY_PATH" ]; then
-          echo "Found binary at $BINARY_PATH, copying to bundle..."
-          cp "$BINARY_PATH" ios/Build/ClawPass.app/Contents/MacOS/ClawPass
-          chmod +x ios/Build/ClawPass.app/Contents/MacOS/ClawPass
+          echo "Found binary at $BINARY_PATH, copying to bundle root..."
+          cp "$BINARY_PATH" ios/Build/ClawPass.app/ClawPass
+          chmod +x ios/Build/ClawPass.app/ClawPass
         else
-          echo "Binary not found! Listing .build directory for debugging..."
-          ls -R ios/.build
+          echo "Binary not found!"
           exit 1
         fi
         
-        # Create a basic Info.plist for the bundle
-        cat <<EOF > ios/Build/ClawPass.app/Contents/Info.plist
+        # Create a basic Info.plist in the bundle root
+        cat <<EOF > ios/Build/ClawPass.app/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -65,6 +61,13 @@ jobs:
         </dict>
         </plist>
         EOF
+    
+    - name: Strip Binary
+      run: |
+        BINARY_PATH=$(find ios/Build/ClawPass.app -name "ClawPass" -type f | head -n 1)
+        if [ -n "$BINARY_PATH" ]; then
+          strip -x "$BINARY_PATH"
+        fi
     
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
