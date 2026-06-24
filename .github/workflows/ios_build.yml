@@ -34,6 +34,11 @@ jobs:
           exit 1
         fi
         cp "$BINARY_PATH" ios/Payload/ClawPass.app/ClawPass
+        
+        # Finalize the binary for signing (Crucial for SideStore/isideload)
+        # Strip debug symbols to fix "__LINKEDIT isn't final Mach-O segment"
+        strip -x ios/Payload/ClawPass.app/ClawPass
+        
         cat <<EOF > ios/Payload/ClawPass.app/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
