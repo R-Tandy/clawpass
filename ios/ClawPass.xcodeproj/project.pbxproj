@@ -11,6 +11,7 @@
 		000000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000021 /* ContentView.swift */; };
 		000000000000000000000003 /* AddEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000022 /* AddEntryView.swift */; };
 		000000000000000000000004 /* EntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000023 /* EntryDetailView.swift */; };
+		00000000000000000000000A /* SyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000024 /* SyncView.swift */; };
 		000000000000000000000005 /* VaultEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000031 /* VaultEntry.swift */; };
 		000000000000000000000006 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000032 /* CryptoService.swift */; };
 		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
@@ -24,10 +25,12 @@
 		000000000000000000000021 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		000000000000000000000022 /* AddEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEntryView.swift; sourceTree = "<group>"; };
 		000000000000000000000023 /* EntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryDetailView.swift; sourceTree = "<group>"; };
+		000000000000000000000024 /* SyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncView.swift; sourceTree = "<group>"; };
 		000000000000000000000031 /* VaultEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultEntry.swift; sourceTree = "<group>"; };
 		000000000000000000000032 /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
 		000000000000000000000033 /* VaultManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultManager.swift; sourceTree = "<group>"; };
 		000000000000000000000034 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
+		000000000000000000000035 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,20 +54,13 @@
 		000000000000000000000051 /* ClawPass */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000052 /* ClawPassApp.swift */,
+				000000000000000000000011 /* ClawPassApp.swift */,
 				000000000000000000000053 /* Views */,
 				000000000000000000000054 /* Models */,
 				000000000000000000000055 /* Services */,
+				000000000000000000000035 /* Assets.xcassets */,
 			);
-			path = "";
-			sourceTree = "<group>";
-		};
-		000000000000000000000052 = {
-			isa = PBXGroup;
-			children = (
-				000000000000000000000011 /* ClawPassApp.swift */,
-			);
-			name = "";
+			path = ClawPass;
 			sourceTree = "<group>";
 		};
 		000000000000000000000053 /* Views */ = {
@@ -73,6 +69,7 @@
 				000000000000000000000021 /* ContentView.swift */,
 				000000000000000000000022 /* AddEntryView.swift */,
 				000000000000000000000023 /* EntryDetailView.swift */,
+				000000000000000000000024 /* SyncView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -155,6 +152,7 @@
 				000000000000000000000002 /* ContentView.swift in Sources */,
 				000000000000000000000003 /* AddEntryView.swift in Sources */,
 				000000000000000000000004 /* EntryDetailView.swift in Sources */,
+				00000000000000000000000A /* SyncView.swift in Sources */,
 				000000000000000000000005 /* VaultEntry.swift in Sources */,
 				000000000000000000000006 /* CryptoService.swift in Sources */,
 				000000000000000000000007 /* VaultManager.swift in Sources */,
@@ -170,9 +168,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = ios;
-				TARGETED_DEVICE_FAMILY = "1,2";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -183,9 +178,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = ios;
-				TARGETED_DEVICE_FAMILY = "1,2";
 				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
 			};
 			name = Release;
@@ -214,7 +206,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.clawpass.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.reno.clawpass.v3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -244,10 +236,10 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks",
+					"@executable_path/Framework và Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.clawpass.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.reno.clawpass.v3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
