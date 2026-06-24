@@ -21,7 +21,7 @@ jobs:
         cd ios
         xcodebuild archive \
           -scheme ClawPass \
-          -destination generic/iphoneos \
+          -destination 'generic/platform=iOS' \
           -archivePath ClawPass.xcarchive \
           PRODUCT_BUNDLE_IDENTIFIER=com.reno.clawpass.v3 \
           CODE_SIGNING_REQUIRED=NO \
