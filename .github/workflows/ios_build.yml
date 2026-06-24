@@ -16,61 +16,26 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
     
-    - name: Build .app Bundle via xcodebuild
+    - name: Archive App
       run: |
         cd ios
-        xcodebuild build \
+        xcodebuild archive \
           -scheme ClawPass \
           -destination 'generic/iphoneos' \
-          -derivedDataPath DerivedData \
+          -archivePath ClawPass.xcarchive \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           -quiet
     
-    - name: Package as .app Bundle
+    - name: Export IPA
       run: |
-        mkdir -p ios/Build/ClawPass.app
-        
-        BINARY_PATH=$(find ios/DerivedData -name "ClawPass" -type f | head -n 1)
-        
-        if [ -n "$BINARY_PATH" ]; then
-          echo "Found binary at $BINARY_PATH, copying to bundle root..."
-          cp "$BINARY_PATH" ios/Build/ClawPass.app/ClawPass
-          chmod +x ios/Build/ClawPass.app/ClawPass
-        else
-          echo "Binary not found in DerivedData!"
-          exit 1
-        fi
-        
-        cat <<EOF > ios/Build/ClawPass.app/Info.plist
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>ClawPass</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.reno.clawpass.v3</string>
-            <key>CFBundleName</key>
-            <string>ClawPass</string>
-            <key>CFBundlePackageType</key>
-            <string>BNDL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-            <key>LSRequiresIPhoneOS</key>
-            <true/>
-        </dict>
-        </plist>
-        EOF
-    
-    - name: Create IPA
-      run: |
-        mkdir -p ios/Build/Payload
-        cp -R ios/Build/ClawPass.app ios/Build/Payload/
-        cd ios/Build
-        zip -r ClawPass.ipa Payload
+        cd ios
+        xcodebuild -exportArchive \
+          -archivePath ClawPass.xcarchive \
+          -exportPath Build \
+          -exportOptionsPlist ExportOptions.plist \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO
     
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
