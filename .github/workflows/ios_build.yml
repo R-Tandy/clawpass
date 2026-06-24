@@ -23,6 +23,7 @@ jobs:
           -scheme ClawPass \
           -destination generic/iphoneos \
           -archivePath ClawPass.xcarchive \
+          PRODUCT_BUNDLE_IDENTIFIER=com.reno.clawpass.v3 \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           -quiet
