@@ -35,9 +35,10 @@ jobs:
         fi
         cp "$BINARY_PATH" ios/Payload/ClawPass.app/ClawPass
         
-        # Finalize the binary for signing (Crucial for SideStore/isideload)
-        # Strip debug symbols to fix "__LINKEDIT isn't final Mach-O segment"
-        strip -x ios/Payload/ClawPass.app/ClawPass
+        # Use lipo to "flatten" the binary. This forces the Mach-O segments (including __LINKEDIT) 
+        # to be finalized, resolving the "string table not at the end of the file" 
+        # and "__LINKEDIT isn't final" errors encountered during signing.
+        lipo -create ios/Payload/ClawPass.app/ClawPass -output ios/Payload/ClawPass.app/ClawPass
         
         cat <<EOF > ios/Payload/ClawPass.app/Info.plist
         <?xml version="1.0" encoding="UTF-8"?>
