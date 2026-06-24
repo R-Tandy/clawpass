@@ -19,6 +19,9 @@ jobs:
     - name: Archive App
       run: |
         cd ios
+        # Temporarily move Package.swift to avoid Hybrid Project confusion
+        mv Package.swift Package.swift.bak || true
+        
         xcodebuild archive \
           -scheme ClawPass \
           -destination 'generic/platform=iOS' \
@@ -27,6 +30,9 @@ jobs:
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
           -quiet
+          
+        # Restore Package.swift
+        mv Package.swift.bak Package.swift || true
     
     - name: Export IPA
       run: |
