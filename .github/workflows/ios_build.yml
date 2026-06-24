@@ -19,28 +19,19 @@ jobs:
     - name: Build Binary via Swift Package
       run: |
         cd ios
-        # Use the Swift Package manager to build the release binary for iOS arm64
         swift build -c release \
           --triple arm64-apple-ios16.0 \
           --sdk $(xcrun --show-sdk-path --sdk iphoneos)
     
     - name: Assemble IPA Payload
       run: |
-        # 1. Setup directory structure
         mkdir -p ios/Payload/ClawPass.app
-        
-        # 2. Find the compiled binary (search for the executable named ClawPass)
         BINARY_PATH=$(find ios/.build/release -name "ClawPass" -type f -executable | head -n 1)
-        
         if [ -z "$BINARY_PATH" ]; then
           echo "Error: Binary not found in .build/release"
           exit 1
         fi
-        
-        echo "Found binary at $BINARY_PATH, copying to payload..."
         cp "$BINARY_PATH" ios/Payload/ClawPass.app/ClawPass
-        
-        # 3. Create Info.plist
         cat <<EOF > ios/Payload/ClawPass.app/Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -65,8 +56,6 @@ jobs:
 </dict>
 </plist>
 EOF
-
-        # 4. Copy Assets if they exist
         if [ -d "ios/Assets.xcassets" ]; then
           cp -R ios/Assets.xcassets ios/Payload/ClawPass.app/
         fi
@@ -74,8 +63,6 @@ EOF
     - name: Package as IPA
       run: |
         cd ios
-        # Zip the Payload folder and rename to .ipa
-        # -r for recursive, -X to exclude metadata files
         zip -r ../ClawPass-iOS.ipa Payload/
         mv ../ClawPass-iOS.ipa ../ClawPass.ipa
     
