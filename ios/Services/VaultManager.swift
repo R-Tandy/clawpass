@@ -309,6 +309,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         try loadData(); refreshUI()
         syncService.sendEntryDelete(entryId: entryIdLower)
+        syncService.flushOutbox()
     }
 
     func decryptPassword(for entry: VaultEntry) throws -> String {

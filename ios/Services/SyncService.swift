@@ -538,19 +538,20 @@ class SyncService: ObservableObject {
             log("SINCED: Sync pipeline already active. Skipping redundant trigger.")
             return
         }
-        
+
         isSyncing = true
         log("SINCED: Starting automated sync pipeline...")
-        
+
         syncQueue.async { [weak self] in
             guard let self = self else { return }
             self.flushOutbox()
             self.requestTombstones()
             self.requestCategories()
             self.requestSync()
-            
-            // Reset syncing flag after a short delay to allow the pipeline to settle
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+
+            // Strict deterministic flow — no timers.
+            // Caller (VaultManager after salt/unlock) is responsible for sequencing.
+            DispatchQueue.main.async {
                 self.isSyncing = false
                 self.log("SINCED: Sync pipeline cycle complete.")
             }
