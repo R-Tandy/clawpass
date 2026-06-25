@@ -17,6 +17,7 @@
 		000000000000000000000007 /* VaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000033 /* VaultManager.swift */; };
 		000000000000000000000008 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000034 /* SyncService.swift */; };
 		000000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000000035 /* Assets.xcassets */; };
+		000000000000000000000302 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = 000000000000000000000300 /* SQLite */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000000302 /* SQLite in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -107,6 +109,9 @@
 			dependencies = (
 			);
 			name = ClawPass;
+			packageProductDependencies = (
+				000000000000000000000300 /* SQLite */,
+			);
 			productName = ClawPass;
 			productReference = 000000000000000000000010 /* ClawPass.app */;
 			productType = "com.apple.product-type.application";
@@ -134,6 +139,9 @@
 				Base,
 			);
 			mainGroup = 000000000000000000000050;
+			packageReferences = (
+				000000000000000000000301 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+			);
 			productRefGroup = 000000000000000000000050;
 			projectDirPath = "";
 			projectRoot = "";
@@ -275,6 +283,19 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+		000000000000000000000300 /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 000000000000000000000301 /* XCRemoteSwiftPackageReference "SQLite.swift" */;
+			productName = SQLite;
+		};
+		000000000000000000000301 /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.14.1;
+			};
+		};
 	};
 	rootObject = 000000000000000000000100 /* Project object */;
 }

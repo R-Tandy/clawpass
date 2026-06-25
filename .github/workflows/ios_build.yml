@@ -32,6 +32,7 @@ jobs:
         # passes codesign -v checks. SideStore's iLoader will replace this
         # ad-hoc signature with the developer's real provisioning profile
         # at install time, so we don't need a real cert on the CI runner.
+        set -o pipefail
         xcodebuild \
           -project ClawPass.xcodeproj \
           -target ClawPass \
@@ -47,7 +48,15 @@ jobs:
           PROVISIONING_PROFILE_SPECIFIER="" \
           ONLY_ACTIVE_ARCH=NO \
           ARCHS=arm64 \
-          build 2>&1 | tail -200
+          build 2>&1 | tee /tmp/xcodebuild.log | tail -200
+        # Final exit-code check in case the pipefail isn't honored everywhere.
+        XCB_EXIT=${PIPESTATUS[0]}
+        echo "xcodebuild exit code: $XCB_EXIT"
+        if [ "$XCB_EXIT" -ne 0 ]; then
+          echo "::error::xcodebuild failed. Full log:"
+          cat /tmp/xcodebuild.log
+          exit "$XCB_EXIT"
+        fi
 
     - name: Locate built .app
       id: locate
