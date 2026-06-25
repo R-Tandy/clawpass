@@ -58,8 +58,11 @@ jobs:
         tail -80 /tmp/xcodebuild.log || true
         echo "=== xcodebuild exit: $XCB_EXIT ==="
         if [ "$XCB_EXIT" -ne 0 ]; then
-          echo "::error::xcodebuild failed (exit $XCB_EXIT). Full log:"
-          cat /tmp/xcodebuild.log || true
+          echo "::error::xcodebuild failed (exit $XCB_EXIT). Extracting error lines:"
+          grep -E 'error:|warning:|fatal error:|note:' /tmp/xcodebuild.log | head -100 || true
+          echo "---"
+          echo "Last 120 lines of full log:"
+          tail -120 /tmp/xcodebuild.log || true
           exit "$XCB_EXIT"
         fi
 
