@@ -62,7 +62,6 @@
 				000000000000000000000055 /* Services */,
 				000000000000000000000035 /* Assets.xcassets */,
 			);
-			path = ClawPass;
 			sourceTree = "<group>";
 		};
 		000000000000000000000053 /* Views */ = {
