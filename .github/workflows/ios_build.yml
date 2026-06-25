@@ -32,6 +32,11 @@ jobs:
         # passes codesign -v checks. SideStore's iLoader will replace this
         # ad-hoc signature with the developer's real provisioning profile
         # at install time, so we don't need a real cert on the CI runner.
+        #
+        # We do NOT pass -derivedDataPath: when you supply -derivedDataPath,
+        # xcodebuild also requires -scheme (or -testProductsPath/-xctestrun).
+        # The project has no shared scheme yet, so we let xcodebuild use the
+        # default DerivedData location under ~/Library/Developer/Xcode/...
         set -o pipefail
         xcodebuild \
           -project ClawPass.xcodeproj \
@@ -39,7 +44,6 @@ jobs:
           -configuration Release \
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
-          -derivedDataPath build \
           CODE_SIGN_IDENTITY="-" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=YES \
@@ -48,10 +52,13 @@ jobs:
           PROVISIONING_PROFILE_SPECIFIER="" \
           ONLY_ACTIVE_ARCH=NO \
           ARCHS=arm64 \
-          build 2>&1 | tee /tmp/xcodebuild.log | tail -200
-        # Final exit-code check in case the pipefail isn't honored everywhere.
-        XCB_EXIT=${PIPESTATUS[0]}
-        echo "xcodebuild exit code: $XCB_EXIT"
+          build > /tmp/xcodebuild.log 2>&1
+        XCB_EXIT=$?
+        # Echo just the last 80 lines for the workflow log, but keep the full
+        # log on disk in case we need to dump it.
+        echo "=== xcodebuild tail (last 80 lines) ==="
+        tail -80 /tmp/xcodebuild.log
+        echo "=== xcodebuild exit: $XCB_EXIT ==="
         if [ "$XCB_EXIT" -ne 0 ]; then
           echo "::error::xcodebuild failed. Full log:"
           cat /tmp/xcodebuild.log
@@ -61,18 +68,21 @@ jobs:
     - name: Locate built .app
       id: locate
       run: |
-        # xcodebuild's -derivedDataPath puts products under build/Build/Products/Release-iphoneos
-        APP_PATH=$(find ios/build -name "ClawPass.app" -type d | head -n 1)
+        # Default DerivedData lives under ~/Library/Developer/Xcode/DerivedData
+        # when -derivedDataPath is not supplied.
+        APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name "ClawPass.app" -type d -path "*Release-iphoneos*" 2>/dev/null | head -n 1)
         if [ -z "$APP_PATH" ]; then
-          echo "::error::ClawPass.app not found after xcodebuild. Dumping build dir:"
-          find ios/build -maxdepth 6 -type d 2>/dev/null || true
+          # Last-resort: search anywhere in DerivedData.
+          APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
+        fi
+        if [ -z "$APP_PATH" ]; then
+          echo "::error::ClawPass.app not found. Dumping DerivedData:"
+          find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 4 -type d 2>/dev/null || true
           exit 1
         fi
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
         echo "Located .app at: $APP_PATH"
-        echo "App contents:"
         ls -la "$APP_PATH"
-        echo "Info.plist keys:"
         /usr/libexec/PlistBuddy -c "Print" "$APP_PATH/Info.plist" 2>/dev/null | head -60
 
     - name: Package as IPA
