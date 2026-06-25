@@ -80,7 +80,7 @@ jobs:
         fi
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
         echo "Located .app at: $APP_PATH"
-        ls "$APP_PATH"
+        ls -la "$APP_PATH"
         /usr/libexec/PlistBuddy -c "Print" "$APP_PATH/Info.plist" 2>/dev/null | head -60
 
     - name: Package as IPA
@@ -93,7 +93,7 @@ jobs:
         # Verify the executable exists in the bundle.
         if [ ! -f "ios/Payload/ClawPass.app/ClawPass" ]; then
           echo "::error::ClawPass executable missing inside ClawPass.app"
-          ls ios/Payload/ClawPass.app
+          ls -la ios/Payload/ClawPass.app
           exit 1
         fi
 
@@ -109,7 +109,7 @@ jobs:
         zip -r ../ClawPass-iOS.ipa Payload/
         mv ../ClawPass-iOS.ipa ../ClawPass.ipa
         echo "IPA size:"
-        ls ../ClawPass.ipa
+        ls -la ../ClawPass.ipa
 
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
