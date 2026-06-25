@@ -24,14 +24,13 @@ jobs:
         cd ios
         xcodebuild -list -project ClawPass.xcodeproj || true
 
-    - name: Build with xcodebuild (Release, ad-hoc signed, iOS device)
+    - name: Build with xcodebuild (Release, unsigned, iOS device)
       run: |
         cd ios
-        # Build the app for an iOS device target, Release config.
-        # Ad-hoc signing (CODE_SIGN_IDENTITY="-") produces a bundle that
-        # passes codesign -v checks. SideStore's iLoader will replace this
-        # ad-hoc signature with the developer's real provisioning profile
-        # at install time, so we don't need a real cert on the CI runner.
+        # Build the app for an iOS device target, Release config, with code
+        # signing DISABLED. SideStore's iLoader accepts a fully unsigned .app
+        # inside the IPA and signs it with the developer's free provisioning
+        # profile at install time, so we don't need a real cert on the runner.
         #
         # We do NOT pass -derivedDataPath: when you supply -derivedDataPath,
         # xcodebuild also requires -scheme (or -testProductsPath/-xctestrun).
@@ -44,9 +43,9 @@ jobs:
           -configuration Release \
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
-          CODE_SIGN_IDENTITY="-" \
+          CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=YES \
+          CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_STYLE=Manual \
           DEVELOPMENT_TEAM="" \
           PROVISIONING_PROFILE_SPECIFIER="" \
@@ -55,7 +54,6 @@ jobs:
           build > /tmp/xcodebuild.log 2>&1
         XCB_EXIT=$?
         set -e
-        # Always print the tail so we see the actual error regardless of exit code.
         echo "=== xcodebuild tail (last 80 lines) ==="
         tail -80 /tmp/xcodebuild.log || true
         echo "=== xcodebuild exit: $XCB_EXIT ==="
