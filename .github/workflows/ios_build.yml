@@ -32,17 +32,21 @@ jobs:
         # inside the IPA and signs it with the developer's free provisioning
         # profile at install time, so we don't need a real cert on the runner.
         #
-        # We do NOT pass -derivedDataPath: when you supply -derivedDataPath,
-        # xcodebuild also requires -scheme (or -testProductsPath/-xctestrun).
-        # The project has no shared scheme yet, so we let xcodebuild use the
-        # default DerivedData location under ~/Library/Developer/Xcode/...
+        # We pass -derivedDataPath to put the build output in a known location
+        # (the runner's user dir, NOT the project tree). Without this, some
+        # Xcode versions default to ./build relative to the project, which
+        # causes 'lstat(...SQLite.swift_SQLite.bundle): No such file or
+        # directory' errors when the SwiftPM package resource bundle can't
+        # be located.
         set +e
         xcodebuild \
           -project ClawPass.xcodeproj \
-          -target ClawPass \
+          -scheme ClawPass \
           -configuration Release \
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
+          -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass" \
+          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages" \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
@@ -69,16 +73,17 @@ jobs:
     - name: Locate built .app
       id: locate
       run: |
-        # Default DerivedData lives under ~/Library/Developer/Xcode/DerivedData
-        # when -derivedDataPath is not supplied.
-        APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name "ClawPass.app" -type d -path "*Release-iphoneos*" 2>/dev/null | head -n 1)
-        if [ -z "$APP_PATH" ]; then
-          # Last-resort: search anywhere in DerivedData.
-          APP_PATH=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
+        # We pass -derivedDataPath explicitly to xcodebuild, so the output
+        # is at $DD/Build/Products/Release-iphoneos/ClawPass.app
+        DD="$HOME/Library/Developer/Xcode/DerivedData/ClawPass"
+        APP_PATH="$DD/Build/Products/Release-iphoneos/ClawPass.app"
+        if [ ! -d "$APP_PATH" ]; then
+          # Fallback: search the DerivedData tree.
+          APP_PATH=$(find "$DD" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
         fi
-        if [ -z "$APP_PATH" ]; then
+        if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
           echo "::error::ClawPass.app not found. Dumping DerivedData:"
-          find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 4 -type d 2>/dev/null || true
+          find "$DD" -maxdepth 6 -type d 2>/dev/null || true
           exit 1
         fi
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
