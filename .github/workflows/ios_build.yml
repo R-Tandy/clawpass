@@ -9,78 +9,91 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Show Xcode version
       run: xcodebuild -version
-    
-    - name: Build Binary via Swift Package
+
+    - name: Show available SDKs
+      run: xcodebuild -showsdks | grep -i ios || true
+
+    - name: List project targets/schemes
       run: |
         cd ios
-        # Build a release binary for arm64 iOS. SwiftPM places the executable
-        # at ios/.build/<triple>/release/ClawPass.
-        swift build -c release \
-          --triple arm64-apple-ios16.0 \
-          --sdk $(xcrun --show-sdk-path --sdk iphoneos) \
-          -Xswiftc -O
-    
-    - name: Locate built binary
+        xcodebuild -list -project ClawPass.xcodeproj || true
+
+    - name: Build with xcodebuild (Release, ad-hoc signed, iOS device)
+      run: |
+        cd ios
+        # Build the app for an iOS device target, Release config.
+        # Ad-hoc signing (CODE_SIGN_IDENTITY="-") produces a bundle that
+        # passes codesign -v checks. SideStore's iLoader will replace this
+        # ad-hoc signature with the developer's real provisioning profile
+        # at install time, so we don't need a real cert on the CI runner.
+        xcodebuild \
+          -project ClawPass.xcodeproj \
+          -target ClawPass \
+          -configuration Release \
+          -sdk iphoneos \
+          -destination 'generic/platform=iOS' \
+          -derivedDataPath build \
+          CODE_SIGN_IDENTITY="-" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=YES \
+          CODE_SIGN_STYLE=Manual \
+          DEVELOPMENT_TEAM="" \
+          PROVISIONING_PROFILE_SPECIFIER="" \
+          ONLY_ACTIVE_ARCH=NO \
+          ARCHS=arm64 \
+          build 2>&1 | tail -200
+
+    - name: Locate built .app
       id: locate
       run: |
-        cd ios
-        # Preferred path: SwiftPM places the product under .build/<triple>/release/
-        BINARY_PATH=$(find .build -name "ClawPass" -type f -perm +111 2>/dev/null | head -n 1)
-        if [ -z "$BINARY_PATH" ]; then
-          # Fallback: any executable named ClawPass anywhere under ios/
-          BINARY_PATH=$(find . -name "ClawPass" -type f -perm +111 2>/dev/null | head -n 1)
-        fi
-        if [ -z "$BINARY_PATH" ]; then
-          echo "::error::ClawPass binary not found after build. Dumping ios/.build contents:"
-          find .build -maxdepth 6 -type f 2>/dev/null || true
+        # xcodebuild's -derivedDataPath puts products under build/Build/Products/Release-iphoneos
+        APP_PATH=$(find ios/build -name "ClawPass.app" -type d | head -n 1)
+        if [ -z "$APP_PATH" ]; then
+          echo "::error::ClawPass.app not found after xcodebuild. Dumping build dir:"
+          find ios/build -maxdepth 6 -type d 2>/dev/null || true
           exit 1
         fi
-        echo "binary_path=$BINARY_PATH" >> $GITHUB_OUTPUT
-        echo "Located binary at: $BINARY_PATH"
-    
-    - name: Assemble .app bundle
-      run: |
-        cd ios
-        APP_DIR="Payload/ClawPass.app"
-        rm -rf "$APP_DIR"
-        mkdir -p "$APP_DIR"
-        
-        # Copy the executable (do not run lipo on a single-arch binary).
-        BINARY_PATH="${{ steps.locate.outputs.binary_path }}"
-        cp "$BINARY_PATH" "$APP_DIR/ClawPass"
-        chmod +x "$APP_DIR/ClawPass"
-        
-        # Verify the binary is a valid arm64 Mach-O.
-        file "$APP_DIR/ClawPass"
-        
-        # Copy the real Info.plist from source. This preserves all usage
-        # description strings (NSLocalNetworkUsageDescription, NSFaceIDUsageDescription,
-        # NSBonjourServices) which are required for sync and biometrics to work.
-        cp Info.plist "$APP_DIR/Info.plist"
-        
-        # Copy the SwiftPM resource bundle (contains compiled Assets.car) next to the binary.
-        # iOS will not pick this up as the app's main icon, but it keeps resources available.
-        if [ -d ".build/arm64-apple-ios16.0/release/ClawPass_ClawPass.bundle" ]; then
-          cp -R ".build/arm64-apple-ios16.0/release/ClawPass_ClawPass.bundle" "$APP_DIR/"
-        fi
-        
-        echo "App bundle contents:"
-        ls -la "$APP_DIR"
-    
+        echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+        echo "Located .app at: $APP_PATH"
+        echo "App contents:"
+        ls -la "$APP_PATH"
+        echo "Info.plist keys:"
+        /usr/libexec/PlistBuddy -c "Print" "$APP_PATH/Info.plist" 2>/dev/null | head -60
+
     - name: Package as IPA
       run: |
+        APP_PATH="${{ steps.locate.outputs.app_path }}"
+        rm -rf ios/Payload
+        mkdir -p ios/Payload
+        cp -R "$APP_PATH" ios/Payload/ClawPass.app
+
+        # Verify the executable exists in the bundle.
+        if [ ! -f "ios/Payload/ClawPass.app/ClawPass" ]; then
+          echo "::error::ClawPass executable missing inside ClawPass.app"
+          ls -la ios/Payload/ClawPass.app
+          exit 1
+        fi
+
+        # Confirm CFBundleExecutable is a real string, not an unexpanded placeholder.
+        CFB_EXEC=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" ios/Payload/ClawPass.app/Info.plist)
+        echo "CFBundleExecutable in built bundle: $CFB_EXEC"
+        if echo "$CFB_EXEC" | grep -q '\$('; then
+          echo "::error::CFBundleExecutable still contains an unresolved Xcode variable: $CFB_EXEC"
+          exit 1
+        fi
+
         cd ios
         zip -r ../ClawPass-iOS.ipa Payload/
         mv ../ClawPass-iOS.ipa ../ClawPass.ipa
         echo "IPA size:"
         ls -la ../ClawPass.ipa
-    
+
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
