@@ -37,7 +37,7 @@ jobs:
         # xcodebuild also requires -scheme (or -testProductsPath/-xctestrun).
         # The project has no shared scheme yet, so we let xcodebuild use the
         # default DerivedData location under ~/Library/Developer/Xcode/...
-        set -o pipefail
+        set +e
         xcodebuild \
           -project ClawPass.xcodeproj \
           -target ClawPass \
@@ -54,14 +54,14 @@ jobs:
           ARCHS=arm64 \
           build > /tmp/xcodebuild.log 2>&1
         XCB_EXIT=$?
-        # Echo just the last 80 lines for the workflow log, but keep the full
-        # log on disk in case we need to dump it.
+        set -e
+        # Always print the tail so we see the actual error regardless of exit code.
         echo "=== xcodebuild tail (last 80 lines) ==="
-        tail -80 /tmp/xcodebuild.log
+        tail -80 /tmp/xcodebuild.log || true
         echo "=== xcodebuild exit: $XCB_EXIT ==="
         if [ "$XCB_EXIT" -ne 0 ]; then
-          echo "::error::xcodebuild failed. Full log:"
-          cat /tmp/xcodebuild.log
+          echo "::error::xcodebuild failed (exit $XCB_EXIT). Full log:"
+          cat /tmp/xcodebuild.log || true
           exit "$XCB_EXIT"
         fi
 
