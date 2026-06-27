@@ -16,8 +16,12 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
 
-    - name: Show available SDKs
-      run: xcodebuild -showsdks | grep -i ios || true
+    - name: Resolve SwiftPM packages
+      run: |
+        cd ios
+        xcodebuild -resolvePackageDependencies \
+          -project ClawPass.xcodeproj \
+          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages"
 
     - name: Build with -target + SwiftPM path
       run: |
