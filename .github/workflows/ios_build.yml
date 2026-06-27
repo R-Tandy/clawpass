@@ -41,7 +41,7 @@ jobs:
         set +e
         xcodebuild \
           -project ClawPass.xcodeproj \
-          -scheme ClawPass \
+          -target ClawPass \
           -configuration Release \
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
