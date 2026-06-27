@@ -19,24 +19,15 @@ jobs:
     - name: Show available SDKs
       run: xcodebuild -showsdks | grep -i ios || true
 
-    - name: List schemes and destinations
-      run: |
-        cd ios
-        xcodebuild -list -project ClawPass.xcodeproj || true
-        xcodebuild -showdestinations -project ClawPass.xcodeproj -scheme ClawPass || true
-
-    - name: Build iOS App (Release)
+    - name: Build with -target (no scheme)
       run: |
         cd ios
         set +e
         xcodebuild \
           -project ClawPass.xcodeproj \
-          -scheme ClawPass \
+          -target ClawPass \
           -configuration Release \
           -sdk iphoneos \
-          -destination 'generic/platform=iOS' \
-          -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass" \
-          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages" \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
@@ -57,20 +48,14 @@ jobs:
           exit "$XCB_EXIT"
         fi
 
-    - name: Locate built .app
+    - name: Locate .app (fallback search)
       id: locate
       run: |
-        DD="$HOME/Library/Developer/Xcode/DerivedData/ClawPass"
-        APP_PATH="$DD/Build/Products/Release-iphoneos/ClawPass.app"
-
-        if [ ! -d "$APP_PATH" ]; then
-          echo "Primary path not found, searching..."
-          APP_PATH=$(find "$DD" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
-        fi
+        APP_PATH=$(find /Users/runner -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
 
         if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-          echo "::error::ClawPass.app not found"
-          find "$DD" -maxdepth 8 -name "*.app" -type d 2>/dev/null || true
+          echo "::error::ClawPass.app not found anywhere"
+          find /Users/runner -name "*.app" -type d 2>/dev/null | head -10 || true
           exit 1
         fi
 
@@ -86,7 +71,7 @@ jobs:
         cp -R "$APP_PATH" ios/Payload/ClawPass.app
 
         if [ ! -f "ios/Payload/ClawPass.app/ClawPass" ]; then
-          echo "::error::Executable missing"
+          echo "::error::Executable missing inside ClawPass.app"
           ls -la ios/Payload/ClawPass.app
           exit 1
         fi
