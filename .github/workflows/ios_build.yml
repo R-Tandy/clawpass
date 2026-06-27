@@ -16,14 +16,7 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
 
-    - name: Resolve SwiftPM packages
-      run: |
-        cd ios
-        xcodebuild -resolvePackageDependencies \
-          -project ClawPass.xcodeproj \
-          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages"
-
-    - name: Build with -target + SwiftPM path
+    - name: Build with -target + derivedDataPath (forcing it)
       run: |
         cd ios
         set +e
@@ -32,6 +25,8 @@ jobs:
           -target ClawPass \
           -configuration Release \
           -sdk iphoneos \
+          -destination 'generic/platform=iOS' \
+          -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass" \
           -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages" \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
@@ -53,14 +48,19 @@ jobs:
           exit "$XCB_EXIT"
         fi
 
-    - name: Locate .app (fallback search)
+    - name: Locate built .app
       id: locate
       run: |
-        APP_PATH=$(find /Users/runner -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
+        DD="$HOME/Library/Developer/Xcode/DerivedData/ClawPass"
+        APP_PATH="$DD/Build/Products/Release-iphoneos/ClawPass.app"
+
+        if [ ! -d "$APP_PATH" ]; then
+          APP_PATH=$(find "$DD" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
+        fi
 
         if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-          echo "::error::ClawPass.app not found anywhere"
-          find /Users/runner -name "*.app" -type d 2>/dev/null | head -10 || true
+          echo "::error::ClawPass.app not found"
+          find "$DD" -maxdepth 8 -name "*.app" -type d 2>/dev/null || true
           exit 1
         fi
 
@@ -76,7 +76,7 @@ jobs:
         cp -R "$APP_PATH" ios/Payload/ClawPass.app
 
         if [ ! -f "ios/Payload/ClawPass.app/ClawPass" ]; then
-          echo "::error::Executable missing inside ClawPass.app"
+          echo "::error::Executable missing"
           ls -la ios/Payload/ClawPass.app
           exit 1
         fi
