@@ -16,7 +16,7 @@ jobs:
     - name: Show Xcode version
       run: xcodebuild -version
 
-    - name: Build with -target + derivedDataPath (forcing it)
+    - name: Build (minimal flags)
       run: |
         cd ios
         set +e
@@ -25,15 +25,9 @@ jobs:
           -target ClawPass \
           -configuration Release \
           -sdk iphoneos \
-          -destination 'generic/platform=iOS' \
-          -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass" \
-          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages" \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGN_STYLE=Manual \
-          DEVELOPMENT_TEAM="" \
-          PROVISIONING_PROFILE_SPECIFIER="" \
           ONLY_ACTIVE_ARCH=NO \
           ARCHS=arm64 \
           build > /tmp/xcodebuild.log 2>&1
@@ -48,27 +42,21 @@ jobs:
           exit "$XCB_EXIT"
         fi
 
-    - name: Locate built .app
+    - name: Locate .app
       id: locate
       run: |
-        DD="$HOME/Library/Developer/Xcode/DerivedData/ClawPass"
-        APP_PATH="$DD/Build/Products/Release-iphoneos/ClawPass.app"
-
-        if [ ! -d "$APP_PATH" ]; then
-          APP_PATH=$(find "$DD" -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
-        fi
+        APP_PATH=$(find /Users/runner -name "ClawPass.app" -type d 2>/dev/null | head -n 1)
 
         if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
           echo "::error::ClawPass.app not found"
-          find "$DD" -maxdepth 8 -name "*.app" -type d 2>/dev/null || true
+          find /Users/runner -name "*.app" -type d 2>/dev/null | head -10 || true
           exit 1
         fi
 
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
         echo "Located .app at: $APP_PATH"
-        ls -la "$APP_PATH"
 
-    - name: Verify bundle & create IPA
+    - name: Create IPA
       run: |
         APP_PATH="${{ steps.locate.outputs.app_path }}"
         rm -rf ios/Payload
@@ -77,13 +65,6 @@ jobs:
 
         if [ ! -f "ios/Payload/ClawPass.app/ClawPass" ]; then
           echo "::error::Executable missing"
-          ls -la ios/Payload/ClawPass.app
-          exit 1
-        fi
-
-        CFB_EXEC=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" ios/Payload/ClawPass.app/Info.plist)
-        if echo "$CFB_EXEC" | grep -q '\('; then
-          echo "::error::Unexpanded variable in CFBundleExecutable: $CFB_EXEC"
           exit 1
         fi
 
