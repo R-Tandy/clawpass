@@ -32,7 +32,6 @@ jobs:
         # inside the IPA and signs it with the developer's free provisioning
         # profile at install time, so we don't need a real cert on the runner.
         #
-        # We pass -derivedDataPath to put the build output in a known location
         # (the runner's user dir, NOT the project tree). Without this, some
         # Xcode versions default to ./build relative to the project, which
         # causes 'lstat(...SQLite.swift_SQLite.bundle): No such file or
@@ -41,12 +40,10 @@ jobs:
         set +e
         xcodebuild \
           -project ClawPass.xcodeproj \
-          -target ClawPass \
+          -scheme ClawPass \
           -configuration Release \
           -sdk iphoneos \
           -destination 'generic/platform=iOS' \
-          -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass" \
-          -clonedSourcePackagesDirPath "$HOME/Library/Developer/Xcode/DerivedData/ClawPass/SourcePackages" \
           CODE_SIGN_IDENTITY="" \
           CODE_SIGNING_REQUIRED=NO \
           CODE_SIGNING_ALLOWED=NO \
@@ -73,7 +70,6 @@ jobs:
     - name: Locate built .app
       id: locate
       run: |
-        # We pass -derivedDataPath explicitly to xcodebuild, so the output
         # is at $DD/Build/Products/Release-iphoneos/ClawPass.app
         DD="$HOME/Library/Developer/Xcode/DerivedData/ClawPass"
         APP_PATH="$DD/Build/Products/Release-iphoneos/ClawPass.app"
