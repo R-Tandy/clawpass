@@ -1,4 +1,4 @@
-// MARK: - VERSION_SINCED_2026_06_27_CLEAN_REWRITE
+// MARK: - VERSION_SINCED_2026_06_27_CLEAN_REWRITE_WITH_API
 import Foundation
 import SQLite3
 import LocalAuthentication
@@ -62,9 +62,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         guard let db = db else { return }
 
         let createEntries = "CREATE TABLE IF NOT EXISTS entries (id TEXT PRIMARY KEY, title TEXT, username TEXT, encrypted_password BLOB, url TEXT, encrypted_notes BLOB, category_id TEXT, totp_secret TEXT, created_at REAL, modified_at REAL, is_favorite INTEGER, sync_status TEXT);"
-
         let createCategories = "CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT, icon TEXT, color TEXT);"
-
         let createSettings = "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);"
 
         let tables = [createEntries, createCategories, createSettings]
@@ -136,7 +134,6 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         sqlite3_finalize(catStmt)
 
-        // Add default Favorites category
         let favId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
         if !loadedCats.contains(where: { $0.id == favId }) {
             loadedCats.append(Category(id: favId, name: "Favorites", icon: "star.fill", color: "#FFD700"))
@@ -164,7 +161,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             sqlite3_bind_text(stmt, 3, (entry.username as NSString).utf8String, -1, nil)
             
             if !entry.encryptedPassword.isEmpty {
-                entry.encryptedPassword.withUnsafeBytes { bytes in
+                _ = entry.encryptedPassword.withUnsafeBytes { bytes in
                     sqlite3_bind_blob(stmt, 4, bytes.baseAddress, Int32(entry.encryptedPassword.count), nil)
                 }
             } else {
@@ -178,7 +175,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
             
             if let notes = entry.encryptedNotes, !notes.isEmpty {
-                notes.withUnsafeBytes { bytes in
+                _ = notes.withUnsafeBytes { bytes in
                     sqlite3_bind_blob(stmt, 6, bytes.baseAddress, Int32(notes.count), nil)
                 }
             } else {
@@ -241,7 +238,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.pendingSetupPassword = password
     }
     
-    func initializeWithSalt(password: String, salt: [UInt8]) throws {
+    func initializeWithSalt(password: String, salt: Data) throws {
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
         let dbPath = vaultDir.appendingPathComponent("vault.db").path
@@ -251,15 +248,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         createTables()
         
-        // Derive key
-        self.encryptionKey = cryptoService.deriveKey(password: password, salt: salt)
+        self.encryptionKey = try cryptoService.deriveKey(from: password, salt: salt)
         self.isUnlocked = true
         self.isReady = true
         loadData()
     }
     
     func unlock(with password: String, saltOverride: Data? = nil, skipHandshake: Bool = false, forceLock: Bool = false) throws {
-        try initializeWithSalt(password: password, salt: saltOverride?.map { Array($0) } ?? [])
+        let saltData = saltOverride ?? Data()
+        try initializeWithSalt(password: password, salt: saltData)
     }
     
     func lock() {
@@ -329,6 +326,92 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         if status == errSecSuccess, let data = result as? Data { return data }
         if let fallback = UserDefaults.standard.data(forKey: "vault_salt_fallback_\(vaultId)") { return fallback }
         return nil
+    }
+    
+    // MARK: - Compatibility / Legacy API for Views & Sync
+    
+    func hasAnyVault() -> Bool {
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        let dbPath = vaultDir.appendingPathComponent("vault.db").path
+        return FileManager.default.fileExists(atPath: dbPath)
+    }
+    
+    func getDebugInfo(password: String) {
+        let combined = Data(password.utf8) + cryptoService.systemIdentitySalt
+        self.debugKeyHash = cryptoService.sha256(combined).map { String(format: "%02x", $0) }.joined().prefix(12) + "..."
+        self.debugCanaryStatus = "Checked"
+        self.objectWillChange.send()
+    }
+    
+    func nuclearReset() {
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        let dbPath = vaultDir.appendingPathComponent("vault.db").path
+        try? FileManager.default.removeItem(atPath: dbPath)
+        
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword]
+        SecItemDelete(query as CFDictionary)
+        
+        self.lock()
+        self.isFirstPopulationPending = false
+        self.objectWillChange.send()
+        print("[VaultManager] Nuclear reset completed")
+    }
+    
+    func addEntry(_ entry: VaultEntry, password: String, notes: String?) throws {
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        
+        var newEntry = entry
+        if !password.isEmpty {
+            newEntry.encryptedPassword = try cryptoService.encrypt(password, using: key)
+        }
+        if let notes = notes, !notes.isEmpty {
+            let encryptedNotesData = try cryptoService.encrypt(notes, using: key)
+            newEntry.encryptedNotes = encryptedNotesData
+        }
+        saveEntry(newEntry)
+    }
+    
+    func decryptPassword(for entry: VaultEntry) throws -> String {
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        guard !entry.encryptedPassword.isEmpty else { return "" }
+        return try cryptoService.decrypt(entry.encryptedPassword, using: key)
+    }
+    
+    func decryptNotes(for entry: VaultEntry) throws -> String? {
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        guard let enc = entry.encryptedNotes, !enc.isEmpty else { return nil }
+        return try cryptoService.decrypt(enc, using: key)
+    }
+    
+    func updateEntry(_ entry: VaultEntry, newPassword: String, newNotes: String) throws {
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        
+        var updated = entry
+        if !newPassword.isEmpty {
+            updated.encryptedPassword = try cryptoService.encrypt(newPassword, using: key)
+        }
+        if !newNotes.isEmpty {
+            let enc = try cryptoService.encrypt(newNotes, using: key)
+            updated.encryptedNotes = enc
+        }
+        saveEntry(updated)
+    }
+    
+    func getPendingEntries(completion: @escaping ([SyncVaultEntry], [String]) -> Void) {
+        let updates = entries.map { entry in
+            SyncVaultEntry(
+                id: entry.id.uuidString,
+                title: entry.title,
+                username: entry.username,
+                encrypted_password: Array(entry.encryptedPassword),
+                url: entry.url,
+                encrypted_notes: entry.encryptedNotes.map { Array($0) },
+                category_id: entry.categoryID?.uuidString,
+                totp_secret: entry.totpSecret,
+                is_favorite: entry.isFavorite
+            )
+        }
+        completion(updates, [])
     }
     
     // MARK: - SyncServiceDelegate
@@ -441,7 +524,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 
                 if let password = self.pendingSetupPassword {
                     do {
-                        try self.initializeWithSalt(password: password, salt: salt)
+                        try self.initializeWithSalt(password: password, salt: serverSaltData)
                         try self.unlock(with: password, skipHandshake: true, forceLock: false)
                         self.pendingSetupPassword = nil
                         self.isFirstPopulationPending = false
