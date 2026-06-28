@@ -137,6 +137,31 @@
 			);
 			mainGroup = 000000000000000000000050;
 			packageReferences = (
+				000000000000000000000301 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+			);
+			productRefGroup = 000000000000000000000050;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000000000090 /* ClawPass */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000000000092 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000000001 /* ClawPassApp.swift in Sources */,
+				000000000000000000000002 /* ContentView.swift in Sources */,
+				000000000000000000000003 /* AddEntryView.swift in Sources */,
+				000000000000000000000004 /* EntryDetailView.swift in Sources */,
+				00000000000000000000000A /* SyncView.swift in Sources */,
+				000000000000000000000005 /* VaultEntry.swift in Sources */,
+				000000000000000000000006 /* CryptoService.swift in Sources */,
+				000000000000000000000007 /* VaultManager.swift in Sources */,
+				000000000000000000000008 /* SyncService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,6 +280,7 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
 
 	};
 	rootObject = 000000000000000000000100 /* Project object */;
