@@ -288,7 +288,7 @@ struct EntryDetailView: View {
         .confirmationDialog("Delete Entry?", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 do {
-                    VaultManager.shared.deleteEntry(entry.id)
+                    VaultManager.shared.deleteEntry(id: entry.id)
                     dismiss()
                 } catch {
                     print("Delete failed: \(error)")

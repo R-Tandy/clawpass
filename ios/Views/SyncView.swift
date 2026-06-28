@@ -119,6 +119,7 @@ struct KeyStatusPlate: View {
     @ObservedObject var vaultManager: VaultManager
     
     var body: some View {
+        let keyStatus = vaultManager.verifyCurrentKey()
         VStack(spacing: 12) {
             HStack {
                 Text("CRYPTOGRAPHIC STATE:")
@@ -128,12 +129,12 @@ struct KeyStatusPlate: View {
                 
                 HStack {
                     Circle()
-                        .fill(vaultManager.verifyCurrentKey() == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
+                        .fill(keyStatus == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
                         .frame(width: 8, height: 8)
                     
-                    Text(vaultManager.verifyCurrentKey().uppercased())
+                    Text(keyStatus.uppercased())
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(vaultManager.verifyCurrentKey() == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
+                        .foregroundColor(keyStatus == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
                 }
             }
         }

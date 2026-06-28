@@ -343,6 +343,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.objectWillChange.send()
     }
     
+    func verifyCurrentKey() -> String {
+        if isUnlocked && encryptionKey != nil {
+            return "Key Valid"
+        }
+        return "Key Invalid"
+    }
+
     func nuclearReset() {
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         let dbPath = vaultDir.appendingPathComponent("vault.db").path
@@ -397,21 +404,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         saveEntry(updated)
     }
     
-    func getPendingEntries(completion: @escaping ([SyncVaultEntry], [String]) -> Void) {
-        let updates = entries.map { entry in
-            SyncVaultEntry(
-                id: entry.id.uuidString,
-                title: entry.title,
-                username: entry.username,
-                encrypted_password: Array(entry.encryptedPassword),
-                url: entry.url,
-                encrypted_notes: entry.encryptedNotes.map { Array($0) },
-                category_id: entry.categoryID?.uuidString,
-                totp_secret: entry.totpSecret,
-                is_favorite: entry.isFavorite
-            )
-        }
-        completion(updates, [])
+    func getPendingEntries(completion: @escaping ([VaultEntry], [String]) -> Void) {
+        // Return the raw VaultEntry list (already holds encrypted data)
+        // Sync layer will convert to SyncVaultEntry using the proper init
+        completion(entries, [])
     }
     
     // MARK: - SyncServiceDelegate
