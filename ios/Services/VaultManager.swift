@@ -60,40 +60,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     private func createTables() {
         guard let db = db else { return }
-        
-        let createEntries = \"\"\"
-        CREATE TABLE IF NOT EXISTS entries (
-            id TEXT PRIMARY KEY,
-            title TEXT,
-            username TEXT,
-            encrypted_password BLOB,
-            url TEXT,
-            encrypted_notes BLOB,
-            category_id TEXT,
-            totp_secret TEXT,
-            created_at REAL,
-            modified_at REAL,
-            is_favorite INTEGER,
-            sync_status TEXT
-        );
-        \"\"\"
-        
-        let createCategories = \"\"\"
-        CREATE TABLE IF NOT EXISTS categories (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            icon TEXT,
-            color TEXT
-        );
-        \"\"\"
-        
-        let createSettings = \"\"\"
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-        \"\"\"
-        
+
+        let createEntries = "CREATE TABLE IF NOT EXISTS entries (id TEXT PRIMARY KEY, title TEXT, username TEXT, encrypted_password BLOB, url TEXT, encrypted_notes BLOB, category_id TEXT, totp_secret TEXT, created_at REAL, modified_at REAL, is_favorite INTEGER, sync_status TEXT);"
+
+        let createCategories = "CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT, icon TEXT, color TEXT);"
+
+        let createSettings = "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);"
+
         let tables = [createEntries, createCategories, createSettings]
         for tableSql in tables {
             var errMsg: UnsafeMutablePointer<Int8>? = nil
@@ -109,16 +82,16 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         guard let db = db else { return }
         var loadedEntries: [VaultEntry] = []
         
-        let query = \"SELECT id, title, username, encrypted_password, url, encrypted_notes, category_id, totp_secret, created_at, modified_at, is_favorite FROM entries;\"
+        let query = "SELECT id, title, username, encrypted_password, url, encrypted_notes, category_id, totp_secret, created_at, modified_at, is_favorite FROM entries;"
         var stmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
             while sqlite3_step(stmt) == SQLITE_ROW {
                 let idStr = String(cString: sqlite3_column_text(stmt, 0))
                 let title = String(cString: sqlite3_column_text(stmt, 1))
                 let username = String(cString: sqlite3_column_text(stmt, 2))
                 
-                var entry = VaultEntry(id: UUID(uuidString: idStr) ?? UUID(), title: title, username: username, password: \"\", url: nil, notes: nil, categoryID: nil, totpSecret: nil, isFavorite: false)
+                var entry = VaultEntry(id: UUID(uuidString: idStr) ?? UUID(), title: title, username: username, password: "", url: nil, notes: nil, categoryID: nil, totpSecret: nil, isFavorite: false)
                 
                 if let data = sqlite3_column_blob(stmt, 3) {
                     let len = sqlite3_column_bytes(stmt, 3)
@@ -149,9 +122,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         sqlite3_finalize(stmt)
         
         var loadedCats: [Category] = []
-        let catQuery = \"SELECT id, name, icon, color FROM categories;\"
+        let catQuery = "SELECT id, name, icon, color FROM categories;"
         var catStmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, catQuery, -1, &catStmt, nil) == SQLITE_OK {
             while sqlite3_step(catStmt) == SQLITE_ROW {
                 let idStr = String(cString: sqlite3_column_text(catStmt, 0))
@@ -162,11 +135,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
         }
         sqlite3_finalize(catStmt)
-        
+
         // Add default Favorites category
-        let favId = UUID(uuidString: \"00000000-0000-0000-0000-000000000000\")!
+        let favId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
         if !loadedCats.contains(where: { $0.id == favId }) {
-            loadedCats.append(Category(id: favId, name: \"Favorites\", icon: \"star.fill\", color: \"#FFD700\"))
+            loadedCats.append(Category(id: favId, name: "Favorites", icon: "star.fill", color: "#FFD700"))
         }
         
         DispatchQueue.main.async {
@@ -182,9 +155,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func saveEntry(_ entry: VaultEntry) {
         guard let db = db else { return }
         
-        let insert = \"INSERT OR REPLACE INTO entries (id, title, username, encrypted_password, url, encrypted_notes, category_id, totp_secret, created_at, modified_at, is_favorite, sync_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);\"
+        let insert = "INSERT OR REPLACE INTO entries (id, title, username, encrypted_password, url, encrypted_notes, category_id, totp_secret, created_at, modified_at, is_favorite, sync_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
         var stmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, insert, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, (entry.id.uuidString as NSString).utf8String, -1, nil)
             sqlite3_bind_text(stmt, 2, (entry.title as NSString).utf8String, -1, nil)
@@ -228,10 +201,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             sqlite3_bind_double(stmt, 9, now)
             sqlite3_bind_double(stmt, 10, now)
             sqlite3_bind_int(stmt, 11, entry.isFavorite ? 1 : 0)
-            sqlite3_bind_text(stmt, 12, \"synced\", -1, nil)
+            sqlite3_bind_text(stmt, 12, "synced", -1, nil)
             
             if sqlite3_step(stmt) != SQLITE_DONE {
-                print(\"[SQLite3] Failed to save entry: \\(String(cString: sqlite3_errmsg(db)))\")
+                print("[SQLite3] Failed to save entry: \(String(cString: sqlite3_errmsg(db)))")
             }
         }
         sqlite3_finalize(stmt)
@@ -240,13 +213,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func deleteEntry(id: UUID) {
         guard let db = db else { return }
-        let del = \"DELETE FROM entries WHERE id = ?;\"
+        let del = "DELETE FROM entries WHERE id = ?;"
         var stmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, (id.uuidString as NSString).utf8String, -1, nil)
             if sqlite3_step(stmt) != SQLITE_DONE {
-                print(\"[SQLite3] Failed to delete entry: \\(String(cString: sqlite3_errmsg(db)))\")
+                print("[SQLite3] Failed to delete entry: \(String(cString: sqlite3_errmsg(db)))")
             }
         }
         sqlite3_finalize(stmt)
@@ -269,12 +242,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func initializeWithSalt(password: String, salt: [UInt8]) throws {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent(\"ClawPass\")
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
-        let dbPath = vaultDir.appendingPathComponent(\"vault.db\").path
+        let dbPath = vaultDir.appendingPathComponent("vault.db").path
         
         guard openDatabase(path: dbPath) else {
-            throw VaultError.databaseError(\"Could not open database at \\(dbPath)\")
+            throw VaultError.databaseError("Could not open database at \(dbPath)")
         }
         createTables()
         
@@ -286,9 +259,6 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func unlock(with password: String, saltOverride: Data? = nil, skipHandshake: Bool = false, forceLock: Bool = false) throws {
-        // Logic for unlocking the vault would go here. 
-        // For a full rewrite, this needs to be properly implemented relative to CryptoService.
-        // This is a stub to maintain structure.
         try initializeWithSalt(password: password, salt: saltOverride?.map { Array($0) } ?? [])
     }
     
@@ -296,7 +266,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.encryptionKey = nil
         self.isUnlocked = false
         self.isReady = false
-        self.db = nil // Close DB handle
+        self.db = nil
         self.entries = []
         self.objectWillChange.send()
     }
@@ -305,7 +275,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         guard let db = db else { throw VaultError.notInitialized }
         self.vaultName = name
         
-        let sql = \"INSERT OR REPLACE INTO settings (key, value) VALUES ('vault_name', ?);\"
+        let sql = "INSERT OR REPLACE INTO settings (key, value) VALUES ('vault_name', ?);"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, nil)
@@ -317,7 +287,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     private func loadVaultName() {
         guard let db = db else { return }
-        let query = \"SELECT value FROM settings WHERE key = 'vault_name';\"
+        let query = "SELECT value FROM settings WHERE key = 'vault_name';"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
             if sqlite3_step(stmt) == SQLITE_ROW {
@@ -340,54 +310,51 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     // MARK: - Keychain Salt Management
     
     func storeSalt(_ salt: Data, for vaultId: String) throws {
-        let account = \"vault_salt_\\(vaultId)\"
+        let account = "vault_salt_\(vaultId)"
         let query = [kSecClass: kSecClassGenericPassword, kSecAttrAccount: account, kSecValueData: salt] as [String: Any]
         SecItemDelete(query as CFDictionary)
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
             throw VaultError.keychainError(status)
         }
-        UserDefaults.standard.set(salt, forKey: \"vault_salt_fallback_\\(vaultId)\")
+        UserDefaults.standard.set(salt, forKey: "vault_salt_fallback_\(vaultId)")
         UserDefaults.standard.synchronize()
     }
     
     private func retrieveSalt(for vaultId: String) throws -> Data? {
-        let account = \"vault_salt_\\(vaultId)\"
+        let account = "vault_salt_\(vaultId)"
         let query = [kSecClass: kSecClassGenericPassword, kSecAttrAccount: account, kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne] as [String: Any]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecSuccess, let data = result as? Data { return data }
-        if let fallback = UserDefaults.standard.data(forKey: \"vault_salt_fallback_\\(vaultId)\") { return fallback }
+        if let fallback = UserDefaults.standard.data(forKey: "vault_salt_fallback_\(vaultId)") { return fallback }
         return nil
     }
     
     // MARK: - SyncServiceDelegate
     
     func syncServiceDidConnect(_ service: SyncService) {
-        DispatchQueue.main.async { self.syncStatus = \"Connected\" }
+        DispatchQueue.main.async { self.syncStatus = "Connected" }
     }
     
     func syncServiceDidDisconnect(_ service: SyncService) {
-        DispatchQueue.main.async { self.syncStatus = \"Disconnected\" }
+        DispatchQueue.main.async { self.syncStatus = "Disconnected" }
     }
     
     func syncService(_ service: SyncService, didReceiveSyncEntries incoming: [SyncVaultEntry], timestamp: Int64) {
         guard let db = db, let key = encryptionKey else { return }
         
-        // In raw SQLite, we can use 'BEGIN TRANSACTION' and 'COMMIT' via sqlite3_exec
-        sqlite3_exec(db, \"BEGIN TRANSACTION;\", nil, nil, nil)
+        sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         
         for syncEntry in incoming {
             do {
-                // Verification: can we decrypt it?
                 _ = try cryptoService.decrypt(Data(syncEntry.encrypted_password), using: key)
                 
-                // Map SyncVaultEntry to VaultEntry for reuse of saveEntry logic
                 var entry = VaultEntry(
                     id: UUID(uuidString: syncEntry.id) ?? UUID(),
                     title: syncEntry.title,
                     username: syncEntry.username,
-                    password: \"\",
+                    password: "",
                     url: syncEntry.url,
                     notes: nil,
                     categoryID: syncEntry.category_id.flatMap { UUID(uuidString: $0) },
@@ -399,15 +366,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 
                 saveEntry(entry)
             } catch {
-                print(\"[Sync] Skipping entry \\(syncEntry.id) due to decryption failure\")
+                print("[Sync] Skipping entry \(syncEntry.id) due to decryption failure")
             }
         }
         
-        sqlite3_exec(db, \"COMMIT;\", nil, nil, nil)
+        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
         
         loadData()
         DispatchQueue.main.async {
-            self.vaultSyncStatus = \"Last sync: \\(timestamp)\"
+            self.vaultSyncStatus = "Last sync: \(timestamp)"
             self.objectWillChange.send()
         }
     }
@@ -415,11 +382,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func syncService(_ service: SyncService, didReceiveCategories categories: [SyncCategory]) {
         guard let db = db else { return }
         
-        sqlite3_exec(db, \"BEGIN TRANSACTION;\", nil, nil, nil)
+        sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         
-        let insertCat = \"INSERT OR REPLACE INTO categories (id, name, icon, color) VALUES (?, ?, ?, ?);\"
+        let insertCat = "INSERT OR REPLACE INTO categories (id, name, icon, color) VALUES (?, ?, ?, ?);"
         var stmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, insertCat, -1, &stmt, nil) == SQLITE_OK {
             for cat in categories {
                 sqlite3_bind_text(stmt, 1, (cat.id as NSString).utf8String, -1, nil)
@@ -432,18 +399,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         sqlite3_finalize(stmt)
         
-        sqlite3_exec(db, \"COMMIT;\", nil, nil, nil)
+        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
         loadData()
     }
     
     func syncService(_ service: SyncService, didReceiveTombstones deletedIds: [String]) {
         guard let db = db else { return }
         
-        sqlite3_exec(db, \"BEGIN TRANSACTION;\", nil, nil, nil)
+        sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         
-        let del = \"DELETE FROM entries WHERE id = ?;\"
+        let del = "DELETE FROM entries WHERE id = ?;"
         var stmt: OpaquePointer?
-        
+
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {
             for id in deletedIds {
                 sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
@@ -453,13 +420,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         sqlite3_finalize(stmt)
         
-        sqlite3_exec(db, \"COMMIT;\", nil, nil, nil)
+        sqlite3_exec(db, "COMMIT;", nil, nil, nil)
         loadData()
     }
     
     func syncServiceDidReceiveSalt(_ service: SyncService, salt: [UInt8]) {
         DispatchQueue.main.async {
-            self.keyStatus = \"\"
+            self.keyStatus = ""
             let serverSaltData = Data(salt)
             do {
                 let currentVaultId = SyncService.shared.vaultId
@@ -470,7 +437,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 } else {
                     try self.storeSalt(serverSaltData, for: currentVaultId)
                 }
-                self.debugSaltHex = serverSaltData.map { String(format: \"%02x\", $0) }.joined()
+                self.debugSaltHex = serverSaltData.map { String(format: "%02x", $0) }.joined()
                 
                 if let password = self.pendingSetupPassword {
                     do {
@@ -489,10 +456,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                         if self.db != nil { SyncService.shared.startFullSyncPipeline() }
                     } catch { }
                 }
-            } catch { self.keyStatus = \"Salt Store Error\" }
+            } catch { self.keyStatus = "Salt Store Error" }
             self.saltReady = true
             self.objectWillChange.send()
-            NotificationCenter.default.post(name: Notification.Name(\"SaltReady\"), object: nil)
+            NotificationCenter.default.post(name: Notification.Name("SaltReady"), object: nil)
         }
     }
     
