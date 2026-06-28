@@ -137,7 +137,6 @@
 			);
 			mainGroup = 000000000000000000000050;
 			packageReferences = (
-				000000000000000000000301 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
 			);
 			productRefGroup = 000000000000000000000050;
 			projectDirPath = "";
