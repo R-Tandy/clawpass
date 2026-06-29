@@ -207,6 +207,14 @@ struct UnlockView: View {
         VaultManager.shared.getDebugInfo(password: password)
         do {
             try VaultManager.shared.unlock(with: password)
+        } catch let err as VaultError {
+            switch err {
+            case .vaultNotFound:
+                errorMessage = "No vault exists for that password on this device. Tap 'Retrieve Vault from Server' to set it up."
+            default:
+                errorMessage = "Invalid password"
+            }
+            showingError = true
         } catch {
             errorMessage = "Invalid password"
             showingError = true

@@ -12,6 +12,10 @@ enum VaultError: Error {
     case entryNotFound
     case keychainError(OSStatus)
     case decryptionFailed
+    /// Refused `unlock` for a vault that doesn't exist on disk yet. Caller
+    /// should route the user to `setupVault` (the 'Retrieve Vault from
+    /// Server' flow) instead.
+    case vaultNotFound(String)
 }
 
 extension Notification.Name {
@@ -297,6 +301,25 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let derivedVaultId = cryptoService.deriveVaultId(password: password)
         SyncService.shared.setVaultId(derivedVaultId)
 
+        // Refuse to "unlock" a vault that doesn't exist on this device yet.
+        // The previous behavior silently created an empty vault_<id>.db,
+        // derived a key from an empty salt (no keychain entry existed),
+        // showed the user a vault view with zero entries, and then the
+        // async handshake raced the entry read. Resulting trace showed
+        // iOS requesting B's vault_id mid-stream on a connection that
+        // was still active for A, with the server forcibly closing the
+        // socket (os error 10054) and iOS reporting an absurd packet
+        // length (~2 GB) on the next sync attempt.
+        //
+        // The right UX is to refuse here, surface a clear error to the
+        // caller (UnlockView), and tell the user to tap
+        // 'Retrieve Vault from Server' which goes through the full
+        // Handshake -> Ack -> Salt -> Sync pipeline.
+        if !vaultFileExists(forVaultId: derivedVaultId) {
+            print("[VaultManager] unlock rejected: no vault_<id>.db for derived id \(derivedVaultId.prefix(12))...")
+            throw VaultError.vaultNotFound(derivedVaultId)
+        }
+
         let saltData = saltOverride ?? Data()
         // When the caller didn't supply a salt (first unlock with no prior
         // server contact), use what we already have in the keychain for this
@@ -382,6 +405,33 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
     
+    /// Names of every vault_<id>.db / vault.db currently on disk. Used by
+    /// ContentView to list available vaults when `vaultId` is unset.
+    func availableVaultFilenames() -> [String] {
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
+        return items.filter { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }.sorted()
+    }
+
+    /// True if a `.db` file already exists for this vaultId. false means
+    /// the user is trying to *unlock* a vault that hasn't been set up on
+    /// this device yet — they should be routed to the 'Retrieve Vault
+    /// from Server' flow instead of silently creating an empty vault.
+    func vaultFileExists(forVaultId vaultId: String) -> Bool {
+        let filename: String
+        if vaultId.isEmpty || vaultId == "vault_1" {
+            filename = "vault.db"
+        } else {
+            filename = "vault_\(vaultId).db"
+        }
+        let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("ClawPass")
+            .appendingPathComponent(filename)
+            .path
+        return FileManager.default.fileExists(atPath: dbPath)
+    }
+
     // MARK: - Keychain Salt Management
     
     func storeSalt(_ salt: Data, for vaultId: String) throws {
