@@ -361,6 +361,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         try initializeWithSalt(password: password, salt: effectiveSalt)
         print("[VaultManager] unlock: init OK, entries.count=\(entries.count), db!=nil=\(db != nil)")
 
+        // Clear the key-status banner. Previously only the salt-receive
+        // path (syncServiceDidReceiveSalt) cleared this, so users
+        // unlocking from a local DB while the server was offline kept
+        // seeing the "Key Status: Unknown" banner even though their key
+        // was valid and entries had loaded fine.
+        DispatchQueue.main.async { self.keyStatus = "" }
+
         // After a fresh unlock, kick off the sync pipeline so the
         // 'Syncing your vault...' overlay clears. Previously only
         // syncServiceDidReceiveSalt did this, leaving unlock-the-existing-
