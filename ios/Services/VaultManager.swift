@@ -310,22 +310,34 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             effectiveSalt = Data()
         }
         try initializeWithSalt(password: password, salt: effectiveSalt)
+        print("[VaultManager] unlock: init OK, entries.count=\(entries.count), db!=nil=\(db != nil)")
 
         // After a fresh unlock, kick off the sync pipeline so the
         // 'Syncing your vault...' overlay clears. Previously only
         // syncServiceDidReceiveSalt did this, leaving unlock-the-existing-
         // vault flows stuck on the overlay until the user manually opened
         // SyncView and pressed 'Sync now'.
+        //
+        // Order matters: triggerHandshake() is the *only* way the connection
+        // reaches handshakeCompleted=true; without it the pipeline's
+        // requestTombstones/Categories/Sync calls silently bail, the
+        // syncResponse never arrives, firstSyncComplete stays false, and the
+        // overlay shows forever.
         if !skipHandshake {
             SyncService.shared.startUDPListener()
             SyncService.shared.startDiscovery()
+            SyncService.shared.triggerHandshake()
         }
         if db != nil {
+            // Pipeline will fire after handshake completes (because each
+            // request is guarded by handshakeCompleted). If syncServiceDidReceiveSalt
+            // also fires it, the !isSyncing guard in startFullSyncPipeline dedupes.
             SyncService.shared.startFullSyncPipeline()
         }
     }
     
     func lock() {
+        print("[VaultManager] lock: previous dbPath=\(currentVaultDbPath())")
         self.encryptionKey = nil
         self.isUnlocked = false
         self.isReady = false
