@@ -46,6 +46,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     private var syncService = SyncService.shared
     private var pendingUnlockPassword: String?
     private var pendingSetupPassword: String?
+    /// True while applying server-sent sync responses. Suppresses the
+    /// sync-push in saveEntry/deleteEntry so we don't echo back entries
+    /// the server just sent us. Set/cleared in the SyncServiceDelegate
+    /// handlers below.
+    private var isApplyingRemoteUpdate = false
     
     init() {
         SyncService.shared.delegate = self
@@ -240,6 +245,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             self.objectWillChange.send()
             NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
         }
+        // Push the change to the Desktop sync server. Suppressed while we're
+        // applying a server-sent sync response (the echo-back would be a loop).
+        // Also no-op while the handshake hasn't completed (sendEntryUpdate
+        // itself guards on that and logs a notice).
+        if !isApplyingRemoteUpdate {
+            SyncService.shared.sendEntryUpdate(entry: entry)
+        }
     }
 
     func deleteEntry(id: UUID) {
@@ -255,10 +267,19 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         sqlite3_finalize(stmt)
         // Same reasoning as saveEntry: update the array on the main thread.
+        let idString = id.uuidString
         DispatchQueue.main.async {
             self.entries.removeAll { $0.id == id }
             self.objectWillChange.send()
             NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
+        }
+        // Push the deletion to the Desktop sync server. Suppressed while
+        // we're applying a server-sent sync response (tombstone echo-back
+        // would be a loop). Tombstones themselves arrive via raw SQL in
+        // didReceiveTombstones, not through this function, so the guard
+        // is belt-and-braces.
+        if !isApplyingRemoteUpdate {
+            SyncService.shared.sendEntryDelete(entryId: idString)
         }
     }
     
@@ -577,9 +598,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func syncService(_ service: SyncService, didReceiveSyncEntries incoming: [SyncVaultEntry], timestamp: Int64) {
         guard let db = db, let key = encryptionKey else { return }
-        
+
+        // Re-entrancy guard: saveEntry() would otherwise push each of these
+        // entries back to the server in an echo loop. The guard is cleared
+        // in defer so any thrown error path also resets state.
+        isApplyingRemoteUpdate = true
+        defer { isApplyingRemoteUpdate = false }
+
         sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
-        
+
         for syncEntry in incoming {
             do {
                 _ = try cryptoService.decrypt(Data(syncEntry.encrypted_password), using: key)
@@ -639,7 +666,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func syncService(_ service: SyncService, didReceiveTombstones deletedIds: [String]) {
         guard let db = db else { return }
-        
+
+        // Re-entrancy guard for symmetry with didReceiveSyncEntries. The
+        // current tombstones path uses raw SQL (not deleteEntry), so the
+        // flag isn't strictly required, but it documents the intent and
+        // keeps a future refactor that switches to deleteEntry() safe.
+        isApplyingRemoteUpdate = true
+        defer { isApplyingRemoteUpdate = false }
+
         sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         
         let del = "DELETE FROM entries WHERE id = ?;"
