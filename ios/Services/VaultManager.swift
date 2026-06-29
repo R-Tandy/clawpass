@@ -733,6 +733,24 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                         DispatchQueue.main.async { self.isUnlocked = true; self.objectWillChange.send() }
                         if self.db != nil { SyncService.shared.startFullSyncPipeline() }
                     } catch { }
+                } else if self.isUnlocked {
+                    // Reconnect path: vault is already unlocked and we just
+                    // received a salt from the server after a reconnect
+                    // (e.g., iOS came back online after being offline). The
+                    // previous code skipped the sync pipeline in this case
+                    // because neither pendingSetupPassword nor
+                    // pendingUnlockPassword was set. Result: flushOutbox()
+                    // never ran, so offline-edited/added entries on iOS were
+                    // never pushed to Desktop, AND requestSync() never
+                    // fired, so Desktop-side edits made while iOS was
+                    // offline never reached iOS. This single branch makes
+                    // bidirectional sync work after a reconnect.
+                    //
+                    // Order: flushOutbox (push local pending changes) ->
+                    // requestSync (pull server changes since lastTimestamp).
+                    // The re-entrancy guard in saveEntry/didReceiveSyncEntries
+                    // keeps the resulting broadcasts from echoing back.
+                    SyncService.shared.startFullSyncPipeline()
                 }
             } catch { self.keyStatus = "Salt Store Error" }
             self.saltReady = true
