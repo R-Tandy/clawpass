@@ -225,9 +225,19 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
         }
         sqlite3_finalize(stmt)
-        refreshUI()
+        // Update the in-memory array so the UI sees the change immediately.
+        // Without this, views stay on stale data until the next loadData() call.
+        DispatchQueue.main.async {
+            if let idx = self.entries.firstIndex(where: { $0.id == entry.id }) {
+                self.entries[idx] = entry
+            } else {
+                self.entries.append(entry)
+            }
+            self.objectWillChange.send()
+            NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
+        }
     }
-    
+
     func deleteEntry(id: UUID) {
         guard let db = db else { return }
         let del = "DELETE FROM entries WHERE id = ?;"
@@ -240,7 +250,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
         }
         sqlite3_finalize(stmt)
-        refreshUI()
+        // Same reasoning as saveEntry: update the array on the main thread.
+        DispatchQueue.main.async {
+            self.entries.removeAll { $0.id == id }
+            self.objectWillChange.send()
+            NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
+        }
     }
     
     // MARK: - Vault Logic
@@ -273,8 +288,41 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func unlock(with password: String, saltOverride: Data? = nil, skipHandshake: Bool = false, forceLock: Bool = false) throws {
+        // Always derive the vaultId from the password before deciding which
+        // .db file to open. Without this, an unlock after app restart (or
+        // after switching to a different vault password) opens the
+        // SyncService.vaultId-nominated file, NOT the file that corresponds
+        // to the password we just typed. Result: we load the previous
+        // session's entries instead of the vault the user asked for.
+        let derivedVaultId = cryptoService.deriveVaultId(password: password)
+        SyncService.shared.setVaultId(derivedVaultId)
+
         let saltData = saltOverride ?? Data()
-        try initializeWithSalt(password: password, salt: saltData)
+        // When the caller didn't supply a salt (first unlock with no prior
+        // server contact), use what we already have in the keychain for this
+        // vaultId, falling back to empty salt only if none exists.
+        let effectiveSalt: Data
+        if saltOverride != nil {
+            effectiveSalt = saltData
+        } else if let stored = try? retrieveSalt(for: derivedVaultId) {
+            effectiveSalt = stored
+        } else {
+            effectiveSalt = Data()
+        }
+        try initializeWithSalt(password: password, salt: effectiveSalt)
+
+        // After a fresh unlock, kick off the sync pipeline so the
+        // 'Syncing your vault...' overlay clears. Previously only
+        // syncServiceDidReceiveSalt did this, leaving unlock-the-existing-
+        // vault flows stuck on the overlay until the user manually opened
+        // SyncView and pressed 'Sync now'.
+        if !skipHandshake {
+            SyncService.shared.startUDPListener()
+            SyncService.shared.startDiscovery()
+        }
+        if db != nil {
+            SyncService.shared.startFullSyncPipeline()
+        }
     }
     
     func lock() {
@@ -349,13 +397,21 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     // MARK: - Compatibility / Legacy API for Views & Sync
     
     func hasAnyVault() -> Bool {
-        // True if either the legacy single-file vault.db exists OR any per-vault
-        // file exists under the ClawPass directory. Matches Desktop's expectation
-        // that "any present vault" gates the Unlock vs Setup screen decision.
+        // True if any vault_<id>.db exists OR the legacy vault.db. Matches
+        // Desktop's expectation that 'any present vault' gates Unlock vs Setup.
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return false }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
         return items.contains { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }
+    }
+
+    /// Names of every vault_<id>.db / vault.db currently on disk. Used by
+    /// ContentView to list available vaults when `vaultId` is unset.
+    func availableVaultFilenames() -> [String] {
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
+        return items.filter { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }.sorted()
     }
     
     func getDebugInfo(password: String) {
