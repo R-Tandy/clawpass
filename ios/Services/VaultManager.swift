@@ -467,22 +467,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         return items.contains { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }
     }
 
-    /// Names of every vault_<id>.db / vault.db currently on disk. Used by
-    /// ContentView to list available vaults when `vaultId` is unset.
-    func availableVaultFilenames() -> [String] {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
-        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
-        return items.filter { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }.sorted()
-    }
-    
     func getDebugInfo(password: String) {
         let combined = Data(password.utf8) + cryptoService.systemIdentitySalt
         self.debugKeyHash = cryptoService.sha256(combined).map { String(format: "%02x", $0) }.joined().prefix(12) + "..."
         self.debugCanaryStatus = "Checked"
         self.objectWillChange.send()
     }
-    
+
     func verifyCurrentKey() -> String {
         if isUnlocked && encryptionKey != nil {
             return "Key Valid"
