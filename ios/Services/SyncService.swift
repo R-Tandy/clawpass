@@ -299,7 +299,11 @@ class SyncService: ObservableObject {
     private let syncQueue = DispatchQueue(label: "com.clawpass.sync", qos: .userInitiated)
     private var deviceId: String { UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString }
     
-    var vaultId: String = "vault_1"
+    /// Empty until the user enters a password and `setupVault` derives it. We
+    /// intentionally do NOT default this to "vault_1" because that masked the
+    /// per-vault file selection in the original code. `vault_<id>.db` is the
+    /// canonical name from Desktop's `format!("vault_{}.db", vault_id)`.
+    var vaultId: String = ""
 
 
     init() {

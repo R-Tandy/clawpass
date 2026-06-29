@@ -553,16 +553,26 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                     try self.storeSalt(serverSaltData, for: currentVaultId)
                 }
                 self.debugSaltHex = serverSaltData.map { String(format: "%02x", $0) }.joined()
+                print("[VaultManager] Salt received from server: \(self.debugSaltHex.prefix(16))...; current vaultId=\(currentVaultId)")
                 
                 if let password = self.pendingSetupPassword {
                     do {
+                        // Single-pass init with the server salt — no second unlock call.
+                        // The previous code re-derived the key with saltOverride==nil
+                        // (i.e. empty salt) immediately after, producing a key that
+                        // didn't match what entries were encrypted with. That left
+                        // entries un-decryptable, showing zero entries in the UI.
                         try self.initializeWithSalt(password: password, salt: serverSaltData)
-                        try self.unlock(with: password, skipHandshake: true, forceLock: false)
+                        let resolvedPath = self.currentVaultDbPath()
+                        print("[VaultManager] init OK; DB=\(resolvedPath); key=\(self.encryptionKey != nil ? "valid" : "INVALID")")
                         self.pendingSetupPassword = nil
                         self.isFirstPopulationPending = false
                         DispatchQueue.main.async { self.isUnlocked = true; self.objectWillChange.send() }
                         if self.db != nil { SyncService.shared.startFullSyncPipeline() }
-                    } catch { self.isFirstPopulationPending = false }
+                    } catch {
+                        print("[VaultManager] setup init failed: \(error)")
+                        self.isFirstPopulationPending = false
+                    }
                 } else if let password = self.pendingUnlockPassword {
                     do {
                         try self.unlock(with: password, saltOverride: serverSaltData, skipHandshake: true, forceLock: true)
