@@ -256,7 +256,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
     func deleteEntry(id: UUID) {
         guard let db = db else { return }
-        let del = "DELETE FROM entries WHERE id = ?;"
+        // Case-insensitive match: iOS sends/receives ids via the wire
+        // in iOS's canonical UUID().uuidString (always uppercase), but
+        // legacy rows may have been persisted in different cases by
+        // older code paths. Comparing lower(id) = lower(?) catches
+        // both forms without false negatives.
+        let del = "DELETE FROM entries WHERE lower(id) = lower(?);"
         var stmt: OpaquePointer?
 
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {
@@ -675,8 +680,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         defer { isApplyingRemoteUpdate = false }
 
         sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
-        
-        let del = "DELETE FROM entries WHERE id = ?;"
+
+        // Case-insensitive DELETE: Desktop normalizes stored ids to
+        // UPPERCASE, but tombstone files still contain mixed-case
+        // ghosts from pre-fix sync paths. A plain `WHERE id = ?`
+        // would silently miss rows that differ in case from the
+        // tombstone ID. Compare via `lower(id) = lower(?)`.
+        let del = "DELETE FROM entries WHERE lower(id) = lower(?);"
         var stmt: OpaquePointer?
 
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {

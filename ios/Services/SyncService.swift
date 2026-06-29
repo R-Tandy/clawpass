@@ -773,16 +773,41 @@ class SyncService: ObservableObject {
                 // millis since epoch (matches Desktop `timestamp_millis()`
                 // in sync_tcp.rs::handle_client).
                 self.lastSyncTimestamp = timestamp
+                // CRITICAL: dispatch the delegate call to main too. We're
+                // being invoked from a Network-framework callback queue
+                // (background). VaultManager.didReceiveSyncEntries does
+                // SQLite work (saveEntry, loadData) and then publishes
+                // `entries = loadedEntries` via its OWN DispatchQueue.main.async
+                // — but it also reads `self.db` and `self.encryptionKey`
+                // synchronously at the top. Those are set on main by the
+                // salt handler (`syncServiceDidReceiveSalt` -> `unlock`).
+                // If this delegate fires on background BEFORE the main-thread
+                // unlock has finished, the guard `db != nil && key != nil`
+                // returns early and the entries never get saved. Then
+                // `firstSyncComplete` flips to true but `entries` stays
+                // empty, leaving the "Syncing your vault..." overlay
+                // stuck until the user closes/reopens the app.
+                //
+                // Dispatching to main here serializes the delegate call
+                // AFTER any pending salt-handler unlock work.
+                self.delegate?.syncService(self, didReceiveSyncEntries: entries, timestamp: timestamp)
             }
-            self.delegate?.syncService(self, didReceiveSyncEntries: entries, timestamp: timestamp)
             
         case .categoriesResponse(let categories):
             self.log("SINCED: Categories response received (\(categories.count) categories).")
-            self.delegate?.syncService(self, didReceiveCategories: categories)
-            
+            // Dispatch to main for the same race-avoidance reason as
+            // .syncResponse above: VaultManager.didReceiveCategories does
+            // SQLite work and reads `self.db` (set on main by the salt
+            // handler). Dispatching serializes AFTER pending unlock work.
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveCategories: categories)
+            }
+
         case .tombstonesResponse(let deletedIds):
             self.log("SINCED: Tombstones response received (\(deletedIds.count) IDs).")
-            self.delegate?.syncService(self, didReceiveTombstones: deletedIds)
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveTombstones: deletedIds)
+            }
             
         case .entryUpdate(let entry):
             self.log("SINCED: Individual entry update received: \(entry.title)")
@@ -794,11 +819,16 @@ class SyncService: ObservableObject {
             // which collapsed to seconds-vs-millis and made the next
             // requestSync() either ask for everything or miss entries.
             let entryUpdateTimestamp = Int64(Date().timeIntervalSince1970 * 1000)
-            self.delegate?.syncService(self, didReceiveSyncEntries: [entry], timestamp: entryUpdateTimestamp)
-            
+            // Same race-avoidance as .syncResponse above.
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveSyncEntries: [entry], timestamp: entryUpdateTimestamp)
+            }
+
         case .entryDelete(let entryId):
             self.log("SINCED: Individual entry deletion received: \(entryId)")
-            self.delegate?.syncService(self, didReceiveTombstones: [entryId])
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveTombstones: [entryId])
+            }
             
         case .error(let message):
             self.log("SINCED SERVER ERROR: \(message)")
