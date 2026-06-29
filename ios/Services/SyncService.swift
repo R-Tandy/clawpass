@@ -228,18 +228,37 @@ struct SyncVaultEntry: Codable {
         self.encrypted_notes = entry.encryptedNotes?.map { UInt8($0) }
         self.category_id = entry.categoryID?.uuidString
         self.totp_secret = entry.totpSecret
-        self.created_at = Int64(entry.createdAt.timeIntervalSince1970)
-        self.modified_at = Int64(entry.modifiedAt.timeIntervalSince1970)
+        // Server-side filter is `e.modified_at > ts` where `ts` is
+        // `chrono::Utc::now().timestamp_millis()` (millis since epoch).
+        // Previously we sent `Date().timeIntervalSince1970` which is
+        // seconds since epoch — about 1000x too small. With a zero initial
+        // `lastSyncTimestamp`, every entry passed the filter on every
+        // reconnect, the server sent back its full state, and iOS blindly
+        // `INSERT OR REPLACE`d it, overwriting the actual newer entry
+        // that hadn't been confirmed by the server yet. Multiplied by
+        // 1000 to match. See commit "Wire-protocol timestamps in millis".
+        self.created_at = Int64(entry.createdAt.timeIntervalSince1970 * 1000)
+        self.modified_at = Int64(entry.modifiedAt.timeIntervalSince1970 * 1000)
         self.is_favorite = entry.isFavorite
     }
-    
+
     func toVaultEntry() throws -> VaultEntry {
         guard let uuid = UUID(uuidString: self.id) else { throw SyncError.invalidEntryId }
         let categoryUUID = self.category_id.flatMap { UUID(uuidString: $0) }
+        // Wire `created_at`/`modified_at` are millis-since-epoch
+        // (server-side convention). Divide by 1000 to reconstruct a
+        // `Date`. Wall-clock precision in iOS DB is still receive-time
+        // because didReceiveSyncEntries builds a fresh VaultEntry; the
+        // entry's true modification time stays on the server. For LWW
+        // the server's wall clock is authoritative anyway.
+        let createdAt  = Date(timeIntervalSince1970: TimeInterval(self.created_at)  / 1000.0)
+        let modifiedAt = Date(timeIntervalSince1970: TimeInterval(self.modified_at) / 1000.0)
         var entry = VaultEntry(
             id: uuid, title: self.title, username: self.username, password: "",
             url: self.url, notes: nil, categoryID: categoryUUID, totpSecret: self.totp_secret, isFavorite: self.is_favorite
         )
+        entry.createdAt = createdAt
+        entry.modifiedAt = modifiedAt
         entry.encryptedPassword = Data(self.encrypted_password)
         if let notes = self.encrypted_notes {
             entry.encryptedNotes = Data(notes)
@@ -744,6 +763,16 @@ class SyncService: ObservableObject {
             self.log("SINCED: Sync response received (\(entries.count) entries).")
             DispatchQueue.main.async {
                 self.firstSyncComplete = true
+                // Persist the server's "since" marker so the next
+                // requestSync() is incremental instead of returning the
+                // full vault every time. The server's filter is
+                // `e.modified_at > last_timestamp`, so without this update
+                // we'd ask for everything on every reconnect, and the
+                // server's response would overwrite any newer local state
+                // via `INSERT OR REPLACE` in saveEntry(). Wire unit is
+                // millis since epoch (matches Desktop `timestamp_millis()`
+                // in sync_tcp.rs::handle_client).
+                self.lastSyncTimestamp = timestamp
             }
             self.delegate?.syncService(self, didReceiveSyncEntries: entries, timestamp: timestamp)
             
@@ -757,7 +786,15 @@ class SyncService: ObservableObject {
             
         case .entryUpdate(let entry):
             self.log("SINCED: Individual entry update received: \(entry.title)")
-            self.delegate?.syncService(self, didReceiveSyncEntries: [entry], timestamp: Int64(Date().timeIntervalSince1970))
+            // Wall-clock as **millis** since epoch. The receiving path
+            // (didReceiveSyncEntries) updates `lastSyncTimestamp` from
+            // this value, and the server filter compares it against
+            // entries' `modified_at` which is also millis. Previously
+            // we passed `Int64(Date().timeIntervalSince1970)` (seconds),
+            // which collapsed to seconds-vs-millis and made the next
+            // requestSync() either ask for everything or miss entries.
+            let entryUpdateTimestamp = Int64(Date().timeIntervalSince1970 * 1000)
+            self.delegate?.syncService(self, didReceiveSyncEntries: [entry], timestamp: entryUpdateTimestamp)
             
         case .entryDelete(let entryId):
             self.log("SINCED: Individual entry deletion received: \(entryId)")
