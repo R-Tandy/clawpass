@@ -49,6 +49,26 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     // MARK: - Database Core
     
+    /// Per-vault DB filename. Matches Desktop's `vault_{id}.db` convention when a
+    /// `vaultId` is set, and falls back to the legacy `vault.db` for the default
+    /// ("vault_1") or unset cases — keeping existing single-vault installs working.
+    private func currentVaultDbFilename() -> String {
+        let vid = SyncService.shared.vaultId
+        if vid.isEmpty || vid == "vault_1" {
+            return "vault.db"
+        }
+        return "vault_\(vid).db"
+    }
+    
+    /// Absolute path to the DB file that *should* currently be open, given the
+    /// SyncService vaultId. Callers use this to open/initialize against the
+    /// correct per-vault file.
+    private func currentVaultDbPath() -> String {
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
+        return vaultDir.appendingPathComponent(currentVaultDbFilename()).path
+    }
+    
     private func openDatabase(path: String) -> Bool {
         if sqlite3_open(path, &db) != SQLITE_OK {
             let err = db == nil ? "Unknown error" : String(cString: sqlite3_errmsg(db))
@@ -239,9 +259,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     }
     
     func initializeWithSalt(password: String, salt: Data) throws {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
-        let dbPath = vaultDir.appendingPathComponent("vault.db").path
+        let dbPath = currentVaultDbPath()
         
         guard openDatabase(path: dbPath) else {
             throw VaultError.databaseError("Could not open database at \(dbPath)")
@@ -331,9 +349,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     // MARK: - Compatibility / Legacy API for Views & Sync
     
     func hasAnyVault() -> Bool {
+        // True if either the legacy single-file vault.db exists OR any per-vault
+        // file exists under the ClawPass directory. Matches Desktop's expectation
+        // that "any present vault" gates the Unlock vs Setup screen decision.
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        let dbPath = vaultDir.appendingPathComponent("vault.db").path
-        return FileManager.default.fileExists(atPath: dbPath)
+        guard FileManager.default.fileExists(atPath: vaultDir.path) else { return false }
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
+        return items.contains { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }
     }
     
     func getDebugInfo(password: String) {
@@ -352,11 +374,25 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
     func nuclearReset() {
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        let dbPath = vaultDir.appendingPathComponent("vault.db").path
-        try? FileManager.default.removeItem(atPath: dbPath)
+        // Wipe all vault_*.db and the legacy vault.db. Matches Desktop's
+        // "wipe everything" semantics from PROJECT_STATUS.md Phase 3.
+        if let items = try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path) {
+            for name in items where name.hasSuffix(".db") {
+                try? FileManager.default.removeItem(atPath: vaultDir.appendingPathComponent(name).path)
+            }
+        }
         
-        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword]
-        SecItemDelete(query as CFDictionary)
+        // Wipe every vault_salt_* keychain item (single-class delete matches
+        // a deletion-by-service query; we then re-add nothing, leaving Keychain
+        // clean for the next init).
+        let allKeychain: [String: Any] = [kSecClass as String: kSecClassGenericPassword]
+        SecItemDelete(allKeychain as CFDictionary)
+        // Belt-and-braces: also wipe the UserDefaults fallback salts.
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("vault_salt_fallback_") {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.synchronize()
         
         self.lock()
         self.isFirstPopulationPending = false
