@@ -361,6 +361,16 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     func lock() {
         print("[VaultManager] lock: previous dbPath=\(currentVaultDbPath())")
+        // Tear down any in-flight TCP connection so the next unlock or
+        // setupVault builds a clean one. Without this, a leftover
+        // connection from a previous session keeps isConnected=true,
+        // triggerHandshake() calls startHandshake() directly which
+        // sendPacket's into a stale NWConnection that the OS has long
+        // since reset, so awaitingHandshakeAck never flips, so the
+        // pipeline's requestSalt/RequestCategories/Sync calls all bail
+        // silently on handshakeCompleted=false. The user is then stuck
+        // on the 'Identifying Vault' page forever.
+        SyncService.shared.disconnect()
         self.encryptionKey = nil
         self.isUnlocked = false
         self.isReady = false
