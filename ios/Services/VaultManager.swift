@@ -380,6 +380,23 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // syncResponse never arrives, firstSyncComplete stays false, and the
         // overlay shows forever.
         if !skipHandshake {
+            // Tear down any live connection from a previous vault BEFORE
+            // starting a new handshake. The connection model is hub-and-spoke:
+            // a connection carries exactly one vaultId for its lifetime
+            // (the server's `active_vault_id` is set at handshake and only
+            // changes when a new handshake is processed). Reusing a
+            // connection that was last bound to vault A for a new vault-B
+            // handshake means the server only switches active_vault_id
+            // when the new handshake packet is processed, but in the
+            // meantime any in-flight or already-queued A-bound packets
+            // (e.g. an A-targeted syncResponse that arrived just before
+            // the unlock was tapped) can still be routed to vault B's
+            // UI. disconnect() resets handshakeCompleted and isConnected;
+            // it's idempotent and safe to call when no connection is
+            // active (just resets flags). After disconnect(),
+            // triggerHandshake() will see isConnected=false and start a
+            // fresh NWConnection on the same discovered peer.
+            SyncService.shared.disconnect()
             SyncService.shared.startUDPListener()
             SyncService.shared.startDiscovery()
             SyncService.shared.triggerHandshake()
