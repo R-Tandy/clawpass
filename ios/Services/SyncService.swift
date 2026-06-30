@@ -616,6 +616,17 @@ class SyncService: ObservableObject {
             for entryId in deletes {
                 self.sendEntryDelete(entryId: entryId)
             }
+            // Offline-DELETE outbox cleanup: every id we just sent is
+            // optimistically considered delivered (TCP is reliable
+            // within a session; if the server crashes mid-handle the
+            // worst case is the entry reappearing until the next
+            // user-driven delete). Drop the outbox rows so a future
+            // flushOutbox (e.g. after another reconnect) doesn't
+            // re-send deletes the server has already processed. Safe
+            // to call with an empty array.
+            if !deletes.isEmpty {
+                VaultManager.shared.markTombstonesSent(ids: deletes)
+            }
         }
     }
 

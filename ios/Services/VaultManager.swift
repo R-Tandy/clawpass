@@ -93,8 +93,20 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let createEntries = "CREATE TABLE IF NOT EXISTS entries (id TEXT PRIMARY KEY, title TEXT, username TEXT, encrypted_password BLOB, url TEXT, encrypted_notes BLOB, category_id TEXT, totp_secret TEXT, created_at REAL, modified_at REAL, is_favorite INTEGER, sync_status TEXT);"
         let createCategories = "CREATE TABLE IF NOT EXISTS categories (id TEXT PRIMARY KEY, name TEXT, icon TEXT, color TEXT);"
         let createSettings = "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);"
+        // Offline-delete outbox. Each row is an entry id that the user
+        // deleted locally but that the server hasn't acknowledged yet
+        // (because we were offline, or the handshake hadn't completed,
+        // or we crashed between send and ACK). flushOutbox() reads this
+        // table, sends an EntryDelete per row, then removes the row
+        // optimistically. didReceiveTombstones() also removes a row if
+        // the server happens to echo the id back (covers the case where
+        // the same entry was deleted on both sides). The table lives
+        // in the same per-vault .db file as entries, so nuclearReset()
+        // (which removes every .db file in the ClawPass directory)
+        // wipes it automatically with no extra code.
+        let createTombstones = "CREATE TABLE IF NOT EXISTS pending_tombstones (id TEXT PRIMARY KEY, created_at REAL);"
 
-        let tables = [createEntries, createCategories, createSettings]
+        let tables = [createEntries, createCategories, createSettings, createTombstones]
         for tableSql in tables {
             var errMsg: UnsafeMutablePointer<Int8>? = nil
             if sqlite3_exec(db, tableSql, nil, nil, &errMsg) != SQLITE_OK {
@@ -278,6 +290,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             self.objectWillChange.send()
             NotificationCenter.default.post(name: .vaultDataChanged, object: nil)
         }
+        // Always write the tombstone to the durable outbox BEFORE
+        // attempting the network send. This is the offline-DELETE fix:
+        // sendEntryDelete used to be fire-and-forget and silently
+        // dropped the packet when handshakeCompleted was false (the
+        // user was offline, or the iOS-side handshake hadn't finished
+        // yet). On reconnect, flushOutbox() would read this table and
+        // re-send. The row stays in the outbox until either
+        // markTombstonesSent() runs (online-send path) or
+        // didReceiveTombstones() sees the id come back from the server
+        // (dedup path). Idempotent INSERT OR IGNORE means re-deleting
+        // the same entry (e.g. from a tombstone echo) is a no-op.
+        recordTombstone(id: idString)
         // Push the deletion to the Desktop sync server. Suppressed while
         // we're applying a server-sent sync response (tombstone echo-back
         // would be a loop). Tombstones themselves arrive via raw SQL in
@@ -612,7 +636,92 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func getPendingEntries(completion: @escaping ([VaultEntry], [String]) -> Void) {
         // Return the raw VaultEntry list (already holds encrypted data)
         // Sync layer will convert to SyncVaultEntry using the proper init
-        completion(entries, [])
+        // completion(entries, [])
+
+        // Offline-DELETE outbox: read pending_tombstones. Each row is
+        // an entry id that the user deleted locally but the server
+        // hasn't acknowledged yet. flushOutbox() will call
+        // sendEntryDelete per id and then call markTombstonesSent()
+        // to drop them from the outbox. didReceiveTombstones() also
+        // drops rows as a dedup (in case the server sends the same id
+        // back as part of its tombstone list).
+        guard let db = db else {
+            completion(entries, [])
+            return
+        }
+        let query = "SELECT id FROM pending_tombstones;"
+        var stmt: OpaquePointer?
+        var ids: [String] = []
+        if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                if let cString = sqlite3_column_text(stmt, 0) {
+                    ids.append(String(cString: cString))
+                }
+            }
+        }
+        sqlite3_finalize(stmt)
+        completion(entries, ids)
+    }
+
+    /// Insert an entry id into the durable offline-delete outbox.
+    /// Called from deleteEntry() before any network send. Idempotent:
+    /// re-inserting the same id is a no-op (PRIMARY KEY).
+    func recordTombstone(id: String) {
+        guard let db = db else { return }
+        let sql = "INSERT OR IGNORE INTO pending_tombstones (id, created_at) VALUES (?, ?);"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
+            if sqlite3_step(stmt) != SQLITE_DONE {
+                print("[SQLite3] Failed to record tombstone: \(String(cString: sqlite3_errmsg(db)))")
+            }
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// Remove a list of tombstone ids from the outbox after they've
+    /// been sent on the wire. Called by flushOutbox() once the
+    /// EntryDelete packet has been handed to sendPacket(). Optimistic:
+    /// we don't wait for the server's Ack because the iOS-side
+    /// handleIncomingPacket treats every .ack as a handshake ack and
+    /// doesn't carry a per-id correlation. The TCP connection is
+    /// reliable within a session; if the server crashes mid-handle,
+    /// the worst case is the entry reappearing until the user deletes
+    /// again on the next session. (The persistent outbox IS the
+    /// durability guarantee for the crash-between-intent-and-send
+    /// case; the crash-between-send-and-handle case is rare enough
+    /// to accept the simpler model.)
+    func markTombstonesSent(ids: [String]) {
+        guard let db = db, !ids.isEmpty else { return }
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let sql = "DELETE FROM pending_tombstones WHERE id IN (\(placeholders));"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            for (i, id) in ids.enumerated() {
+                sqlite3_bind_text(stmt, Int32(i + 1), (id as NSString).utf8String, -1, nil)
+            }
+            if sqlite3_step(stmt) != SQLITE_DONE {
+                print("[SQLite3] Failed to clear sent tombstones: \(String(cString: sqlite3_errmsg(db)))")
+            }
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// Remove a single id from the outbox. Called from
+    /// didReceiveTombstones() to dedup: if the server's tombstone
+    /// list happens to include an id we deleted locally and
+    /// recorded in the outbox, we drop our outbox row so we don't
+    /// re-send a delete the server has already processed.
+    func clearTombstone(id: String) {
+        guard let db = db else { return }
+        let sql = "DELETE FROM pending_tombstones WHERE lower(id) = lower(?);"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
     }
     
     // MARK: - SyncServiceDelegate
@@ -718,6 +827,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
                 sqlite3_step(stmt)
                 sqlite3_reset(stmt)
+                // Offline-DELETE outbox dedup: if the server's tombstone
+                // list includes an id we recorded locally as a pending
+                // tombstone (e.g. user deleted on both sides, or the
+                // server already processed our offline delete and is
+                // echoing it back), drop the outbox row so flushOutbox()
+                // doesn't re-send a delete the server has already
+                // acknowledged. clearTombstone is a no-op if the id
+                // isn't in the outbox.
+                clearTombstone(id: id)
             }
         }
         sqlite3_finalize(stmt)
