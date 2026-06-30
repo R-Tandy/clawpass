@@ -361,6 +361,19 @@ class SyncService: ObservableObject {
 
     func setVaultId(_ id: String) {
         self.vaultId = id
+        // Restore the per-vault last-sync timestamp so the next
+        // requestSync asks for only entries the server has changed
+        // since the last successful handshake, instead of every entry
+        // (the previous version inited lastSyncTimestamp to 0 on every
+        // app launch, which combined with the wire-protocol millis
+        // mismatch caused iOS to blindly INSERT OR REPLACE every
+        // server entry on every reconnect).
+        if let stored = UserDefaults.standard.object(forKey: "lastSyncTimestamp_\(id)") as? Int64 {
+            self.lastSyncTimestamp = stored
+            log("SINCED: Restored lastSyncTimestamp=\(stored) for vault \(id.prefix(12))...")
+        } else {
+            self.lastSyncTimestamp = 0
+        }
         log("SINCED: Vault Identity set to \(id)")
     }
 
@@ -784,6 +797,12 @@ class SyncService: ObservableObject {
                 // millis since epoch (matches Desktop `timestamp_millis()`
                 // in sync_tcp.rs::handle_client).
                 self.lastSyncTimestamp = timestamp
+                // Persist per-vault so the next app launch (or next
+                // time this vault is unlocked) asks the server for
+                // only what changed since now. Without this, every
+                // iOS launch reverts to timestamp=0 and pulls every
+                // entry on the server.
+                UserDefaults.standard.set(timestamp, forKey: "lastSyncTimestamp_\(self.vaultId)")
                 // CRITICAL: dispatch the delegate call to main too. We're
                 // being invoked from a Network-framework callback queue
                 // (background). VaultManager.didReceiveSyncEntries does
