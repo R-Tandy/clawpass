@@ -58,13 +58,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     
     // MARK: - Database Core
     
-    /// Per-vault DB filename. Matches Desktop's `vault_{id}.db` convention when a
-    /// `vaultId` is set, and falls back to the legacy `vault.db` for the default
-    /// ("vault_1") or unset cases — keeping existing single-vault installs working.
+    /// Per-vault DB filename. Matches Desktop's `vault_{id}.db` convention.
+    /// v3+ never falls back to the un-suffixed `vault.db` (LEGACY-V2, do not
+    /// touch). If `vaultId` is empty we return an empty string — every caller
+    /// that uses this also gates on `!vaultId.isEmpty`, so the empty string
+    /// is a safe "no path" sentinel rather than a fallback to legacy state.
     private func currentVaultDbFilename() -> String {
         let vid = SyncService.shared.vaultId
-        if vid.isEmpty || vid == "vault_1" {
-            return "vault.db"
+        if vid.isEmpty {
+            return ""
         }
         return "vault_\(vid).db"
     }
@@ -101,9 +103,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // optimistically. didReceiveTombstones() also removes a row if
         // the server happens to echo the id back (covers the case where
         // the same entry was deleted on both sides). The table lives
-        // in the same per-vault .db file as entries, so nuclearReset()
-        // (which removes every .db file in the ClawPass directory)
-        // wipes it automatically with no extra code.
+        // in the same per-vault .db file as entries. nuclearReset() removes
+        // every per-vault `vault_<id>.db` in the ClawPass directory (NOT
+        // the un-suffixed legacy `vault.db`), which wipes the outbox table
+        // automatically with no extra code.
         let createTombstones = "CREATE TABLE IF NOT EXISTS pending_tombstones (id TEXT PRIMARY KEY, created_at REAL);"
 
         let tables = [createEntries, createCategories, createSettings, createTombstones]
@@ -489,26 +492,25 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
     
-    /// Names of every vault_<id>.db / vault.db currently on disk. Used by
-    /// ContentView to list available vaults when `vaultId` is unset.
+    /// Names of every `vault_<id>.db` currently on disk (no other extensions,
+    /// no un-suffixed `vault.db`). Used by ContentView to list available
+    /// vaults when `vaultId` is unset. The bare `vault.db` is LEGACY-V2 and
+    /// deliberately excluded from v3 enumeration.
     func availableVaultFilenames() -> [String] {
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
-        return items.filter { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }.sorted()
+        return items.filter { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }.sorted()
     }
 
-    /// True if a `.db` file already exists for this vaultId. false means
-    /// the user is trying to *unlock* a vault that hasn't been set up on
-    /// this device yet — they should be routed to the 'Retrieve Vault
+    /// True if a `vault_<id>.db` file already exists for this vaultId. false
+    /// means the user is trying to *unlock* a vault that hasn't been set up
+    /// on this device yet — they should be routed to the 'Retrieve Vault
     /// from Server' flow instead of silently creating an empty vault.
+    /// v3+ never falls back to the un-suffixed legacy `vault.db`.
     func vaultFileExists(forVaultId vaultId: String) -> Bool {
-        let filename: String
-        if vaultId.isEmpty || vaultId == "vault_1" {
-            filename = "vault.db"
-        } else {
-            filename = "vault_\(vaultId).db"
-        }
+        guard !vaultId.isEmpty else { return false }
+        let filename = "vault_\(vaultId).db"
         let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ClawPass")
             .appendingPathComponent(filename)
@@ -543,12 +545,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     // MARK: - Compatibility / Legacy API for Views & Sync
     
     func hasAnyVault() -> Bool {
-        // True if any vault_<id>.db exists OR the legacy vault.db. Matches
-        // Desktop's expectation that 'any present vault' gates Unlock vs Setup.
+        // True if any per-vault `vault_<id>.db` exists. Matches Desktop's
+        // expectation that 'any present vault' gates Unlock vs Setup.
+        // v3+ explicitly excludes the un-suffixed legacy `vault.db`.
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return false }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
-        return items.contains { $0.hasSuffix(".db") && ($0 == "vault.db" || $0.hasPrefix("vault_")) }
+        return items.contains { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }
     }
 
     func getDebugInfo(password: String) {
@@ -567,10 +570,12 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
     func nuclearReset() {
         let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        // Wipe all vault_*.db and the legacy vault.db. Matches Desktop's
-        // "wipe everything" semantics from PROJECT_STATUS.md Phase 3.
+        // v3+ wipe target: ONLY the per-vault suffixed `vault_<id>.db` files.
+        // The un-suffixed legacy `vault.db` (LEGACY-V2) is DELIBERATELY
+        // EXCLUDED to preserve Reno's pre-v3 vault. Same constraint as
+        // Desktop's `hard_reset_dot_clawpass` / `wipe_all_vaults` helpers.
         if let items = try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path) {
-            for name in items where name.hasSuffix(".db") {
+            for name in items where name.hasSuffix(".db") && name.hasPrefix("vault_") && name != "vault.db" {
                 try? FileManager.default.removeItem(atPath: vaultDir.appendingPathComponent(name).path)
             }
         }

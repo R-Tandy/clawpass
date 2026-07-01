@@ -690,8 +690,8 @@ class SyncService: ObservableObject {
 
 
     private func startHandshake() {
-        if vaultId == "vault_1" {
-            log("SINCED: Blocked handshake - vault identity not yet derived (still vault_1).")
+        if vaultId.isEmpty {
+            log("SINCED: Blocked handshake - vault identity not yet derived (empty vaultId).")
             return
         }
         

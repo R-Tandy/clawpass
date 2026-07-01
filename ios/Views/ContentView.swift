@@ -38,12 +38,15 @@ struct ContentView: View {
     }
     
     private func checkVaultStatus() {
-        let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("vault.db")
-        
-        print("[UI] Checking vault path: \(path.path)")
-        if !FileManager.default.fileExists(atPath: path.path) {
-            print("[UI] Vault database NOT found. Flagging for setup.")
+        // v3+ debug check: enumerate per-vault files in the ClawPass
+        // directory. NEVER reference the un-suffixed legacy `vault.db`.
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let vaultDir = docs.appendingPathComponent("ClawPass")
+        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
+        let perVaultDbs = items.filter { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }.sorted()
+        print("[UI] Per-vault DBs present: \(perVaultDbs)")
+        if perVaultDbs.isEmpty {
+            print("[UI] No per-vault DB found. Flagging for setup.")
         } else {
             print("[UI] Vault database exists.")
         }
