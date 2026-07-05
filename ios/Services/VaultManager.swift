@@ -342,6 +342,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.isUnlocked = true
         self.isReady = true
         loadData()
+        // Pull the vault name from the per-vault settings table so the
+        // name persists across app restarts and vault switches. Without
+        // this call, `vaultName` stays at the in-memory default ("My Vault"
+        // or whatever was set during a previous session) and the
+        // navigation title in VaultView is wrong until the user manually
+        // edits the name through SettingsView.
+        loadVaultName()
     }
     
     func unlock(with password: String, saltOverride: Data? = nil, skipHandshake: Bool = false, forceLock: Bool = false) throws {
@@ -453,6 +460,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.isReady = false
         self.db = nil
         self.entries = []
+        // Reset vaultName so a vault switch doesn't briefly show the
+        // previous vault's name. The new value is loaded from disk in
+        // `initializeWithSalt` -> `loadVaultName` on the next unlock.
+        self.vaultName = "My Vault"
         self.objectWillChange.send()
     }
     
