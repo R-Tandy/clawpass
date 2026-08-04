@@ -48,7 +48,6 @@
     <key>NSBonjourServices</key>
     <array>
         <string>_clawpass._tcp</string>
-        <string>_clawpass._tcp.local</string>
     </array>
 </dict>
 </plist>

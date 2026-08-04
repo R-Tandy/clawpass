@@ -146,10 +146,24 @@ struct EntryDetailView: View {
                                     .cornerRadius(4)
                                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
                                     .font(.system(.body, design: .monospaced))
-                            } else {
-                                Link(destination: URL(string: url)!) {
+                                    // Reject obviously-malformed URLs as the
+                                    // user types. The plain `url` state is
+                                    // used for display; the Link below only
+                                    // activates when URL() succeeds, so a
+                                    // half-typed "ht" or "ww.example" no
+                                    // longer crashes on the force-unwrap.
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                                    .keyboardType(.URL)
+                            } else if let parsed = URL(string: url) {
+                                // Only render the tap target if the URL is
+                                // parseable. The outer `if !url.isEmpty`
+                                // catches the empty case, but a non-empty
+                                // malformed string (e.g. "example" with no
+                                // scheme) used to crash on URL(string:)!.
+                                Link(destination: parsed) {
                                     HStack {
-                                        Text(url).foregroundColor(Color(hex: "C5A059")).font(.system(.body, design: .monospaced)).lineLimit(1)
+                                        Text(url).foregroundColor(Color(hex: "C5A059")).font(.system(.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                                         Spacer()
                                         Image(systemName: "arrow.up.right.square").foregroundColor(Color(hex: "C5A059"))
                                     }
@@ -158,6 +172,20 @@ struct EntryDetailView: View {
                                     .cornerRadius(4)
                                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
                                 }
+                            } else {
+                                // Non-empty but unparseable. Render as
+                                // non-tappable text so the user can see
+                                // what was saved. Better than the old
+                                // force-unwrap crash on URL(string: url)!
+                                HStack {
+                                    Text(url).foregroundColor(Color(hex: "94a3b8")).font(.system(.body, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                                    Spacer()
+                                    Image(systemName: "link.badge.plus").foregroundColor(Color(hex: "5C5E66"))
+                                }
+                                .padding()
+                                .background(Color(hex: "1B1C21"))
+                                .cornerRadius(4)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
                             }
                         }
                     }

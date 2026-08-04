@@ -97,7 +97,20 @@ struct IdentityPlate: View {
                         return vaultManager.vaultName
                     },
                     set: { newValue in
-                        try? vaultManager.updateVaultName(newValue)
+                        // Don't use `try?` here — the failure mode is
+                        // "vault is locked" (db == nil), in which case
+                        // the user has typed a name into the settings
+                        // field and silently lost it. The Binding set
+                        // closure can't throw, so we capture the error
+                        // in a do/catch and log. The user sees no
+                        // visible error in the field, but the next time
+                        // they open the app the field will reflect the
+                        // last successfully-persisted value.
+                        do {
+                            try vaultManager.updateVaultName(newValue)
+                        } catch {
+                            print("[IdentityPlate] updateVaultName failed: \(error)")
+                        }
                     }
                 ))
                 .textFieldStyle(PlainTextFieldStyle())

@@ -1,8 +1,29 @@
-# ClawPass Desktop - TODO (2026-06-30)
+# ClawPass Desktop - TODO (2026-07-07)
 
-This is the **active** TODO for the Desktop (Tauri + Vue) side. The previous
-copy was an old backup that had been overwritten by various "good-intentioned"
-fixes and is no longer useful — it was deleted.
+This is the **active** TODO for the Desktop (Tauri + Vue) side.
+
+---
+
+## ✅ Done 2026-07-07: Preferences persistence
+- `Prefs` struct + `get_prefs` / `set_prefs` Tauri commands.
+- `prefs.json` in `~/.clawpass/` (global, not per-vault).
+- Vue store: `prefs` ref + `loadPrefs()` + `savePrefs()`.
+- `PreferencesModal.vue`: loads on mount, deep-watches and saves on
+  every change.
+- `VaultView.vue`:
+  - `copyToClipboard` respects `prefs.clear_clipboard` and
+    `prefs.clipboard_timeout_seconds` (was hard-coded 30s).
+  - Auto-lock timer: 5 activity events (mousemove/keydown/click/
+    scroll/touchstart) reset a `setTimeout(prefs.auto_lock_minutes *
+    60_000)`. Fires `lock()` on expiry. `0` = never.
+  - `watch(prefs.auto_lock_minutes)` re-arms the timer on setting
+    change.
+  - `onUnmounted` cleans up listeners and clears the pending timer
+    (critical for vault-switching within the same window session).
+- `App.vue` `onMounted`: `vault.loadPrefs()` once at app start.
+- `cargo check` clean. `npm run build` (vue-tsc + vite) clean.
+- ⚠ **Desktop is gitignored — this work is local-only. Reno must
+  `cargo build && cargo run` to apply.**
 
 ---
 
@@ -16,21 +37,21 @@ fixes and is no longer useful — it was deleted.
 | Quit | Working (native) | |
 
 ### Edit menu
-| Item | Current state | Desired |
-|------|---------------|---------|
-| Undo / Redo / Cut / Copy / Paste | Native, **dead-weight** in this app | **Remove**. Mouseup outside the entry-edit window closes it, so these commands have nothing to operate on. |
-| Generate Password | Fixed 2026-06-30 — was broken because the modal was mounted in VaultView instead of App.vue, so the menu's `generate_password` event had nothing to bind to. Now mounted globally in App.vue like PreferencesModal. The toolbar button (which always worked) now drives the same modal via `inject('showGenerator')`. | Keep. |
-| **Select All** | Doesn't exist | Add. Selects all visible entries in the current category/search filter. |
-| **Delete Selected** | Doesn't exist | Add. Bulk-deletes selected entries; prompts once for confirmation. Should respect the existing tombstone + iOS-sync pipeline (one EntryDelete per entry on the wire). |
-| **Move Selected to Vault...** | Doesn't exist | Add. Opens a small picker listing `vault_<id>.db` files (uses `list_all_vaults` Tauri command already registered in `main.rs`); on confirm, moves each selected entry's row to the chosen vault's DB. Cross-vault moves are tricky — defer until core per-vault storage and the move-target are both in place. |
+
+✅ **DONE 2026-07-07** (local — `desktop/` is gitignored; Reno must rebuild):
+- Added `Select All` (Ctrl+A) — selects every entry in the current filter.
+- Added `Delete Selected` (Del) — bulk delete via the existing per-row `delete_entry` path; one tombstone per entry, one `EntryDelete` per entry on the wire to keep iOS in sync.
+- Added `Lock Now` (Ctrl+L) — quick way to lock from the menu.
+- Kept `Generate Password` (Ctrl+G) at the bottom under a separator.
+- `Move Selected to Vault...` still deferred — cross-vault moves are a design problem and not in the way of anything else. The `list_all_vaults` Tauri command is already registered when we get to it.
+- No Undo/Redo/Cut/Copy/Paste were ever added to the menu (Tauri menus only contain items you explicitly add; the OS-provided Edit menu for text inputs only shows up inside an open EntryEdit modal if we add it there). So there's nothing to remove.
 
 ### Sync menu
-| Item | Current state | Desired |
-|------|---------------|---------|
-| Start Listening | Wired 2026-06-30 to `start_sync_listener` (used to emit a freeform text string and broke the Connected indicator). | **Remove** — was never useful in production and is now redundant with the auto-start of the sync server in `main.rs setup`. |
-| Discover Devices | Wired 2026-06-30 to `discover_sync_peers`. iOS already does this on its own and pushes entries directly. | **Remove** for the same reason. |
-| **Device List** | Doesn't exist | Add. Shows the iPhone(s) currently connected to the desktop sync server (peer list from `sync_tcp::SyncServer` — needs to be exposed to the menu/UI; the data is already in the server's in-memory `connections` map). |
-| **Pull Logs from <device>** | Doesn't exist | Add. Per-device submenu: triggers a `request_logs` message on the wire to that iOS device and surfaces them in a viewer modal. The wire message does not exist yet; would need a new `SyncMessage::RequestLogs` and `SyncMessage::LogBatch` variant. |
+
+✅ **DONE 2026-07-07** (local — same caveat as Edit):
+- Added `Sync Now` (Ctrl+R) — emits a `sync_now` event; the Vue side calls `trigger_remote_sync` via `invoke`. **Known limitation:** `trigger_remote_sync` is a stub that returns "Remote sync trigger requires active session handle integration". The error surfaces via the existing `sync-status` event channel, so the menu item exists and the error is visible in the header indicator. Wiring the actual server requires storing the `SyncServer` handle in `AppState` — small refactor, deferred to the QR/Scanner work since they're the same family of "surface server state to UI" work.
+- `Start Listening` and `Discover Devices` were never in the menu (see note in Edit menu about Tauri not providing a default Edit menu). So nothing to remove here either.
+- `Device List` and `Pull Logs from <device>` still deferred — both require the same `SyncServer`-in-AppState refactor.
 
 ### Window Sync button (bottom-left of sidebar in `VaultView.vue`)
 - Currently calls `startSync` which sets a status indicator and tries to invoke `start_sync_listener`.
@@ -53,18 +74,12 @@ fixes and is no longer useful — it was deleted.
 
 ---
 
-## Preferences modal (open, needs settings persistence)
+## Preferences modal
 
-Reactive settings exist in `PreferencesModal.vue`:
-- `autoLockMinutes` (1 / 5 / 15 / 30 / 0=Never) — **does not actually lock the vault** after the chosen interval.
-- `clearClipboard` + `clipboardTimeoutSeconds` — VaultView hard-codes 30s in its `copyToClipboard` timeout; the modal setting is ignored.
-- The "Start Sync" button works (calls `start_sync_listener`).
-
-To make these real:
-1. Add a `prefs` table to the per-vault DB (or a global `~/.clawpass/prefs.json`).
-2. Tauri commands: `get_prefs()`, `set_prefs(autolock_minutes, clipboard_timeout_seconds)`.
-3. Wire `VaultView.copyToClipboard` to use the `clipboardTimeoutSeconds` from the store.
-4. Add an inactivity timer in `VaultView` (or a service) that calls `lock()` after `autoLockMinutes` of no input — gated on `autoLockMinutes > 0`.
+✅ **DONE 2026-07-07** — see "Done 2026-07-07" at the top. Settings now
+persist to `prefs.json` and auto-lock + clipboard-clear work as configured.
+Open question for next session: surface a small "Vault auto-locked" toast
+when the timer fires? Currently the user just sees the lock screen. Defer.
 
 ---
 

@@ -1,6 +1,15 @@
 # Ignore the desktop project entirely
 desktop/
 
+# Desktop build/install side-effects that the .gitignore for
+# desktop/ would normally catch, but these leak to the repo root
+# when the developer runs `npm install` from ClawPass/ instead of
+# from ClawPass/desktop/. Add them here so the root git status
+# stays clean.
+node_modules/
+package.json
+package-lock.json
+
 # Ignore build artifacts and debug files
 *.pdb
 *.rlib

@@ -200,7 +200,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "ClawPass uses Face ID to unlock your secure password vault.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ClawPass needs local network access to discover and sync with your desktop vault.";
-				INFOPLIST_KEY_NSBonjourServices = "_clawpass._tcp _clawpass._tcp.local";
+				INFOPLIST_KEY_NSBonjourServices = "_clawpass._tcp";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -236,7 +236,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "ClawPass uses Face ID to unlock your secure password vault.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "ClawPass needs local network access to discover and sync with your desktop vault.";
-				INFOPLIST_KEY_NSBonjourServices = "_clawpass._tcp _clawpass._tcp.local";
+				INFOPLIST_KEY_NSBonjourServices = "_clawpass._tcp";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

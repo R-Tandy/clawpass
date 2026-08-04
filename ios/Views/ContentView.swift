@@ -446,32 +446,53 @@ struct VaultView: View {
             }
             .navigationTitle(currentTitle)
             .navigationBarTitleDisplayMode(.inline)
+            // Force the nav bar into the dark color scheme so the
+            // system-rendered title (and back chevron) pick light
+            // foregrounds. Without this, the inline title renders in
+            // the system default (black on the dark #1B1C21 bar) on
+            // some iOS versions, which is the "black on dark grey"
+            // symptom in the top bar. We then immediately override
+            // the title with a styled principal item below so the
+            // vault name renders in the gold accent #C5A059 like the
+            // rest of the steampunk palette.
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
             .toolbar {
+                // Principal title — replaces the .navigationTitle()
+                // text so we can control the foreground color directly.
+                // Kept in sync with `currentTitle` (which mirrors
+                // vaultManager.vaultName).
+                ToolbarItem(placement: .principal) {
+                    Text(currentTitle)
+                        .font(.system(.headline, design: .monospaced))
+                        .foregroundColor(Color(hex: "C5A059"))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack {
-                        Button(action: { 
+                        Button(action: {
                             isSearching.toggle()
                             isSearchFieldFocused = isSearching
                         }) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundColor(isSearching ? Color.white : Color(hex: "C5A059"))
                         }
-                        
+
                         Button(action: { vaultManager.lock() }) {
                             Image(systemName: "lock.fill")
                                 .foregroundColor(Color(hex: "C5A059"))
                         }
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
                         Button(action: { showingSync = true }) {
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .foregroundColor(vaultManager.syncStatus.contains("Connected") ? Color(hex: "39FF14") : Color(hex: "C5A059"))
                         }
-                        
+
                         Button(action: { showingAddEntry = true }) {
                             Image(systemName: "plus")
                                 .foregroundColor(Color(hex: "C5A059"))

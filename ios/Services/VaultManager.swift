@@ -348,7 +348,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // or whatever was set during a previous session) and the
         // navigation title in VaultView is wrong until the user manually
         // edits the name through SettingsView.
-        loadVaultName()
+        // ensureVaultNamePersisted (not loadVaultName) so a fresh vault
+        // with no persisted name gets a derived default written to disk
+        // on first init. See the method for the rationale.
+        ensureVaultNamePersisted()
     }
     
     func unlock(with password: String, saltOverride: Data? = nil, skipHandshake: Bool = false, forceLock: Bool = false) throws {
@@ -461,8 +464,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.db = nil
         self.entries = []
         // Reset vaultName so a vault switch doesn't briefly show the
-        // previous vault's name. The new value is loaded from disk in
-        // `initializeWithSalt` -> `loadVaultName` on the next unlock.
+        // previous vault's name. The new value is loaded (or derived as
+        // a default) in `initializeWithSalt` -> `ensureVaultNamePersisted`
+        // on the next unlock. We reset to "My Vault" here as a
+        // neutral placeholder; the in-memory value is overwritten before
+        // the next render so the user never sees it for long.
         self.vaultName = "My Vault"
         self.objectWillChange.send()
     }
@@ -481,18 +487,51 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.objectWillChange.send()
     }
     
-    private func loadVaultName() {
+    /// Ensures the `settings` table has a `vault_name` row. If the row is
+    /// missing (fresh vault, never explicitly named by the user), this
+    /// writes a derived default so the nav-bar title shows something more
+    /// useful than the in-memory literal "My Vault". The default uses
+    /// the first 6 chars of the current vaultId (uppercased hex) so each
+    /// vault gets a unique placeholder name — useful for multi-vault
+    /// users who can tell at a glance which vault they're in. The user
+    /// can still rename the vault in Settings at any time.
+    private func ensureVaultNamePersisted() {
         guard let db = db else { return }
         let query = "SELECT value FROM settings WHERE key = 'vault_name';"
         var stmt: OpaquePointer?
+        var existing: String? = nil
         if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
             if sqlite3_step(stmt) == SQLITE_ROW {
                 if let text = sqlite3_column_text(stmt, 0) {
-                    self.vaultName = String(cString: text)
+                    existing = String(cString: text)
                 }
             }
         }
         sqlite3_finalize(stmt)
+        // If a name is already persisted, just mirror it to the
+        // @Published field and stop. The user has explicitly named
+        // this vault; don't overwrite.
+        if let name = existing, !name.isEmpty {
+            self.vaultName = name
+            return
+        }
+        // Derive a default from the vaultId. The SyncService exposes
+        // the id as a hex string; first 6 chars gives a short, stable
+        // identifier. Prefixed with "Vault \u{2022} " so the bullet
+        // visually flags it as a generated default the user can
+        // rename in Settings.
+        let vid = SyncService.shared.vaultId
+        let prefix = vid.isEmpty ? "UNNAMED" : String(vid.prefix(6)).uppercased()
+        let defaultName = "Vault \u{2022} \(prefix)"
+        do {
+            try updateVaultName(defaultName)
+        } catch {
+            // updateVaultName throws on db == nil; we've already
+            // guarded on that, so this should never fire. If it
+            // does (e.g. disk full), fall through and let the
+            // in-memory default stand.
+            print("[VaultManager] ensureVaultNamePersisted failed: \(error)")
+        }
     }
     
     func refreshUI() {
