@@ -45,6 +45,8 @@
     <string>ClawPass uses Face ID to unlock your secure password vault.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>ClawPass needs local network access to discover and sync with your desktop vault.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>ClawPass needs camera access to scan connection QR codes.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_clawpass._tcp</string>

@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var port = "7878"
     @State private var showingConnectionError = false
     @State private var errorMessage = ""
+    @State private var showingQRScanner = false
     
     var body: some View {
         ZStack {
@@ -58,6 +59,25 @@ struct SettingsView: View {
                         syncService.connect(to: device)
                     })
                     
+                    // QR Scanner Trigger
+                    Button(action: {
+                        showingQRScanner = true
+                    }) {
+                        HStack {
+                            Image(systemName: "qrcode.viewfinder")
+                                .foregroundColor(Color(hex: "C5A059"))
+                            Text("SCAN CONNECTION QR")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(Color(hex: "0B0C10"))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .padding()
+                        .background(Color(hex: "C5A059"))
+                        .cornerRadius(4)
+                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
+                    }
+                    .padding(.top, 12)
+                    
                     LogPlate(logs: syncService.logs)
                 }
                 .padding()
@@ -69,6 +89,32 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
+        .sheet(isPresented: $showingQRScanner) {
+            QRScannerView { scannedUri in
+                if scannedUri.hasPrefix("clawpass://") {
+                    let stripped = scannedUri.replacingOccurrences(of: "clawpass://", with: "")
+                    let components = stripped.split(separator: ":")
+                    if components.count == 2 {
+                        let host = String(components[0])
+                        let port = UInt16(components[1]) ?? 7878
+                        
+                        let endpoint = NWEndpoint.hostPort(
+                            host: NWEndpoint.Host(host), 
+                            port: NWEndpoint.Port(integerLiteral: port)
+                        )
+                        
+                        let device = SyncDevice(
+                            name: "QR Scanned Device",
+                            endpoint: endpoint,
+                            host: host,
+                            port: port,
+                            remoteDeviceId: "qr_scanned"
+                        )
+                        syncService.connect(to: device)
+                    }
+                }
+            }
+        }
         .alert("Connection Error", isPresented: $showingConnectionError) {
             Button("OK") { }
         } message: {
