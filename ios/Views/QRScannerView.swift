@@ -41,11 +41,37 @@ struct QRScannerView: UIViewControllerRepresentable {
 class ScannerViewController: UIViewController {
     var captureSession: AVCaptureSession?
     var delegate: AVCaptureMetadataOutputObjectsDelegate?
+    
+    private let statusLabel = UILabel()
+    private let startButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .black
 
-        // 1. Setup the visual shell immediately on main thread
+        // 1. Setup a simple status label
+        statusLabel.text = "Camera Ready"
+        statusLabel.textColor = .white
+        statusLabel.textAlignment = .center
+        statusLabel.frame = CGRect(x: 0, y: view.frame.midY - 50, width: view.frame.width, height: 50)
+        view.addSubview(statusLabel)
+
+        // 2. Setup a manual start button to isolate the crash
+        startButton.setTitle("START CAMERA", for: .normal)
+        startButton.setTitleColor(.systemYellow, for: .normal)
+        startButton.titleLabel?.font = .systemFont(ofSize: 20, weight: .bold)
+        startButton.frame = CGRect(x: (view.frame.width - 200)/2, y: view.frame.midY, width: 200, height: 50)
+        startButton.backgroundColor = .darkGray
+        startButton.layer.cornerRadius = 10
+        startButton.addTarget(self, action: #selector(didTapStart), for: .touchUpInside)
+        view.addSubview(startButton)
+    }
+
+    @objc private func didTapStart() {
+        statusLabel.text = "Initializing..."
+        
+        // Move all camera logic here. If it crashes NOW, it's a hardware/perm issue.
+        // If it crashed before this, it was a SwiftUI/Lifecycle issue.
         let session = AVCaptureSession()
         self.captureSession = session
 
@@ -54,28 +80,29 @@ class ScannerViewController: UIViewController {
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
 
-        // 2. Handle permissions on the MAIN thread to ensure the system prompt can be presented
         let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
         if authStatus == .authorized {
             self.triggerHardwareSetup(session: session)
         } else if authStatus == .notDetermined {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 if granted {
-                    // 3. Once granted, move to background thread for the heavy lifting
                     DispatchQueue.global(qos: .userInitiated).async {
                         self?.triggerHardwareSetup(session: session)
                     }
                 } else {
-                    print("[QRScanner] Camera access denied by user")
+                    DispatchQueue.main.async {
+                        self?.statusLabel.text = "Access Denied"
+                    }
                 }
             }
         } else {
-            print("[QRScanner] Camera access denied")
+            DispatchQueue.main.async {
+                self.statusLabel.text = "Access Denied"
+            }
         }
     }
 
     private func triggerHardwareSetup(session: AVCaptureSession) {
-        // Everything in here happens on a background thread
         do {
             guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
                 print("[QRScanner] No camera available")
@@ -101,9 +128,16 @@ class ScannerViewController: UIViewController {
             }
 
             session.startRunning()
+            DispatchQueue.main.async {
+                self.statusLabel.text = "Scanning..."
+                self.startButton.isHidden = true
+            }
             print("[QRScanner] Session started successfully")
         } catch {
             print("[QRScanner] Hardware setup error: \(error)")
+            DispatchQueue.main.async {
+                self.statusLabel.text = "Hardware Error"
+            }
         }
     }
 
