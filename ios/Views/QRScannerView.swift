@@ -48,12 +48,39 @@ class ScannerViewController: UIViewController {
         let session = AVCaptureSession()
         self.captureSession = session
 
+        // Set up the preview layer immediately (this is just a view)
+        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+        previewLayer.frame = view.frame
+        previewLayer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(previewLayer)
+
+        // DEFER ALL HARDWARE SETUP until permission is confirmed
+        DispatchQueue.global(qos: .userInitiated).async {
+            let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            if authStatus == .authorized {
+                self.setupHardware(session: session)
+            } else if authStatus == .notDetermined {
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    if granted {
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            self.setupHardware(session: session)
+                        }
+                    }
+                }
+            } else {
+                print("[QRScanner] Camera access denied")
+            }
+        }
+    }
+
+    private func setupHardware(session: AVCaptureSession) {
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
             print("[QRScanner] No camera available")
             return
         }
         
         do {
+            // Touch hardware ONLY after permission is granted
             let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
             if session.canAddInput(videoInput) {
                 session.addInput(videoInput)
@@ -61,46 +88,20 @@ class ScannerViewController: UIViewController {
                 print("[QRScanner] Could not add video input")
                 return
             }
-        } catch {
-            print("[QRScanner] Error creating video input: \(error)")
-            return
-        }
 
-        let metadataOutput = AVCaptureMetadataOutput()
-        if session.canAddOutput(metadataOutput) {
-            session.addOutput(metadataOutput)
-            metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
-            metadataOutput.metadataObjectTypes = [.qr]
-        } else {
-            print("[QRScanner] Could not add metadata output")
-            return
-        }
-
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.frame = view.frame
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                // Ensure we check authorization before starting
-                let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
-                if authStatus == .authorized {
-                    session.startRunning()
-                } else if authStatus == .notDetermined {
-                    AVCaptureDevice.requestAccess(for: .video) { granted in
-                        if granted {
-                            DispatchQueue.global(qos: .userInitiated).async {
-                                session.startRunning()
-                            }
-                        }
-                    }
-                } else {
-                    print("[QRScanner] Camera access denied")
-                }
-            } catch {
-                print("[QRScanner] Critical error starting session: \(error)")
+            let metadataOutput = AVCaptureMetadataOutput()
+            if session.canAddOutput(metadataOutput) {
+                session.addOutput(metadataOutput)
+                metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
+                metadataOutput.metadataObjectTypes = [.qr]
+            } else {
+                print("[QRScanner] Could not add metadata output")
+                return
             }
+
+            session.startRunning()
+        } catch {
+            print("[QRScanner] Hardware setup error: \(error)")
         }
     }
 
