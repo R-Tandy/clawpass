@@ -39,54 +39,55 @@ struct QRScannerView: UIViewControllerRepresentable {
 }
 
 class ScannerViewController: UIViewController {
-    var captureSession: AVCaptureSession!
+    var captureSession: AVCaptureSession?
     var delegate: AVCaptureMetadataOutputObjectsDelegate?
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        captureSession = AVCaptureSession()
+        let session = AVCaptureSession()
+        self.captureSession = session
 
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else { return }
-        let videoInput: AVCaptureDeviceInput
-
-        do {
-            videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
-        } catch {
+        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+            print("[QRScanner] No camera available")
             return
         }
-
-        if (captureSession.canAddInput(videoInput)) {
-            captureSession.addInput(videoInput)
-        } else {
+        
+        do {
+            let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
+            if session.canAddInput(videoInput) {
+                session.addInput(videoInput)
+            } else {
+                print("[QRScanner] Could not add video input")
+                return
+            }
+        } catch {
+            print("[QRScanner] Error creating video input: \(error)")
             return
         }
 
         let metadataOutput = AVCaptureMetadataOutput()
-
-        if (captureSession.canAddOutput(metadataOutput)) {
-            captureSession.addOutput(metadataOutput)
-
+        if session.canAddOutput(metadataOutput) {
+            session.addOutput(metadataOutput)
             metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
             metadataOutput.metadataObjectTypes = [.qr]
         } else {
+            print("[QRScanner] Could not add metadata output")
             return
         }
 
-        let previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
+        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.frame = view.frame
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
 
         DispatchQueue.global(qos: .userInitiated).async {
-            self.captureSession.startRunning()
+            session.startRunning()
         }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if captureSession != nil {
-            captureSession.stopRunning()
-        }
+        captureSession?.stopRunning()
     }
 }

@@ -33,7 +33,7 @@ struct SettingsView: View {
                         .background(Color(hex: "2D2E35"))
                         .padding(.vertical, 8)
                     
-                    Text("SATELLITE LINK")
+                    Text("SERVER LINK")
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundColor(Color(hex: "C5A059"))
                         .frame(maxWidth: .infinity, alignment: .leading)

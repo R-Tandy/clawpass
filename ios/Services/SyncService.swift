@@ -775,7 +775,9 @@ class SyncService: ObservableObject {
                 // REMOVED: automatic startFullSyncPipeline() call. 
                 // The VaultManager must trigger this once the DB is actually open.
             } else {
-                self.log("SINCED: Received generic ACK.")
+                // Generic ACKs are noisy and usually just confirm receipt of 
+                // an entry update or similar. Silencing to keep logs clean.
+                // self.log("SINCED: Received generic ACK.")
             }
 
             
