@@ -19,8 +19,6 @@ jobs:
     - name: Build (minimal flags)
       run: |
         cd ios
-        # Fix: removed 'ios/' prefix because we already cd'd into ios
-        mogrify -alpha off Assets.xcassets/AppIcon.appiconset/*.png || echo "Icon optimization skipped"
         
         xcodebuild \\
           -project ClawPass.xcodeproj \\
