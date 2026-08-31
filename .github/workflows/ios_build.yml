@@ -19,22 +19,22 @@ jobs:
     - name: Build (minimal flags)
       run: |
         cd ios
-        set +e
-        xcodebuild \
-          -project ClawPass.xcodeproj \
-          -target ClawPass \
-          -configuration Release \
-          -sdk iphoneos \
-          CODE_SIGN_IDENTITY="" \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          ONLY_ACTIVE_ARCH=NO \
-          ARCHS=arm64 \
+        # Fix: removed 'ios/' prefix because we already cd'd into ios
+        mogrify -alpha off Assets.xcassets/AppIcon.appiconset/*.png || echo "Icon optimization skipped"
+        
+        xcodebuild \\
+          -project ClawPass.xcodeproj \\
+          -target ClawPass \\
+          -configuration Release \\
+          -sdk iphoneos \\
+          CODE_SIGN_IDENTITY="" \\
+          CODE_SIGNING_REQUIRED=NO \\
+          CODE_SIGNING_ALLOWED=NO \\
+          ONLY_ACTIVE_ARCH=NO \\
+          ARCHS=arm64 \\
           build > /tmp/xcodebuild.log 2>&1
+        
         XCB_EXIT=$?
-        set -e
-
-        echo "=== xcodebuild exit: $XCB_EXIT ==="
         if [ "$XCB_EXIT" -ne 0 ]; then
           echo "::error::xcodebuild failed (exit $XCB_EXIT)"
           grep -E 'error:|warning:|fatal error:' /tmp/xcodebuild.log | head -80 || true
@@ -55,6 +55,18 @@ jobs:
 
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
         echo "Located .app at: $APP_PATH"
+
+    - name: Verify Info.plist in Bundle
+      run: |
+        APP_PATH="${{ steps.locate.outputs.app_path }}"
+        PLIST_PATH="$APP_PATH/Info.plist"
+        echo "Checking bundle plist at: $PLIST_PATH"
+        if grep -q "NSCameraUsageDescription" "$PLIST_PATH"; then
+          echo "✅ NSCameraUsageDescription found in bundled Info.plist"
+        else
+          echo "::error::NSCameraUsageDescription MISSING from bundled Info.plist!"
+          exit 1
+        fi
 
     - name: Create IPA
       run: |
