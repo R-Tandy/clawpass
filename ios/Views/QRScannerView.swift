@@ -82,7 +82,25 @@ class ScannerViewController: UIViewController {
         view.layer.addSublayer(previewLayer)
 
         DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
+            do {
+                // Ensure we check authorization before starting
+                let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+                if authStatus == .authorized {
+                    session.startRunning()
+                } else if authStatus == .notDetermined {
+                    AVCaptureDevice.requestAccess(for: .video) { granted in
+                        if granted {
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                session.startRunning()
+                            }
+                        }
+                    }
+                } else {
+                    print("[QRScanner] Camera access denied")
+                }
+            } catch {
+                print("[QRScanner] Critical error starting session: \(error)")
+            }
         }
     }
 
