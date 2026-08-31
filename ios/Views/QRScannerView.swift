@@ -45,42 +45,43 @@ class ScannerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // 1. Setup the visual shell immediately on main thread
         let session = AVCaptureSession()
         self.captureSession = session
 
-        // Set up the preview layer immediately (this is just a view)
         let previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.frame = view.frame
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
 
-        // DEFER ALL HARDWARE SETUP until permission is confirmed
-        DispatchQueue.global(qos: .userInitiated).async {
-            let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
-            if authStatus == .authorized {
-                self.setupHardware(session: session)
-            } else if authStatus == .notDetermined {
-                AVCaptureDevice.requestAccess(for: .video) { granted in
-                    if granted {
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            self.setupHardware(session: session)
-                        }
+        // 2. Handle permissions on the MAIN thread to ensure the system prompt can be presented
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        if authStatus == .authorized {
+            self.triggerHardwareSetup(session: session)
+        } else if authStatus == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                if granted {
+                    // 3. Once granted, move to background thread for the heavy lifting
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self?.triggerHardwareSetup(session: session)
                     }
+                } else {
+                    print("[QRScanner] Camera access denied by user")
                 }
-            } else {
-                print("[QRScanner] Camera access denied")
             }
+        } else {
+            print("[QRScanner] Camera access denied")
         }
     }
 
-    private func setupHardware(session: AVCaptureSession) {
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-            print("[QRScanner] No camera available")
-            return
-        }
-        
+    private func triggerHardwareSetup(session: AVCaptureSession) {
+        // Everything in here happens on a background thread
         do {
-            // Touch hardware ONLY after permission is granted
+            guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+                print("[QRScanner] No camera available")
+                return
+            }
+            
             let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
             if session.canAddInput(videoInput) {
                 session.addInput(videoInput)
@@ -100,6 +101,7 @@ class ScannerViewController: UIViewController {
             }
 
             session.startRunning()
+            print("[QRScanner] Session started successfully")
         } catch {
             print("[QRScanner] Hardware setup error: \(error)")
         }
