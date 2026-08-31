@@ -210,6 +210,10 @@ struct UnlockView: View {
         VaultManager.shared.getDebugInfo(password: password)
         do {
             try VaultManager.shared.unlock(with: password)
+            
+            // Persist password to Keychain for future Biometric unlocks
+            try? CryptoService.shared.saveMasterPasswordToKeychain(password)
+            
         } catch let err as VaultError {
             switch err {
             case .vaultNotFound:
@@ -240,8 +244,8 @@ struct UnlockView: View {
                     reason: "Unlock ClawPass"
                 )
                 if success {
-                    // Retrieve master password from UserDefaults for biometric unlock
-                    if let savedPassword = UserDefaults.standard.string(forKey: "vault_master_password") {
+                    // Retrieve master password from Keychain for biometric unlock
+                    if let savedPassword = try? CryptoService.shared.retrieveMasterPasswordFromKeychain() {
                         await MainActor.run {
                             do {
                                 try VaultManager.shared.unlock(with: savedPassword)

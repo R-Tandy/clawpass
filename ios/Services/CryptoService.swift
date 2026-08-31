@@ -108,7 +108,44 @@ class CryptoService {
         }
     }
     
-    // MARK: - Password Generation
+    // MARK: - Keychain Master Password Storage
+    
+    func saveMasterPasswordToKeychain(_ password: String) throws {
+        let data = Data(password.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "vault_master_password",
+            kSecValueData as String: data
+        ]
+        
+        SecItemDelete(query as CFDictionary)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            throw CryptoError.keychainError(status)
+        }
+    }
+    
+    func retrieveMasterPasswordFromKeychain() throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "vault_master_password",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        if status == errSecItemNotFound {
+            return nil
+        }
+        
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw CryptoError.keychainError(status)
+        }
+        
+        return String(data: data, encoding: .utf8)
+    }
     
     func generatePassword(length: Int = 16,
                          useUppercase: Bool = true,
