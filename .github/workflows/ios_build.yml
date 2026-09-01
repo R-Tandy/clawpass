@@ -30,7 +30,7 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           ONLY_ACTIVE_ARCH=NO \
           ARCHS=arm64 \
-          build 2>&1 tee /tmp/xcodebuild.log
+          build 2>&1 | tee /tmp/xcodebuild.log
         
         XCB_EXIT=$?
         if [ "$XCB_EXIT" -ne 0 ]; then
