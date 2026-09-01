@@ -31,7 +31,6 @@ struct QRScannerView: UIViewControllerRepresentable {
                 
                 DispatchQueue.main.async {
                     self.parent.onCodeFound(stringValue)
-                    self.parent.presentationMode.wrappedValue.dismiss()
                 }
             }
         }
