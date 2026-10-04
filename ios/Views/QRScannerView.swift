@@ -22,9 +22,65 @@ struct QRScannerView: UIViewControllerRepresentable {
 
     class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         var parent: QRScannerView
+        var captureSession: AVCaptureSession?
+        var metadataOutput: AVCaptureMetadataOutput?
+        private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
 
         init(_ parent: QRScannerView) {
             self.parent = parent
+        }
+
+        func setupCamera(for controller: ScannerViewController) {
+            let session = AVCaptureSession()
+            self.captureSession = session
+
+            do {
+                guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+                    SyncService.shared.log("[QRScanner] No camera available")
+                    return
+                }
+                
+                let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
+                if session.canAddInput(videoInput) {
+                    session.addInput(videoInput)
+                } else {
+                    SyncService.shared.log("[QRScanner] Could not add video input")
+                    return
+                }
+
+                let output = AVCaptureMetadataOutput()
+                if session.canAddOutput(output) {
+                    session.addOutput(output)
+                    output.metadataObjectTypes = [.qr]
+                    output.setMetadataObjectsDelegate(self, queue: metadataQueue)
+                    self.metadataOutput = output
+                    SyncService.shared.log("[QRScanner] Metadata output configured in Coordinator")
+                } else {
+                    SyncService.shared.log("[QRScanner] Could not add metadata output")
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+                    previewLayer.frame = controller.view.frame
+                    previewLayer.videoGravity = .resizeAspectFill
+                    controller.view.layer.insertSublayer(previewLayer, at: 0)
+                    
+                    self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
+                    controller.statusLabel.text = "Scanning for connection QR..."
+                    
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        SyncService.shared.log("[QRScanner] Starting session from Coordinator...")
+                        session.startRunning()
+                        SyncService.shared.log("[QRScanner] Session started (Coordinator-Driven)")
+                    }
+                }
+            } catch {
+                SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
+                DispatchQueue.main.async {
+                    controller.statusLabel.text = "Hardware Error"
+                }
+            }
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
