@@ -60,10 +60,10 @@ struct QRScannerView: UIViewControllerRepresentable {
                 if session.canAddOutput(output) {
                     session.addOutput(output)
                     
-                    // CRITICAL: All configuration must happen INSIDE begin/commit block
+                    // Use a dedicated high-priority queue for metadata
                     output.setMetadataObjectsDelegate(controller, queue: DispatchQueue(label: "com.clawpass.qr.metadata", qos: .userInteractive))
                     output.metadataObjectTypes = [.qr]
-                    SyncService.shared.log("[QRScanner] Metadata output added and delegate set (UserInteractive Queue)")
+                    SyncService.shared.log("[QRScanner] Metadata output added and delegate set")
                 } else {
                     SyncService.shared.log("[QRScanner] FAIL: Session cannot add metadata output")
                     session.commitConfiguration()
@@ -75,6 +75,9 @@ struct QRScannerView: UIViewControllerRepresentable {
                     previewLayer.frame = controller.view.frame
                     previewLayer.videoGravity = .resizeAspectFill
                     controller.view.layer.insertSublayer(previewLayer, at: 0)
+                    
+                    // REMOVED: rectOfInterest = (0,0,1,1). 
+                    // Defaulting to full frame to avoid coordinate system mismatches.
                     
                     controller.statusLabel.text = "Scanning for connection QR..."
                     
@@ -90,7 +93,6 @@ struct QRScannerView: UIViewControllerRepresentable {
                 }
             }
             session.commitConfiguration()
-            SyncService.shared.log("[QRScanner] Configuration committed.")
         }
     }
 }
@@ -142,7 +144,10 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // Log every trigger to prove delegate connectivity
+        // PANIC LOG: Log EVERY trigger of the delegate, even if empty.
+        // This proves if the OS is actually calling the delegate at all.
+        SyncService.shared.log("[QRScanner-DEBUG] Delegate triggered. Objects: \(metadataObjects.count)")
+
         if metadataObjects.isEmpty {
             return 
         }
