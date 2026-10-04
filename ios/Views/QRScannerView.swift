@@ -141,8 +141,11 @@ class ScannerViewController: UIViewController {
             let output = AVCaptureMetadataOutput()
             if session.canAddOutput(output) {
                 session.addOutput(output)
-                output.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
+                
+                // CRITICAL: Configure metadata types BEFORE setting the delegate
                 output.metadataObjectTypes = [.qr]
+                output.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
+                
                 self.metadataOutput = output
                 SyncService.shared.log("[QRScanner] Metadata output configured for .qr")
             } else {
@@ -156,27 +159,15 @@ class ScannerViewController: UIViewController {
                 previewLayer.videoGravity = .resizeAspectFill
                 self.view.layer.insertSublayer(previewLayer, at: 0)
                 
-                // Set the region of interest to match the visual scanning box.
-                // Coordinates are normalized (0.0 to 1.0) and are rotated for portrait.
-                let boxSize = self.scanBox.frame.width
-                let boxX = self.scanBox.frame.origin.x
-                let boxY = self.scanBox.frame.origin.y
-                let viewW = self.view.frame.width
-                let viewH = self.view.frame.height
+                // Ensure full frame scanning
+                self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                 
-                let normW = boxSize / viewW
-                let normH = boxSize / viewH
-                let normX = boxX / viewW
-                let normY = boxY / viewH
-                
-                // x -> y, y -> x mapping for AVFoundation portrait
-                self.metadataOutput?.rectOfInterest = CGRect.zero
-                
-                self.statusLabel.text = "Align QR code within the box"
+                self.statusLabel.text = "Scanning for connection QR..."
                 
                 DispatchQueue.global(qos: .userInitiated).async {
+                    SyncService.shared.log("[QRScanner] Attempting to start session...")
                     session.startRunning()
-                    SyncService.shared.log("[QRScanner] Session started with rectOfInterest")
+                    SyncService.shared.log("[QRScanner] Session started (Full Frame)")
                 }
             }
         } catch {
