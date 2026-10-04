@@ -148,18 +148,27 @@ class ScannerViewController: UIViewController {
                 return
             }
 
-            session.startRunning()
-            SyncService.shared.log("[QRScanner] Session startRunning() called")
-            
+            // Attach preview layer BEFORE starting the session to ensure 
+            // the pipeline is fully linked before the stream begins.
             DispatchQueue.main.async {
                 let previewLayer = AVCaptureVideoPreviewLayer(session: session)
                 previewLayer.frame = self.view.frame
                 previewLayer.videoGravity = .resizeAspectFill
                 self.view.layer.insertSublayer(previewLayer, at: 0)
                 
-                self.statusLabel.text = "Align QR code within the box"
+                self.statusLabel.text = "Ready to scan..."
+                
+                // Start the session on a background thread AFTER the UI is ready.
+                DispatchQueue.global(qos: .userInitiated).async {
+                    session.startRunning()
+                    SyncService.shared.log("[QRScanner] session.startRunning() called AFTER UI attach")
+                    
+                    DispatchQueue.main.async {
+                        self.statusLabel.text = "Align QR code within the box"
+                    }
+                }
             }
-            SyncService.shared.log("[QRScanner] Session started automatically and layer attached")
+            SyncService.shared.log("[QRScanner] Configuration complete, starting session...")
         } catch {
             SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
             DispatchQueue.main.async {
