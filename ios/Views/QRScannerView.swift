@@ -25,10 +25,21 @@ struct QRScannerView: UIViewControllerRepresentable {
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+            let logPrefix = "[QRScanner]"
+            SyncService.shared.log("\(logPrefix) captureOutput triggered with \(metadataObjects.count) objects")
+            
             if let metadataObject = metadataObjects.first {
-                guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
-                guard let stringValue = readableObject.stringValue else { return }
+                SyncService.shared.log("\(logPrefix) First object type: \(type(of: metadataObject))")
+                guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { 
+                    SyncService.shared.log("\(logPrefix) Object was not a machine readable code")
+                    return 
+                }
+                guard let stringValue = readableObject.stringValue else { 
+                    SyncService.shared.log("\(logPrefix) Readable object had no string value")
+                    return 
+                }
                 
+                SyncService.shared.log("\(logPrefix) SUCCESS: Found QR code with value: \(stringValue)")
                 DispatchQueue.main.async {
                     self.parent.onCodeFound(stringValue)
                 }
