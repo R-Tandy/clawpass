@@ -81,7 +81,9 @@ class ScannerViewController: UIViewController {
 
         let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
         if authStatus == .authorized {
-            self.triggerHardwareSetup(session: session)
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.triggerHardwareSetup(session: session)
+            }
         } else if authStatus == .notDetermined {
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 if granted {
