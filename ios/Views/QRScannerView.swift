@@ -55,8 +55,9 @@ struct QRScannerView: UIViewControllerRepresentable {
     }
 }
 
-class ScannerViewController: NSObject, UIViewController, AVCaptureMetadataOutputObjectsDelegate {
+class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     var captureSession: AVCaptureSession?
+    var onCodeFound: ((String) -> Void)?
     var metadataOutput: AVCaptureMetadataOutput?
     private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
