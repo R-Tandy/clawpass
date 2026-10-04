@@ -51,6 +51,7 @@ struct QRScannerView: UIViewControllerRepresentable {
 class ScannerViewController: UIViewController {
     var captureSession: AVCaptureSession?
     var delegate: AVCaptureMetadataOutputObjectsDelegate?
+    var metadataOutput: AVCaptureMetadataOutput?
     private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
     private let statusLabel = UILabel()
@@ -137,38 +138,48 @@ class ScannerViewController: UIViewController {
                 return
             }
 
-            let metadataOutput = AVCaptureMetadataOutput()
-            if session.canAddOutput(metadataOutput) {
-                session.addOutput(metadataOutput)
-                metadataOutput.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
-                metadataOutput.metadataObjectTypes = [.qr]
-                SyncService.shared.log("[QRScanner] Metadata output added successfully")
+            let output = AVCaptureMetadataOutput()
+            if session.canAddOutput(output) {
+                session.addOutput(output)
+                output.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
+                output.metadataObjectTypes = [.qr]
+                self.metadataOutput = output
+                SyncService.shared.log("[QRScanner] Metadata output configured for .qr")
             } else {
                 SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
             }
 
-            // Attach preview layer BEFORE starting the session to ensure 
-            // the pipeline is fully linked before the stream begins.
             DispatchQueue.main.async {
                 let previewLayer = AVCaptureVideoPreviewLayer(session: session)
                 previewLayer.frame = self.view.frame
                 previewLayer.videoGravity = .resizeAspectFill
                 self.view.layer.insertSublayer(previewLayer, at: 0)
                 
-                self.statusLabel.text = "Ready to scan..."
+                // Set the region of interest to match the visual scanning box.
+                // Coordinates are normalized (0.0 to 1.0) and are rotated for portrait.
+                let boxSize = self.scanBox.frame.width
+                let boxX = self.scanBox.frame.origin.x
+                let boxY = self.scanBox.frame.origin.y
+                let viewW = self.view.frame.width
+                let viewH = self.view.frame.height
                 
-                // Start the session on a background thread AFTER the UI is ready.
+                let normW = boxSize / viewW
+                let normH = boxSize / viewH
+                let normX = boxX / viewW
+                let normY = boxY / viewH
+                
+                // x -> y, y -> x mapping for AVFoundation portrait
+                let rectOfInterest = CGRect(x: normY, y: normX, width: normH, height: normW)
+                self.metadataOutput?.rectOfInterest = rectOfInterest
+                
+                self.statusLabel.text = "Align QR code within the box"
+                
                 DispatchQueue.global(qos: .userInitiated).async {
                     session.startRunning()
-                    SyncService.shared.log("[QRScanner] session.startRunning() called AFTER UI attach")
-                    
-                    DispatchQueue.main.async {
-                        self.statusLabel.text = "Align QR code within the box"
-                    }
+                    SyncService.shared.log("[QRScanner] Session started with rectOfInterest")
                 }
             }
-            SyncService.shared.log("[QRScanner] Configuration complete, starting session...")
         } catch {
             SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
             DispatchQueue.main.async {
