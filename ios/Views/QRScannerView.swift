@@ -148,16 +148,8 @@ class ScannerViewController: UIViewController {
             let output = AVCaptureMetadataOutput()
             if session.canAddOutput(output) {
                 session.addOutput(output)
-                
-                // Configure types
-                output.metadataObjectTypes = [.qr]
-                
-                // CRITICAL: Use the coordinator directly from the delegate property
-                // to ensure we are not using a stale reference.
-                output.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
-                
                 self.metadataOutput = output
-                SyncService.shared.log("[QRScanner] Metadata output configured for [.qr, .ciqr, .aztec]")
+                SyncService.shared.log("[QRScanner] Metadata output added to session")
             } else {
                 SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
@@ -169,6 +161,9 @@ class ScannerViewController: UIViewController {
                 previewLayer.videoGravity = .resizeAspectFill
                 self.view.layer.insertSublayer(previewLayer, at: 0)
                 
+                // Configure the output on the main thread right before starting
+                self.metadataOutput?.metadataObjectTypes = [.qr]
+                self.metadataOutput?.setMetadataObjectsDelegate(self.delegate, queue: .main)
                 self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                 
                 self.statusLabel.text = "Scanning for connection QR..."
@@ -176,7 +171,7 @@ class ScannerViewController: UIViewController {
                 DispatchQueue.global(qos: .userInitiated).async {
                     SyncService.shared.log("[QRScanner] Attempting to start session...")
                     session.startRunning()
-                    SyncService.shared.log("[QRScanner] Session started (Full Frame)")
+                    SyncService.shared.log("[QRScanner] Session started (Main-Queue Delegate)")
                 }
             }
         } catch {
