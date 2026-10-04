@@ -403,11 +403,21 @@ class SyncService: ObservableObject {
 
 
     func connect(to device: SyncDevice) {
-        // 1. Prevent connection storms: If we are already ready or attempting, stop.
+        // 1. Guard: If we are already connected to this exact host/port, skip.
+        if let existing = connection, existing.state == .ready {
+            if case let .hostPort(host, port) = existing.endpoint,
+               host.debugDescription.contains(device.host),
+               port.debugDescription.contains("\(device.port)") {
+                log("SINCED: Already connected to \(device.host):\(device.port). Skipping redundant connection.")
+                return
+            }
+        }
+
+        // 2. Prevent connection storms: If we are already preparing, stop.
         if let existing = connection {
             switch existing.state {
-            case .ready, .preparing, .setup:
-                log("SINCED: Connection already active or preparing for \(device.host). Skipping.")
+            case .preparing, .setup:
+                log("SINCED: Connection already preparing for \(device.host). Skipping.")
                 return
             default:
                 break

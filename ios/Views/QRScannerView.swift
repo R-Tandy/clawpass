@@ -69,15 +69,8 @@ class ScannerViewController: UIViewController {
     @objc private func didTapStart() {
         statusLabel.text = "Initializing..."
         
-        // Move all camera logic here. If it crashes NOW, it's a hardware/perm issue.
-        // If it crashed before this, it was a SwiftUI/Lifecycle issue.
         let session = AVCaptureSession()
         self.captureSession = session
-
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.frame = view.frame
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
 
         let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
         if authStatus == .authorized {
@@ -129,7 +122,13 @@ class ScannerViewController: UIViewController {
             }
 
             session.startRunning()
+            
             DispatchQueue.main.async {
+                let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+                previewLayer.frame = self.view.frame
+                previewLayer.videoGravity = .resizeAspectFill
+                self.view.layer.addSublayer(previewLayer)
+                
                 self.statusLabel.text = "Scanning..."
                 self.startButton.isHidden = true
             }
