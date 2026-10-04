@@ -170,8 +170,7 @@ class ScannerViewController: UIViewController {
                 let normY = boxY / viewH
                 
                 // x -> y, y -> x mapping for AVFoundation portrait
-                let rectOfInterest = CGRect(x: normY, y: normX, width: normH, height: normW)
-                self.metadataOutput?.rectOfInterest = rectOfInterest
+                self.metadataOutput?.rectOfInterest = CGRect.zero
                 
                 self.statusLabel.text = "Align QR code within the box"
                 
