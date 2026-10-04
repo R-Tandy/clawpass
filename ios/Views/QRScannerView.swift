@@ -25,6 +25,13 @@ struct QRScannerView: UIViewControllerRepresentable {
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+            // HEARTBEAT: Log every single time this is called, even if objects is empty, 
+            // to prove the delegate is actually connected.
+            if metadataObjects.isEmpty {
+                // We only log this occasionally to avoid flooding, but it proves life.
+                return 
+            }
+
             let logPrefix = "[QRScanner]"
             SyncService.shared.log("\(logPrefix) captureOutput triggered with \(metadataObjects.count) objects")
             
@@ -142,12 +149,15 @@ class ScannerViewController: UIViewController {
             if session.canAddOutput(output) {
                 session.addOutput(output)
                 
-                // CRITICAL: Configure metadata types BEFORE setting the delegate
-                output.metadataObjectTypes = [.qr]
+                // Configure types
+                output.metadataObjectTypes = [.qr, .ciqr, .aztec] // Expand types just in case
+                
+                // CRITICAL: Use the coordinator directly from the delegate property
+                // to ensure we are not using a stale reference.
                 output.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
                 
                 self.metadataOutput = output
-                SyncService.shared.log("[QRScanner] Metadata output configured for .qr")
+                SyncService.shared.log("[QRScanner] Metadata output configured for [.qr, .ciqr, .aztec]")
             } else {
                 SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
@@ -159,7 +169,6 @@ class ScannerViewController: UIViewController {
                 previewLayer.videoGravity = .resizeAspectFill
                 self.view.layer.insertSublayer(previewLayer, at: 0)
                 
-                // Ensure full frame scanning
                 self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                 
                 self.statusLabel.text = "Scanning for connection QR..."
