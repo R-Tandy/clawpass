@@ -51,6 +51,7 @@ struct QRScannerView: UIViewControllerRepresentable {
 class ScannerViewController: UIViewController {
     var captureSession: AVCaptureSession?
     var delegate: AVCaptureMetadataOutputObjectsDelegate?
+    private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
     private let statusLabel = UILabel()
 
@@ -113,13 +114,15 @@ class ScannerViewController: UIViewController {
             let metadataOutput = AVCaptureMetadataOutput()
             if session.canAddOutput(metadataOutput) {
                 session.addOutput(metadataOutput)
-                metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
+                // Use the dedicated metadataQueue instead of main
+                metadataOutput.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
                 metadataOutput.metadataObjectTypes = [.qr]
             } else {
                 SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
             }
 
+            // Ensure hardware is ready before starting
             session.startRunning()
             
             DispatchQueue.main.async {
