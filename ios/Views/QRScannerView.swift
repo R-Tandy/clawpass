@@ -53,33 +53,21 @@ class ScannerViewController: UIViewController {
     var delegate: AVCaptureMetadataOutputObjectsDelegate?
     
     private let statusLabel = UILabel()
-    private let startButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
 
-        // 1. Setup a simple status label
-        statusLabel.text = "Camera Ready"
+        statusLabel.text = "Initializing Camera..."
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
         statusLabel.frame = CGRect(x: 0, y: view.frame.midY - 50, width: view.frame.width, height: 50)
         view.addSubview(statusLabel)
 
-        // 2. Setup a manual start button to isolate the crash
-        startButton.setTitle("START CAMERA", for: .normal)
-        startButton.setTitleColor(.systemYellow, for: .normal)
-        startButton.titleLabel?.font = .systemFont(ofSize: 20, weight: .bold)
-        startButton.frame = CGRect(x: (view.frame.width - 200)/2, y: view.frame.midY, width: 200, height: 50)
-        startButton.backgroundColor = .darkGray
-        startButton.layer.cornerRadius = 10
-        startButton.addTarget(self, action: #selector(didTapStart), for: .touchUpInside)
-        view.addSubview(startButton)
+        setupCamera()
     }
 
-    @objc private func didTapStart() {
-        statusLabel.text = "Initializing..."
-        
+    private func setupCamera() {
         let session = AVCaptureSession()
         self.captureSession = session
 
@@ -110,7 +98,7 @@ class ScannerViewController: UIViewController {
     private func triggerHardwareSetup(session: AVCaptureSession) {
         do {
             guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-                print("[QRScanner] No camera available")
+                SyncService.shared.log("[QRScanner] No camera available")
                 return
             }
             
@@ -118,7 +106,7 @@ class ScannerViewController: UIViewController {
             if session.canAddInput(videoInput) {
                 session.addInput(videoInput)
             } else {
-                print("[QRScanner] Could not add video input")
+                SyncService.shared.log("[QRScanner] Could not add video input")
                 return
             }
 
@@ -128,7 +116,7 @@ class ScannerViewController: UIViewController {
                 metadataOutput.setMetadataObjectsDelegate(delegate, queue: DispatchQueue.main)
                 metadataOutput.metadataObjectTypes = [.qr]
             } else {
-                print("[QRScanner] Could not add metadata output")
+                SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
             }
 
@@ -141,11 +129,10 @@ class ScannerViewController: UIViewController {
                 self.view.layer.addSublayer(previewLayer)
                 
                 self.statusLabel.text = "Scanning..."
-                self.startButton.isHidden = true
             }
-            print("[QRScanner] Session started successfully")
+            SyncService.shared.log("[QRScanner] Session started automatically")
         } catch {
-            print("[QRScanner] Hardware setup error: \(error)")
+            SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
             DispatchQueue.main.async {
                 self.statusLabel.text = "Hardware Error"
             }
