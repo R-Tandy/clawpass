@@ -7,7 +7,10 @@ struct QRScannerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
-        controller.onCodeFound = onCodeFound
+        
+        // Start the camera setup via the coordinator
+        context.coordinator.setupCamera(for: controller)
+        
         return controller
     }
 
