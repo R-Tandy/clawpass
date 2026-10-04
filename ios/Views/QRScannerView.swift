@@ -204,7 +204,7 @@ class ScannerViewController: NSObject, UIViewController, AVCaptureMetadataOutput
                 
                 // Configure the output on the main thread right before starting
                 self.metadataOutput?.metadataObjectTypes = [.qr]
-                self.metadataOutput?.setMetadataObjectsDelegate(self.delegate, queue: .main)
+                self.metadataOutput?.setMetadataObjectsDelegate(self, queue: .main)
                 self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                 
                 self.statusLabel.text = "Scanning for connection QR..."
