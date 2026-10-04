@@ -54,18 +54,44 @@ class ScannerViewController: UIViewController {
     private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
     private let statusLabel = UILabel()
+    private let overlayView = UIView()
+    private let scanBox = UIView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
 
+        setupUI()
+        setupCamera()
+    }
+
+    private func setupUI() {
+        // 1. Status Label
         statusLabel.text = "Initializing Camera..."
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
-        statusLabel.frame = CGRect(x: 0, y: view.frame.midY - 50, width: view.frame.width, height: 50)
+        statusLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        statusLabel.frame = CGRect(x: 20, y: view.frame.height - 100, width: view.frame.width - 40, height: 40)
         view.addSubview(statusLabel)
 
-        setupCamera()
+        // 2. Dark Overlay
+        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        overlayView.frame = view.bounds
+        view.addSubview(overlayView)
+
+        // 3. Scanning Box
+        let boxSize: CGFloat = 250
+        scanBox.frame = CGRect(
+            x: (view.frame.width - boxSize) / 2,
+            y: (view.frame.height - boxSize) / 2,
+            width: boxSize,
+            height: boxSize
+        )
+        scanBox.layer.borderColor = UIColor(red: 0.77, green: 0.63, blue: 0.35, alpha: 1.0).cgColor // #C5A059
+        scanBox.layer.borderWidth = 4
+        scanBox.backgroundColor = .clear
+        
+        overlayView.addSubview(scanBox)
     }
 
     private func setupCamera() {
@@ -114,26 +140,26 @@ class ScannerViewController: UIViewController {
             let metadataOutput = AVCaptureMetadataOutput()
             if session.canAddOutput(metadataOutput) {
                 session.addOutput(metadataOutput)
-                // Use the dedicated metadataQueue instead of main
                 metadataOutput.setMetadataObjectsDelegate(delegate, queue: metadataQueue)
                 metadataOutput.metadataObjectTypes = [.qr]
+                SyncService.shared.log("[QRScanner] Metadata output added successfully")
             } else {
                 SyncService.shared.log("[QRScanner] Could not add metadata output")
                 return
             }
 
-            // Ensure hardware is ready before starting
             session.startRunning()
+            SyncService.shared.log("[QRScanner] Session startRunning() called")
             
             DispatchQueue.main.async {
                 let previewLayer = AVCaptureVideoPreviewLayer(session: session)
                 previewLayer.frame = self.view.frame
                 previewLayer.videoGravity = .resizeAspectFill
-                self.view.layer.addSublayer(previewLayer)
+                self.view.layer.insertSublayer(previewLayer, at: 0)
                 
-                self.statusLabel.text = "Scanning..."
+                self.statusLabel.text = "Align QR code within the box"
             }
-            SyncService.shared.log("[QRScanner] Session started automatically")
+            SyncService.shared.log("[QRScanner] Session started automatically and layer attached")
         } catch {
             SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
             DispatchQueue.main.async {
