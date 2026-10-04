@@ -13,92 +13,17 @@ struct QRScannerView: UIViewControllerRepresentable {
         controller.dismissAction = {
             presentationMode.wrappedValue.dismiss()
         }
-        
-        context.coordinator.setupCamera(for: controller)
-        
         return controller
     }
 
     func updateUIViewController(_ uiViewController: ScannerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject {
-        var parent: QRScannerView
-        var captureSession: AVCaptureSession?
-        
-        init(_ parent: QRScannerView) {
-            self.parent = parent
-        }
-
-        func setupCamera(for controller: ScannerViewController) {
-            SyncService.shared.log("[QRScanner] Beginning setupCamera process...")
-            let session = AVCaptureSession()
-            self.captureSession = session
-
-            session.beginConfiguration()
-            do {
-                SyncService.shared.log("[QRScanner] Requesting default video device...")
-                guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
-                    SyncService.shared.log("[QRScanner] FAIL: No camera available")
-                    session.commitConfiguration()
-                    return
-                }
-                
-                let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
-                if session.canAddInput(videoInput) {
-                    session.addInput(videoInput)
-                } else {
-                    SyncService.shared.log("[QRScanner] FAIL: Session cannot add video input")
-                    session.commitConfiguration()
-                    return
-                }
-
-                let output = AVCaptureMetadataOutput()
-                if session.canAddOutput(output) {
-                    session.addOutput(output)
-                    
-                    // Use a dedicated high-priority queue for metadata
-                    output.setMetadataObjectsDelegate(controller, queue: DispatchQueue(label: "com.clawpass.qr.metadata", qos: .userInteractive))
-                    output.metadataObjectTypes = [.qr]
-                    SyncService.shared.log("[QRScanner] Metadata output added and delegate set")
-                } else {
-                    SyncService.shared.log("[QRScanner] FAIL: Session cannot add metadata output")
-                    session.commitConfiguration()
-                    return
-                }
-
-                DispatchQueue.main.async {
-                    let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-                    previewLayer.frame = controller.view.frame
-                    previewLayer.videoGravity = .resizeAspectFill
-                    controller.view.layer.insertSublayer(previewLayer, at: 0)
-                    
-                    // REMOVED: rectOfInterest = (0,0,1,1). 
-                    // Defaulting to full frame to avoid coordinate system mismatches.
-                    
-                    controller.statusLabel.text = "Scanning for connection QR..."
-                    
-                    DispatchQueue.global(qos: .userInteractive).async {
-                        session.startRunning()
-                        SyncService.shared.log("[QRScanner] session.startRunning() called. isRunning: \(session.isRunning)")
-                    }
-                }
-            } catch {
-                SyncService.shared.log("[QRScanner] CRITICAL: Hardware setup error: \(error)")
-                DispatchQueue.main.async {
-                    controller.statusLabel.text = "Hardware Error"
-                }
-            }
-            session.commitConfiguration()
-        }
-    }
 }
 
 class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
-    var captureSession: AVCaptureSession?
+    // Strong references to keep the pipeline alive
+    private var captureSession: AVCaptureSession?
+    private var metadataOutput: AVCaptureMetadataOutput?
+    
     var onCodeFound: ((String) -> Void)?
     var dismissAction: (() -> Void)?
     
@@ -111,6 +36,12 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
         super.viewDidLoad()
         view.backgroundColor = .black
         setupUI()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Start session ONLY after view is officially in the window hierarchy
+        setupAndStartCamera()
     }
 
     private func setupUI() {
@@ -143,10 +74,73 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
         overlayView.addSubview(scanBox)
     }
 
+    private func setupAndStartCamera() {
+        SyncService.shared.log("[QRScanner] viewDidAppear: Starting Hardware Setup...")
+        
+        let session = AVCaptureSession()
+        self.captureSession = session
+
+        session.beginConfiguration()
+        do {
+            SyncService.shared.log("[QRScanner] Requesting camera device...")
+            guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+                SyncService.shared.log("[QRScanner] FAIL: No camera available")
+                session.commitConfiguration()
+                return
+            }
+            
+            let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
+            if session.canAddInput(videoInput) {
+                session.addInput(videoInput)
+            } else {
+                SyncService.shared.log("[QRScanner] FAIL: Cannot add input")
+                session.commitConfiguration()
+                return
+            }
+
+            let output = AVCaptureMetadataOutput()
+            if session.canAddOutput(output) {
+                session.addOutput(output)
+                self.metadataOutput = output
+                
+                // Use a high-priority background queue for the delegate
+                let metadataQueue = DispatchQueue(label: "com.clawpass.qr.metadata", qos: .userInteractive)
+                output.setMetadataObjectsDelegate(self, queue: metadataQueue)
+                output.metadataObjectTypes = [.qr]
+                SyncService.shared.log("[QRScanner] Metadata output configured and delegate bound")
+            } else {
+                SyncService.shared.log("[QRScanner] FAIL: Cannot add output")
+                session.commitConfiguration()
+                return
+            }
+
+            // Preview Layer
+            let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+            previewLayer.frame = self.view.frame
+            previewLayer.videoGravity = .resizeAspectFill
+            self.view.layer.insertSublayer(previewLayer, at: 0)
+            
+            self.statusLabel.text = "Scanning for connection QR..."
+            
+            // Run on a background thread to avoid freezing the UI, 
+            // but ensure it's called after configuration is committed.
+            DispatchQueue.global(qos: .userInteractive).async {
+                session.startRunning()
+                SyncService.shared.log("[QRScanner] session.startRunning() invoked. isRunning: \(session.isRunning)")
+            }
+        } catch {
+            SyncService.shared.log("[QRScanner] CRITICAL error: \(error)")
+            DispatchQueue.main.async {
+                self.statusLabel.text = "Hardware Error"
+            }
+        }
+        session.commitConfiguration()
+        SyncService.shared.log("[QRScanner] Configuration committed.")
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // PANIC LOG: Log EVERY trigger of the delegate, even if empty.
-        // This proves if the OS is actually calling the delegate at all.
-        SyncService.shared.log("[QRScanner-DEBUG] Delegate triggered. Objects: \(metadataObjects.count)")
+        // ABSOLUTE PANIC LOG: If this fires once, the pipeline is alive.
+        SyncService.shared.log("[QRScanner-DEBUG] Delegate fired. Objects: \(metadataObjects.count)")
 
         if metadataObjects.isEmpty {
             return 
@@ -170,5 +164,6 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        captureSession?.stopRunning()
     }
 }
