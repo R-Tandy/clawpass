@@ -14,7 +14,6 @@ struct QRScannerView: UIViewControllerRepresentable {
             presentationMode.wrappedValue.dismiss()
         }
         
-        // Setup camera via coordinator
         context.coordinator.setupCamera(for: controller)
         
         return controller
@@ -60,9 +59,11 @@ struct QRScannerView: UIViewControllerRepresentable {
                 let output = AVCaptureMetadataOutput()
                 if session.canAddOutput(output) {
                     session.addOutput(output)
-                    // CRITICAL: Set the ViewController as the delegate, NOT the coordinator
-                    output.setMetadataObjectsDelegate(controller, queue: DispatchQueue.main)
+                    
+                    // CRITICAL: All configuration must happen INSIDE begin/commit block
+                    output.setMetadataObjectsDelegate(controller, queue: DispatchQueue(label: "com.clawpass.qr.metadata", qos: .userInteractive))
                     output.metadataObjectTypes = [.qr]
+                    SyncService.shared.log("[QRScanner] Metadata output added and delegate set (UserInteractive Queue)")
                 } else {
                     SyncService.shared.log("[QRScanner] FAIL: Session cannot add metadata output")
                     session.commitConfiguration()
@@ -77,7 +78,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                     
                     controller.statusLabel.text = "Scanning for connection QR..."
                     
-                    DispatchQueue.global(qos: .userInitiated).async {
+                    DispatchQueue.global(qos: .userInteractive).async {
                         session.startRunning()
                         SyncService.shared.log("[QRScanner] session.startRunning() called. isRunning: \(session.isRunning)")
                     }
@@ -89,6 +90,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                 }
             }
             session.commitConfiguration()
+            SyncService.shared.log("[QRScanner] Configuration committed.")
         }
     }
 }
@@ -140,12 +142,11 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        // Log every trigger to prove delegate connectivity
         if metadataObjects.isEmpty {
-            // Keep light red if nothing is found
             return 
         }
 
-        // Light up green as soon as ANY object is detected
         DispatchQueue.main.async {
             self.statusIndicator.backgroundColor = .green
         }
