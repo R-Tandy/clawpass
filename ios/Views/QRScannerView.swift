@@ -119,17 +119,16 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
     var metadataOutput: AVCaptureMetadataOutput?
     private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
-    private let statusLabel = UILabel()
-    private let overlayView = UIView()
-    private let scanBox = UIView()
-    private let statusIndicator = UIView()
+    let statusLabel = UILabel()
+    let overlayView = UIView()
+    let scanBox = UIView()
+    let statusIndicator = UIView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
 
         setupUI()
-        setupCamera()
     }
 
     private func setupUI() {
@@ -284,6 +283,5 @@ class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDel
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        captureSession?.stopRunning()
     }
 }
