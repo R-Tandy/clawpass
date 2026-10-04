@@ -28,7 +28,6 @@ struct QRScannerView: UIViewControllerRepresentable {
             // HEARTBEAT: Log every single time this is called, even if objects is empty, 
             // to prove the delegate is actually connected.
             if metadataObjects.isEmpty {
-                // We only log this occasionally to avoid flooding, but it proves life.
                 return 
             }
 
@@ -48,7 +47,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                 
                 SyncService.shared.log("\(logPrefix) SUCCESS: Found QR code with value: \(stringValue)")
                 DispatchQueue.main.async {
-                    self.onCodeFound?(stringValue)
+                    self.parent.onCodeFound(stringValue)
                 }
             }
         }
