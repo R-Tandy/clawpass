@@ -7,7 +7,7 @@ struct QRScannerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
-        controller.delegate = context.coordinator
+        controller.onCodeFound = onCodeFound
         return controller
     }
 
@@ -48,22 +48,22 @@ struct QRScannerView: UIViewControllerRepresentable {
                 
                 SyncService.shared.log("\(logPrefix) SUCCESS: Found QR code with value: \(stringValue)")
                 DispatchQueue.main.async {
-                    self.parent.onCodeFound(stringValue)
+                    self.onCodeFound?(stringValue)
                 }
             }
         }
     }
 }
 
-class ScannerViewController: UIViewController {
+class ScannerViewController: NSObject, UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     var captureSession: AVCaptureSession?
-    var delegate: AVCaptureMetadataOutputObjectsDelegate?
     var metadataOutput: AVCaptureMetadataOutput?
     private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
     
     private let statusLabel = UILabel()
     private let overlayView = UIView()
     private let scanBox = UIView()
+    private let statusIndicator = UIView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -82,12 +82,18 @@ class ScannerViewController: UIViewController {
         statusLabel.frame = CGRect(x: 20, y: view.frame.height - 100, width: view.frame.width - 40, height: 40)
         view.addSubview(statusLabel)
 
-        // 2. Dark Overlay
+        // 2. Status Indicator (The "Light")
+        statusIndicator.backgroundColor = .red
+        statusIndicator.layer.cornerRadius = 6
+        statusIndicator.frame = CGRect(x: view.frame.width - 30, y: 50, width: 12, height: 12)
+        view.addSubview(statusIndicator)
+
+        // 3. Dark Overlay
         overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         overlayView.frame = view.bounds
         view.addSubview(overlayView)
 
-        // 3. Scanning Box
+        // 4. Scanning Box
         let boxSize: CGFloat = 250
         scanBox.frame = CGRect(
             x: (view.frame.width - boxSize) / 2,
@@ -100,6 +106,41 @@ class ScannerViewController: UIViewController {
         scanBox.backgroundColor = .clear
         
         overlayView.addSubview(scanBox)
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        if metadataObjects.isEmpty {
+            DispatchQueue.main.async {
+                self.statusIndicator.backgroundColor = .red
+            }
+            return 
+        }
+
+        DispatchQueue.main.async {
+            self.statusIndicator.backgroundColor = .green
+        }
+
+        let logPrefix = "[QRScanner]"
+        SyncService.shared.log("\(logPrefix) captureOutput triggered with \(metadataObjects.count) objects")
+        
+        if let metadataObject = metadataObjects.first {
+            SyncService.shared.log("\(logPrefix) First object type: \(type(of: metadataObject))")
+            guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { 
+                SyncService.shared.log("\(logPrefix) Object was not a machine readable code")
+                return 
+            }
+            guard let stringValue = readableObject.stringValue else { 
+                SyncService.shared.log("\(logPrefix) Readable object had no string value")
+                return 
+            }
+            
+            SyncService.shared.log("\(logPrefix) SUCCESS: Found QR code with value: \(stringValue)")
+            
+            // Find the coordinator via the UIViewControllerRepresentable's coordinator
+            // Since we are now the delegate, we need to call the callback.
+            // This is handled by the Coordinator's parent.onCodeFound.
+            // We'll find a way to pass this back.
+        }
     }
 
     private func setupCamera() {
