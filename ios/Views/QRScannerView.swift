@@ -150,7 +150,7 @@ class ScannerViewController: UIViewController {
                 session.addOutput(output)
                 
                 // Configure types
-                output.metadataObjectTypes = [.qr, .ciqr, .aztec] // Expand types just in case
+                output.metadataObjectTypes = [.qr]
                 
                 // CRITICAL: Use the coordinator directly from the delegate property
                 // to ensure we are not using a stale reference.
