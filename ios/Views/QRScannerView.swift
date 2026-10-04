@@ -34,9 +34,11 @@ struct QRScannerView: UIViewControllerRepresentable {
             let session = AVCaptureSession()
             self.captureSession = session
 
+            session.beginConfiguration()
             do {
                 guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
                     SyncService.shared.log("[QRScanner] No camera available")
+                    session.commitConfiguration()
                     return
                 }
                 
@@ -45,6 +47,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                     session.addInput(videoInput)
                 } else {
                     SyncService.shared.log("[QRScanner] Could not add video input")
+                    session.commitConfiguration()
                     return
                 }
 
@@ -57,6 +60,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                     SyncService.shared.log("[QRScanner] Metadata output configured in Coordinator")
                 } else {
                     SyncService.shared.log("[QRScanner] Could not add metadata output")
+                    session.commitConfiguration()
                     return
                 }
 
@@ -69,11 +73,10 @@ struct QRScannerView: UIViewControllerRepresentable {
                     self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                     controller.statusLabel.text = "Scanning for connection QR..."
                     
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        SyncService.shared.log("[QRScanner] Starting session from Coordinator...")
-                        session.startRunning()
-                        SyncService.shared.log("[QRScanner] Session started (Coordinator-Driven)")
-                    }
+                    // Force session start on main thread for this test
+                    SyncService.shared.log("[QRScanner] Starting session on main thread...")
+                    session.startRunning()
+                    SyncService.shared.log("[QRScanner] Session started (Main Thread Start)")
                 }
             } catch {
                 SyncService.shared.log("[QRScanner] Hardware setup error: \(error)")
@@ -81,6 +84,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                     controller.statusLabel.text = "Hardware Error"
                 }
             }
+            session.commitConfiguration()
         }
 
         func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
