@@ -7,12 +7,14 @@ struct QRScannerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
-        controller.onCodeFound = onCodeFound
+        controller.onCodeFound = { code in
+            onCodeFound(code)
+        }
         controller.dismissAction = {
-            context.coordinator.dismiss()
+            presentationMode.wrappedValue.dismiss()
         }
         
-        // Start the camera setup via the coordinator
+        // Setup camera via coordinator
         context.coordinator.setupCamera(for: controller)
         
         return controller
@@ -24,12 +26,10 @@ struct QRScannerView: UIViewControllerRepresentable {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+    class Coordinator: NSObject {
         var parent: QRScannerView
         var captureSession: AVCaptureSession?
-        var metadataOutput: AVCaptureMetadataOutput?
-        private let metadataQueue = DispatchQueue(label: "com.clawpass.metadata", qos: .userInitiated)
-
+        
         init(_ parent: QRScannerView) {
             self.parent = parent
         }
@@ -47,27 +47,22 @@ struct QRScannerView: UIViewControllerRepresentable {
                     session.commitConfiguration()
                     return
                 }
-                SyncService.shared.log("[QRScanner] Camera device found: \(videoCaptureDevice.localizedName)")
                 
-                SyncService.shared.log("[QRScanner] Creating video input...")
                 let videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
                 if session.canAddInput(videoInput) {
                     session.addInput(videoInput)
-                    SyncService.shared.log("[QRScanner] SUCCESS: Video input added")
                 } else {
                     SyncService.shared.log("[QRScanner] FAIL: Session cannot add video input")
                     session.commitConfiguration()
                     return
                 }
 
-                SyncService.shared.log("[QRScanner] Creating metadata output...")
                 let output = AVCaptureMetadataOutput()
                 if session.canAddOutput(output) {
                     session.addOutput(output)
+                    // CRITICAL: Set the ViewController as the delegate, NOT the coordinator
+                    output.setMetadataObjectsDelegate(controller, queue: DispatchQueue.main)
                     output.metadataObjectTypes = [.qr]
-                    output.setMetadataObjectsDelegate(self, queue: metadataQueue)
-                    self.metadataOutput = output
-                    SyncService.shared.log("[QRScanner] SUCCESS: Metadata output added and delegate set")
                 } else {
                     SyncService.shared.log("[QRScanner] FAIL: Session cannot add metadata output")
                     session.commitConfiguration()
@@ -75,20 +70,16 @@ struct QRScannerView: UIViewControllerRepresentable {
                 }
 
                 DispatchQueue.main.async {
-                    SyncService.shared.log("[QRScanner] Configuring preview layer on main thread...")
                     let previewLayer = AVCaptureVideoPreviewLayer(session: session)
                     previewLayer.frame = controller.view.frame
                     previewLayer.videoGravity = .resizeAspectFill
                     controller.view.layer.insertSublayer(previewLayer, at: 0)
                     
-                    self.metadataOutput?.rectOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1)
                     controller.statusLabel.text = "Scanning for connection QR..."
-                    SyncService.shared.log("[QRScanner] Preview layer and rectOfInterest configured")
                     
                     DispatchQueue.global(qos: .userInitiated).async {
-                        SyncService.shared.log("[QRScanner] Attempting session.startRunning()...")
                         session.startRunning()
-                        SyncService.shared.log("[QRScanner] session.startRunning() called. Checking if actually running: \(session.isRunning)")
+                        SyncService.shared.log("[QRScanner] session.startRunning() called. isRunning: \(session.isRunning)")
                     }
                 }
             } catch {
@@ -98,44 +89,11 @@ struct QRScannerView: UIViewControllerRepresentable {
                 }
             }
             session.commitConfiguration()
-            SyncService.shared.log("[QRScanner] Configuration committed.")
-        }
-
-        func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-            // HEARTBEAT: Log every single time this is called, even if objects is empty, 
-            // to prove the delegate is actually connected.
-            if metadataObjects.isEmpty {
-                return 
-            }
-
-            let logPrefix = "[QRScanner]"
-            SyncService.shared.log("\(logPrefix) captureOutput triggered with \(metadataObjects.count) objects")
-            
-            if let metadataObject = metadataObjects.first {
-                SyncService.shared.log("\(logPrefix) First object type: \(type(of: metadataObject))")
-                guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { 
-                    SyncService.shared.log("\(logPrefix) Object was not a machine readable code")
-                    return 
-                }
-                guard let stringValue = readableObject.stringValue else { 
-                    SyncService.shared.log("\(logPrefix) Readable object had no string value")
-                    return 
-                }
-                
-                SyncService.shared.log("\(logPrefix) SUCCESS: Found QR code with value: \(stringValue)")
-                DispatchQueue.main.async {
-                    self.parent.onCodeFound(stringValue)
-                }
-            }
-        }
-        
-        func dismiss() {
-            parent.presentationMode.wrappedValue.dismiss()
         }
     }
 }
 
-class ScannerViewController: UIViewController {
+class ScannerViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     var captureSession: AVCaptureSession?
     var onCodeFound: ((String) -> Void)?
     var dismissAction: (() -> Void)?
@@ -148,12 +106,10 @@ class ScannerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-
         setupUI()
     }
 
     private func setupUI() {
-        // 1. Status Label
         statusLabel.text = "Initializing Camera..."
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
@@ -161,18 +117,15 @@ class ScannerViewController: UIViewController {
         statusLabel.frame = CGRect(x: 20, y: view.frame.height - 100, width: view.frame.width - 40, height: 40)
         view.addSubview(statusLabel)
 
-        // 2. Status Indicator (The "Light")
         statusIndicator.backgroundColor = .red
         statusIndicator.layer.cornerRadius = 6
         statusIndicator.frame = CGRect(x: view.frame.width - 30, y: 50, width: 12, height: 12)
         view.addSubview(statusIndicator)
 
-        // 3. Dark Overlay
         overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         overlayView.frame = view.bounds
         view.addSubview(overlayView)
 
-        // 4. Scanning Box
         let boxSize: CGFloat = 250
         scanBox.frame = CGRect(
             x: (view.frame.width - boxSize) / 2,
@@ -180,15 +133,36 @@ class ScannerViewController: UIViewController {
             width: boxSize,
             height: boxSize
         )
-        scanBox.layer.borderColor = UIColor(red: 0.77, green: 0.63, blue: 0.35, alpha: 1.0).cgColor // #C5A059
+        scanBox.layer.borderColor = UIColor(red: 0.77, green: 0.63, blue: 0.35, alpha: 1.0).cgColor
         scanBox.layer.borderWidth = 4
         scanBox.backgroundColor = .clear
-        
         overlayView.addSubview(scanBox)
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        if metadataObjects.isEmpty {
+            // Keep light red if nothing is found
+            return 
+        }
+
+        // Light up green as soon as ANY object is detected
+        DispatchQueue.main.async {
+            self.statusIndicator.backgroundColor = .green
+        }
+
+        if let metadataObject = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+           let stringValue = metadataObject.stringValue {
+            
+            SyncService.shared.log("[QRScanner] SUCCESS: Found QR code: \(stringValue)")
+            
+            DispatchQueue.main.async {
+                self.onCodeFound?(stringValue)
+                self.dismissAction?()
+            }
+        }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        captureSession?.stopRunning()
     }
 }
