@@ -230,7 +230,7 @@ struct UnlockView: View {
     
     private func recoverVault() {
         VaultManager.shared.getDebugInfo(password: password)
-        VaultManager.shared.setupVault(password: password)
+        VaultManager.shared.retrieveVault(password: password)
     }
     
     private func nuclearReset() {

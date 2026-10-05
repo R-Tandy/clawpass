@@ -329,6 +329,21 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         self.isFirstPopulationPending = true
         self.pendingSetupPassword = password
     }
+
+    /// Lightweight retrieval flow. Triggered by 'Retrieve Vault from Server'.
+    /// Unlike `setupVault`, this does NOT set `isFirstPopulationPending`,
+    /// signaling that we are recovering an existing identity rather than 
+    /// initializing a brand new local vault.
+    func retrieveVault(password: String) {
+        let derivedVaultId = cryptoService.deriveVaultId(password: password)
+        SyncService.shared.setVaultId(derivedVaultId)
+        SyncService.shared.startUDPListener()
+        SyncService.shared.triggerHandshake()
+        
+        self.isFirstPopulationPending = false
+        self.pendingSetupPassword = password
+        print("[VaultManager] Retrieval initiated for vaultId: \(derivedVaultId.prefix(12))...")
+    }
     
     func initializeWithSalt(password: String, salt: Data) throws {
         let dbPath = currentVaultDbPath()
