@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var showingConnectionError = false
     @State private var errorMessage = ""
     @State private var showingQRScanner = false
+    @State private var retrievePassword = ""
+    @State private var showingRetrievePrompt = false
     
     var body: some View {
         ZStack {
@@ -79,6 +81,49 @@ struct SettingsView: View {
                         .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
                     }
                     .padding(.top, 12)
+                    
+                    // RETRIEVE VAULT BUTTON - Appears when connected but no vault unlocked
+                    if syncService.isConnected && !vaultManager.isUnlocked && !vaultManager.hasAnyVault() {
+                        VStack(spacing: 12) {
+                            Text("VAULT RECOVERY")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundColor(Color(hex: "C5A059"))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            SecureField("Master Password", text: $retrievePassword)
+                                .textContentType(.password)
+                                .textFieldStyle(PlainTextFieldStyle())
+                                .padding()
+                                .background(Color(hex: "1B1C21"))
+                                .foregroundColor(Color(hex: "C5A059"))
+                                .cornerRadius(4)
+                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+                                .font(.system(.body, design: .monospaced))
+                            
+                            Button(action: {
+                                guard !retrievePassword.isEmpty else { return }
+                                VaultManager.shared.retrieveVault(password: retrievePassword)
+                                retrievePassword = ""
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                    Text("RETRIEVE VAULT FROM SERVER")
+                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                }
+                                .foregroundColor(Color(hex: "0B0C10"))
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color(hex: "39FF14"))
+                                .cornerRadius(4)
+                                .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
+                            }
+                            .disabled(retrievePassword.isEmpty)
+                        }
+                        .padding()
+                        .background(Color(hex: "1B1C21"))
+                        .cornerRadius(4)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "39FF14"), lineWidth: 1))
+                    }
                     
                     LogPlate(logs: syncService.logs)
                 }
