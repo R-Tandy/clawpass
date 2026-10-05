@@ -18,7 +18,17 @@ struct ContentView: View {
                 // New UX: Connection Hub for users without a local vault
                 GetStartedView(
                     onSetup: { showingSetup = true },
-                    onConnect: { showingConnection = true }
+                    onConnect: { showingConnection = true },
+                    onRetrieve: {
+                        // The retrieval actually happens in a dedicated view or prompt
+                        // For now, we'll let the user connect first, then they can retrieve
+                        // But based on the new UX, we want them to feel they are retrieving.
+                        // Since we need a password, we'll route them to a password entry
+                        // screen that then calls vaultManager.retrieveVault().
+                        // For this immediate fix, we'll route to the connection screen
+                        // because retrieval requires a connection.
+                        showingConnection = true
+                    }
                 )
             } else {
                 UnlockView()
