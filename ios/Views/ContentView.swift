@@ -7,6 +7,7 @@ struct ContentView: View {
     @StateObject private var vaultManager = VaultManager.shared
     @State private var showingSetup = false
     @State private var showingConnection = false
+    @State private var showingRetrievePrompt = false
     
     var body: some View {
         ZStack {
@@ -20,14 +21,7 @@ struct ContentView: View {
                     onSetup: { showingSetup = true },
                     onConnect: { showingConnection = true },
                     onRetrieve: {
-                        // The retrieval actually happens in a dedicated view or prompt
-                        // For now, we'll let the user connect first, then they can retrieve
-                        // But based on the new UX, we want them to feel they are retrieving.
-                        // Since we need a password, we'll route them to a password entry
-                        // screen that then calls vaultManager.retrieveVault().
-                        // For this immediate fix, we'll route to the connection screen
-                        // because retrieval requires a connection.
-                        showingConnection = true
+                        showingRetrievePrompt = true
                     }
                 )
             } else {
@@ -49,6 +43,9 @@ struct ContentView: View {
         .sheet(isPresented: $showingConnection) {
             SettingsView()
         }
+        .sheet(isPresented: $showingRetrievePrompt) {
+            RetrievePromptView(onComplete: { showingRetrievePrompt = false })
+        }
     }
     
     private func checkVaultStatus() {
@@ -62,6 +59,80 @@ struct ContentView: View {
         } else {
             print("[UI] Vault database exists.")
         }
+    }
+}
+
+struct RetrievePromptView: View {
+    @Environment(\.dismiss) var dismiss
+    var onComplete: () -> Void
+    
+    @State private var password = ""
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color(hex: "0B0C10").ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(Color(hex: "39FF14"))
+                    
+                    Text("Retrieve Vault")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(Color(hex: "C5A059"))
+                    
+                    Text("Enter your master password to verify your identity on the server.")
+                        .font(.subheadline)
+                        .foregroundColor(Color(hex: "94a3b8"))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    
+                    SecureField("Master Password", text: $password)
+                        .textContentType(.password)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .padding()
+                        .background(Color(hex: "1B1C21"))
+                        .foregroundColor(Color(hex: "C5A059"))
+                        .cornerRadius(4)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
+                        .frame(maxWidth: 300)
+                        .onSubmit { performRetrieve() }
+                    
+                    Button(action: performRetrieve) {
+                        Text("Retrieve")
+                            .font(.headline)
+                            .frame(maxWidth: 280)
+                            .padding()
+                            .background(password.isEmpty ? Color.gray : Color(hex: "39FF14"))
+                            .foregroundColor(Color(hex: "0B0C10"))
+                            .cornerRadius(4)
+                            .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
+                    }
+                    .disabled(password.isEmpty)
+                    
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationBarHidden(true)
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage)
+            }
+        }
+    }
+    
+    private func performRetrieve() {
+        VaultManager.shared.retrieveVault(password: password)
+        // We don't immediately dismiss because if it fails or needs connection, 
+        // the VaultManager/SyncService will update the UI state.
+        // However, for a smooth UX, we dismiss and let IdentificationView take over.
+        onComplete()
     }
 }
 
@@ -561,22 +632,9 @@ struct VaultView: View {
             }
             .navigationTitle(currentTitle)
             .navigationBarTitleDisplayMode(.inline)
-            // Force the nav bar into the dark color scheme so the
-            // system-rendered title (and back chevron) pick light
-            // foregrounds. Without this, the inline title renders in
-            // the system default (black on the dark #1B1C21 bar) on
-            // some iOS versions, which is the "black on dark grey"
-            // symptom in the top bar. We then immediately override
-            // the title with a styled principal item below so the
-            // vault name renders in the gold accent #C5A059 like the
-            // rest of the steampunk palette.
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
             .toolbar {
-                // Principal title — replaces the .navigationTitle()
-                // text so we can control the foreground color directly.
-                // Kept in sync with `currentTitle` (which mirrors
-                // vaultManager.vaultName).
                 ToolbarItem(placement: .principal) {
                     Text(currentTitle)
                         .font(.system(.headline, design: .monospaced))
