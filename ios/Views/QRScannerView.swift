@@ -1,9 +1,9 @@
 import SwiftUI
 import AVFoundation
+import Vision
 
-// SINGLETON: Lifts the session out of the View lifecycle to prevent
-// accidental deallocation or reset during SwiftUI re-renders.
-class CameraManager: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+// SINGLETON: Persistent manager to handle the Vision pipeline.
+class CameraManager: NSObject {
     static let shared = CameraManager()
     
     var session: AVCaptureSession?
@@ -14,9 +14,10 @@ class CameraManager: NSObject, AVCaptureMetadataOutputObjectsDelegate {
     }
     
     func setupAndStart(previewLayer: AVCaptureVideoPreviewLayer) {
-        SyncService.shared.log("[CameraManager] Initializing persistent session...")
+        SyncService.shared.log("[CameraManager] Initializing Vision-based session...")
         
         let session = AVCaptureSession()
+        session.sessionPreset = .high
         self.session = session
         
         session.beginConfiguration()
@@ -36,23 +37,31 @@ class CameraManager: NSObject, AVCaptureMetadataOutputObjectsDelegate {
                 return
             }
 
-            let output = AVCaptureMetadataOutput()
-            if session.canAddOutput(output) {
-                session.addOutput(output)
-                output.setMetadataObjectsDelegate(self, queue: DispatchQueue(label: "com.clawpass.qr.metadata", qos: .userInteractive))
-                output.metadataObjectTypes = [.qr]
-                SyncService.shared.log("[CameraManager] Metadata output bound to Singleton")
+            // VISION PIPELINE: Use VideoDataOutput instead of MetadataOutput
+            let videoOutput = AVCaptureVideoDataOutput()
+            if session.canAddOutput(videoOutput) {
+                session.addOutput(videoOutput)
+                
+                // Use a dedicated queue for frame processing
+                let processingQueue = DispatchQueue(label: "com.clawpass.vision.queue", qos: .userInteractive)
+                videoOutput.setSampleBufferDelegate(self, queue: processingQueue)
+                SyncService.shared.log("[CameraManager] VideoDataOutput bound to Vision pipeline")
             } else {
-                SyncService.shared.log("[CameraManager] FAIL: Cannot add output")
+                SyncService.shared.log("[CameraManager] FAIL: Cannot add video output")
                 session.commitConfiguration()
                 return
             }
 
             previewLayer.session = session
             
-            DispatchQueue.global(qos: .userInteractive).async {
-                session.startRunning()
-                SyncService.shared.log("[CameraManager] session.startRunning() called. isRunning: \(session.isRunning)")
+            DispatchQueue.main.async {
+                let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+                previewLayer.frame = previewLayer.frame // Placeholder to avoid compiler warnings
+                
+                DispatchQueue.global(qos: .userInteractive).async {
+                    session.startRunning()
+                    SyncService.shared.log("[CameraManager] session.startRunning() called. isRunning: \(session.isRunning)")
+                }
             }
         } catch {
             SyncService.shared.log("[CameraManager] CRITICAL error: \(error)")
@@ -65,19 +74,45 @@ class CameraManager: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         session?.stopRunning()
         session = nil
     }
+}
 
-    func captureOutput(_ output: AVCaptureOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // PANIC LOG: This is the ultimate test of the pipeline.
-        SyncService.shared.log("[CameraManager-DEBUG] Delegate fired. Objects: \(metadataObjects.count)")
+// Extend CameraManager to handle the frame analysis
+extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Log every few frames to prove the pipeline is flowing
+        // (Actual logic would use a counter to avoid flooding logs)
+        
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return
+        }
 
-        if metadataObjects.isEmpty { return }
-
-        if let metadataObject = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
-           let stringValue = metadataObject.stringValue {
-            SyncService.shared.log("[CameraManager] SUCCESS: Found QR code: \(stringValue)")
-            DispatchQueue.main.async {
-                self.onCodeFound?(stringValue)
+        let request = VNDetectBarcodesRequest { request, error in
+            if let error = error {
+                SyncService.shared.log("[Vision] Request error: \(error)")
+                return
             }
+            
+            guard let results = request.results as? [VNBarcodeObservation] else { return }
+            
+            if results.isEmpty {
+                return 
+            }
+            
+            if let firstResult = results.first, let payload = firstResult.payloadStringValue {
+                SyncService.shared.log("[Vision] SUCCESS: Found QR code: \(payload)")
+                DispatchQueue.main.async {
+                    self.onCodeFound?(payload)
+                }
+            }
+        }
+        
+        request.symbologies = [.qr]
+        
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        do {
+            try handler.perform([request])
+        } catch {
+            SyncService.shared.log("[Vision] Handler error: \(error)")
         }
     }
 }
@@ -89,7 +124,6 @@ struct QRScannerView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> ScannerViewController {
         let controller = ScannerViewController()
         
-        // Bind singleton callback to the closure
         CameraManager.shared.onCodeFound = { code in
             onCodeFound(code)
             presentationMode.wrappedValue.dismiss()
@@ -123,7 +157,6 @@ class ScannerViewController: UIViewController {
         
         self.statusLabel.text = "Scanning for connection QR..."
         
-        // Trigger the singleton to take over the hardware
         CameraManager.shared.setupAndStart(previewLayer: previewLayer)
     }
 
@@ -132,7 +165,8 @@ class ScannerViewController: UIViewController {
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
         statusLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        statusLabel.frame = CGRect(x: 20, y: view.frame.height - 100, width: view.frame.width - 40, height: 40)
+        statusLabel.frame = CGRect(x: 20, y: view.// Fixed frame logic
+            view.frame.height - 100, width: view.frame.width - 40, height: 40)
         view.addSubview(statusLabel)
 
         statusIndicator.backgroundColor = .red
