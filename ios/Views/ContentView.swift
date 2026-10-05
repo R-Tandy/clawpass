@@ -87,7 +87,7 @@ struct GetStartedView: View {
                         HStack {
                             Image(systemName: "plus.circle.fill")
                             Text("CREATE NEW VAULT")
-                                .font(.system(size: 14, weight: .bold, design: .monosped))
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
                         }
                         .foregroundColor(Color(hex: "0B0C10"))
                         .frame(maxWidth: 280)
@@ -101,7 +101,7 @@ struct GetStartedView: View {
                         HStack {
                             Image(systemName: "antenna.radiowaves.left.and.right")
                             Text("CONNECT TO SERVER")
-                                .font(.system(size: 14, weight: .bold, design: .monosped))
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
                         }
                         .foregroundColor(Color(hex: "C5A059"))
                         .frame(maxWidth: 280)
