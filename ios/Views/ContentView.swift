@@ -56,8 +56,10 @@ struct ContentView: View {
 }
 
 struct GetStartedView: View {
+    @ObservedObject private var syncService = SyncService.shared
     var onSetup: () -> Void
     var onConnect: () -> Void
+    var onRetrieve: () -> Void
     
     var body: some View {
         ZStack {
@@ -82,7 +84,7 @@ struct GetStartedView: View {
                 }
                 .padding(.top, 60)
                 
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     Button(action: onSetup) {
                         HStack {
                             Image(systemName: "plus.circle.fill")
@@ -97,19 +99,46 @@ struct GetStartedView: View {
                         .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
                     }
                     
+                    Button(action: onRetrieve) {
+                        HStack {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text("RETRIEVE VAULT FROM SERVER")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        }
+                        .foregroundColor(Color(hex: "0B0C10"))
+                        .frame(maxWidth: 280)
+                        .padding()
+                        .background(Color(hex: "39FF14"))
+                        .cornerRadius(4)
+                        .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
+                    }
+                    
                     Button(action: onConnect) {
                         HStack {
                             Image(systemName: "antenna.radiowaves.left.and.right")
-                            Text("CONNECT TO SERVER")
+                            Text("MANUAL CONNECT TO SERVER")
                                 .font(.system(size: 14, weight: .bold, design: .monospaced))
                         }
-                        .foregroundColor(Color(hex: "C5A059"))
+                        .foregroundColor(syncService.isConnected ? Color(hex: "5C5E66") : Color(hex: "C5A059"))
                         .frame(maxWidth: 280)
                         .padding()
-                        .background(Color(hex: "1B1C21"))
+                        .background(syncService.isConnected ? Color(hex: "1B1C21").opacity(0.5) : Color(hex: "1B1C21"))
                         .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(syncService.isConnected ? Color(hex: "5C5E66") : Color(hex: "C5A059"), lineWidth: 1))
                     }
+                    .disabled(syncService.isConnected)
+                }
+                
+                if syncService.isConnected {
+                    HStack {
+                        Circle()
+                            .fill(Color(hex: "39FF14"))
+                            .frame(width: 8, height: 8)
+                        Text("AUTO-CONNECTED VIA BEACON")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(Color(hex: "39FF14"))
+                    }
+                    .padding(.top, 8)
                 }
                 
                 Spacer()
