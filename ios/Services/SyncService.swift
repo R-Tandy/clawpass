@@ -278,6 +278,7 @@ protocol SyncServiceDelegate: AnyObject {
     func syncServiceDidDisconnect(_ service: SyncService)
     func syncService(_ service: SyncService, didReceiveSyncEntries entries: [SyncVaultEntry], timestamp: Int64)
     func syncService(_ service: SyncService, didEncounterError error: Error)
+    func syncService(_ service: SyncService, didEncounterHandshakeError message: String)
     func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
     func syncServiceDidReceiveSalt(_ service: SyncService, salt: [UInt8])
     func syncService(_ service: SyncService, didReceiveCategories categories: [SyncCategory])
@@ -790,6 +791,16 @@ class SyncService: ObservableObject {
                 // self.log("SINCED: Received generic ACK.")
             }
 
+        case .error(let message):
+            self.log("SINCED SERVER ERROR: \(message)")
+            if isHandshaking || awaitingHandshakeAck {
+                self.log("SINCED: Handshake failed with server error: \(message)")
+                self.isHandshaking = false
+                self.awaitingHandshakeAck = false
+                DispatchQueue.main.async {
+                    self.delegate?.syncService(self, didEncounterHandshakeError: message)
+                }
+            }
             
         case .saltResponse(let salt):
             self.log("SINCED: Salt response received.")

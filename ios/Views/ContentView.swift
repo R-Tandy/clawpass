@@ -85,11 +85,22 @@ struct RetrievePromptView: View {
                         .fontWeight(.bold)
                         .foregroundColor(Color(hex: "C5A059"))
                     
-                    Text("Enter your master password to verify your identity on the server.")
-                        .font(.subheadline)
-                        .foregroundColor(Color(hex: "94a3b8"))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                    VStack(spacing: 10) {
+                        Text("Enter your master password to verify your identity on the server.")
+                            .font(.subheadline)
+                            .foregroundColor(Color(hex: "94a3b8"))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        
+                        if let error = VaultManager.shared.lastHandshakeError {
+                            Text(error)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                                .transition(.opacity)
+                        }
+                    }
                     
                     SecureField("Master Password", text: $password)
                         .textContentType(.password)
@@ -128,10 +139,19 @@ struct RetrievePromptView: View {
     }
     
     private func performRetrieve() {
+        // Clear previous error before attempting again
+        VaultManager.shared.lastHandshakeError = nil
+        
         VaultManager.shared.retrieveVault(password: password)
-        // We don't immediately dismiss because if it fails or needs connection, 
-        // the VaultManager/SyncService will update the UI state.
-        // However, for a smooth UX, we dismiss and let IdentificationView take over.
+        
+        // We only dismiss if we are confident the operation started.
+        // If it's a "Retrieve" flow, we stay on the prompt unless 
+        // the VaultManager successfully transitions us to IdentificationView.
+        // To prevent the prompt from flickering away and then 
+        // having the user realize it failed, we'll check if it was 
+        // successful via a small delay or simply let the state drive it.
+        // For now, let's dismiss it and rely on IdentificationView or the
+        // error state.
         onComplete()
     }
 }

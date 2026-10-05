@@ -39,6 +39,8 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     @Published var saltReady = false
     @Published var isFirstPopulationPending = false
     @Published var lastSyncUpdate: Date = Date()
+    @Published var lastHandshakeError: String? = nil
+
     
     private var db: OpaquePointer?
     private var encryptionKey: SymmetricKey?
@@ -912,6 +914,15 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         sqlite3_exec(db, "COMMIT;", nil, nil, nil)
         loadData()
+    }
+    
+    func syncService(_ service: SyncService, didEncounterHandshakeError message: String) {
+        DispatchQueue.main.async {
+            self.lastHandshakeError = message
+            self.isFirstPopulationPending = false
+            self.objectWillChange.send()
+            print("[VaultManager] Handshake failed: \(message)")
+        }
     }
     
     func syncServiceDidReceiveSalt(_ service: SyncService, salt: [UInt8]) {
