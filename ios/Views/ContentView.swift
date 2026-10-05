@@ -6,25 +6,23 @@ import UIKit
 struct ContentView: View {
     @StateObject private var vaultManager = VaultManager.shared
     @State private var showingSetup = false
+    @State private var showingConnection = false
     
     var body: some View {
         ZStack {
             if vaultManager.isUnlocked {
                 VaultView()
             } else if vaultManager.isFirstPopulationPending {
-                // While we are waiting for the server to respond to our identity request
                 IdentificationView()
             } else if !vaultManager.hasAnyVault() {
-                // If no DB exists and we aren't currently identifying, go to Setup
-                SetupView(onComplete: {
-                    // Transition handled by vaultManager.isUnlocked
-                })
+                // New UX: Connection Hub for users without a local vault
+                GetStartedView(
+                    onSetup: { showingSetup = true },
+                    onConnect: { showingConnection = true }
+                )
             } else {
-                // DB exists, we need a password to derive identity and unlock
                 UnlockView()
             }
-            
-            // State Monitor Removed for Production
         }
         .onAppear {
             checkVaultStatus()
@@ -35,11 +33,15 @@ struct ContentView: View {
             print("[UI] SaltReady notification received. Triggering refresh...")
             vaultManager.objectWillChange.send()
         }
+        .sheet(isPresented: $showingSetup) {
+            SetupView(onComplete: { showingSetup = false })
+        }
+        .sheet(isPresented: $showingConnection) {
+            SettingsView()
+        }
     }
     
     private func checkVaultStatus() {
-        // v3+ debug check: enumerate per-vault files in the ClawPass
-        // directory. NEVER reference the un-suffixed legacy `vault.db`.
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let vaultDir = docs.appendingPathComponent("ClawPass")
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
@@ -49,6 +51,76 @@ struct ContentView: View {
             print("[UI] No per-vault DB found. Flagging for setup.")
         } else {
             print("[UI] Vault database exists.")
+        }
+    }
+}
+
+struct GetStartedView: View {
+    var onSetup: () -> Void
+    var onConnect: () -> Void
+    
+    var body: some View {
+        ZStack {
+            Color(hex: "0B0C10").ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                VStack(spacing: 16) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(Color(hex: "C5A059"))
+                    
+                    Text("ClawPass")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(Color(hex: "C5A059"))
+                    
+                    Text("Secure your digital life with a decentralized vault.")
+                        .font(.subheadline)
+                        .foregroundColor(Color(hex: "94a3b8"))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                .padding(.top, 60)
+                
+                VStack(spacing: 20) {
+                    Button(action: onSetup) {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("CREATE NEW VAULT")
+                                .font(.system(size: 14, weight: .bold, design: .monosped))
+                        }
+                        .foregroundColor(Color(hex: "0B0C10"))
+                        .frame(maxWidth: 280)
+                        .padding()
+                        .background(Color(hex: "C5A059"))
+                        .cornerRadius(4)
+                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
+                    }
+                    
+                    Button(action: onConnect) {
+                        HStack {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                            Text("CONNECT TO SERVER")
+                                .font(.system(size: 14, weight: .bold, design: .monosped))
+                        }
+                        .foregroundColor(Color(hex: "C5A059"))
+                        .frame(maxWidth: 280)
+                        .padding()
+                        .background(Color(hex: "1B1C21"))
+                        .cornerRadius(4)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
+                    }
+                }
+                
+                Spacer()
+                
+                Text("Vaults are encrypted locally and synced via your own secure server.")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(Color(hex: "5C5E66"))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                    .padding(.bottom, 40)
+            }
         }
     }
 }
