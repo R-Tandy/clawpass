@@ -55,9 +55,6 @@ class CameraManager: NSObject {
             previewLayer.session = session
             
             DispatchQueue.main.async {
-                let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-                previewLayer.frame = previewLayer.frame // Placeholder to avoid compiler warnings
-                
                 DispatchQueue.global(qos: .userInteractive).async {
                     session.startRunning()
                     SyncService.shared.log("[CameraManager] session.startRunning() called. isRunning: \(session.isRunning)")
@@ -79,9 +76,6 @@ class CameraManager: NSObject {
 // Extend CameraManager to handle the frame analysis
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        // Log every few frames to prove the pipeline is flowing
-        // (Actual logic would use a counter to avoid flooding logs)
-        
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
@@ -165,8 +159,7 @@ class ScannerViewController: UIViewController {
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
         statusLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        statusLabel.frame = CGRect(x: 20, y: view.// Fixed frame logic
-            view.frame.height - 100, width: view.frame.width - 40, height: 40)
+        statusLabel.frame = CGRect(x: 20, y: view.frame.height - 100, width: view.frame.width - 40, height: 40)
         view.addSubview(statusLabel)
 
         statusIndicator.backgroundColor = .red
