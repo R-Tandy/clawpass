@@ -27,14 +27,14 @@ Secure password manager for iOS with local WiFi sync.
 
 ## Features
 
-- AES-256 encrypted vault (SQLCipher)
+- AES-256-GCM encrypted passwords, notes and one-time-code secrets
 - Master password + Face ID / Touch ID unlock
 - Password generator with customizable rules
 - Categories with icons and colors
 - Copy-to-clipboard with auto-clear (30 sec)
 - Secure notes
 - Local WiFi sync between devices
-- Import from Keeper CSV
+- Syncs imports and exports done on the desktop app (CSV from other password managers)
 
 ## Security
 

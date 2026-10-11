@@ -79,8 +79,6 @@ class CryptoService {
     }
     
     func deriveVaultId(password: String) -> String {
-        let prefix = password.prefix(2).map { String($0) }.joined()
-        print("[SINCED-DEBUG] Deriving VaultID for password starting with: \(prefix)...")
         let combined = Data(password.utf8) + systemIdentitySalt
         let digest = SHA256.hash(data: combined)
         return digest.compactMap { String(format: "%02x", $0) }.joined()
@@ -88,88 +86,181 @@ class CryptoService {
 
     
     // MARK: - Biometric Authentication
-    
-    func authenticateWithBiometric(reason: String) async throws -> Bool {
-        let context = LAContext()
+
+    /// True when this device can evaluate Face ID / Touch ID right now.
+    var biometricsAvailable: Bool {
         var error: NSError?
-        
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            return false
-        }
-        
-        do {
-            let success = try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: reason
-            )
-            return success
-        } catch {
-            throw CryptoError.biometricFailed
-        }
+        return LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
     }
-    
+
     // MARK: - Keychain Master Password Storage
-    
+    //
+    // The master password is kept only so Face ID can unlock the vault. The item is
+    // bound to this device, only readable while the phone is unlocked, and protected by
+    // the current biometric enrolment, so reading it prompts for Face ID / Touch ID and
+    // is invalidated if fingerprints/faces are added.
+
+    private let masterPasswordAccount = "vault_master_password"
+
     func saveMasterPasswordToKeychain(_ password: String) throws {
-        let data = Data(password.utf8)
+        guard let access = SecAccessControlCreateWithFlags(
+            nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, .biometryCurrentSet, nil
+        ) else {
+            throw CryptoError.keychainError(errSecParam)
+        }
+        deleteMasterPasswordFromKeychain()
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: "vault_master_password",
-            kSecValueData as String: data
+            kSecAttrAccount as String: masterPasswordAccount,
+            kSecAttrAccessControl as String: access,
+            kSecValueData as String: Data(password.utf8)
         ]
-        
-        SecItemDelete(query as CFDictionary)
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
             throw CryptoError.keychainError(status)
         }
     }
-    
-    func retrieveMasterPasswordFromKeychain() throws -> String? {
+
+    /// Whether a master password is stored for biometric unlock (never prompts).
+    func hasSavedMasterPassword() -> Bool {
+        let context = LAContext()
+        context.interactionNotAllowed = true
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: "vault_master_password",
+            kSecAttrAccount as String: masterPasswordAccount,
+            kSecUseAuthenticationContext as String: context,
+            kSecReturnAttributes as String: true
+        ]
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
+    }
+
+    /// Reads the stored master password. The Keychain itself shows the Face ID prompt
+    /// using `reason`. Blocking; call off the main thread.
+    func retrieveMasterPasswordFromKeychain(reason: String) throws -> String? {
+        let context = LAContext()
+        context.localizedReason = reason
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: masterPasswordAccount,
+            kSecUseAuthenticationContext as String: context,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        if status == errSecItemNotFound {
-            return nil
-        }
-        
+
+        if status == errSecItemNotFound { return nil }
+        if status == errSecUserCanceled || status == errSecAuthFailed { throw CryptoError.biometricFailed }
         guard status == errSecSuccess, let data = result as? Data else {
             throw CryptoError.keychainError(status)
         }
-        
         return String(data: data, encoding: .utf8)
     }
+
+    func deleteMasterPasswordFromKeychain() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: masterPasswordAccount
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
     
-    func generatePassword(length: Int = 16,
+    /// Random password using the system CSPRNG, with at least one character from every
+    /// selected class.
+    func generatePassword(length: Int = 20,
                          useUppercase: Bool = true,
                          useLowercase: Bool = true,
                          useNumbers: Bool = true,
                          useSymbols: Bool = true) -> String {
-        var characters = ""
-        
-        if useLowercase { characters += "abcdefghijklmnopqrstuvwxyz" }
-        if useUppercase { characters += "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
-        if useNumbers { characters += "0123456789" }
-        if useSymbols { characters += "!@#$%^&*()_+-=[]{}|;:,.<>?" }
-        
-        guard !characters.isEmpty else { return "" }
-        
-        var password = ""
+        var pools: [[Character]] = []
+        if useLowercase { pools.append(Array("abcdefghijkmnopqrstuvwxyz")) }
+        if useUppercase { pools.append(Array("ABCDEFGHJKLMNPQRSTUVWXYZ")) }
+        if useNumbers { pools.append(Array("23456789")) }
+        if useSymbols { pools.append(Array("!@#$%^&*-_=+?")) }
+        guard !pools.isEmpty else { return "" }
+
+        let all = pools.flatMap { $0 }
         var rng = SystemRandomNumberGenerator()
-        
-        for _ in 0..<length {
-            let randomIndex = Int.random(in: 0..<characters.count, using: &rng)
-            let index = characters.index(characters.startIndex, offsetBy: randomIndex)
-            password.append(characters[index])
+        var chars: [Character] = pools.compactMap { $0.randomElement(using: &rng) }
+        while chars.count < max(length, pools.count) {
+            chars.append(all.randomElement(using: &rng)!)
         }
-        
-        return password
+        chars.shuffle(using: &rng)
+        return String(chars)
+    }
+}
+
+// MARK: - One-time codes (TOTP, RFC 6238)
+
+enum TOTP {
+    struct Config {
+        let secret: Data
+        let digits: Int
+        let period: Int
+        let algorithm: String
+    }
+
+    /// Accepts a bare base32 setup key or an `otpauth://totp/...` link.
+    static func parse(_ input: String) -> Config? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        var secretText = trimmed
+        var digits = 6
+        var period = 30
+        var algorithm = "SHA1"
+
+        if trimmed.lowercased().hasPrefix("otpauth://") {
+            guard let items = URLComponents(string: trimmed)?.queryItems else { return nil }
+            func value(_ name: String) -> String? { items.first { $0.name.lowercased() == name }?.value }
+            guard let secret = value("secret") else { return nil }
+            secretText = secret
+            if let d = value("digits").flatMap({ Int($0) }), (6...8).contains(d) { digits = d }
+            if let p = value("period").flatMap({ Int($0) }), p > 0 { period = p }
+            if let a = value("algorithm") { algorithm = a.uppercased() }
+        }
+
+        guard let secret = base32Decode(secretText), !secret.isEmpty else { return nil }
+        return Config(secret: secret, digits: digits, period: period, algorithm: algorithm)
+    }
+
+    static func base32Decode(_ text: String) -> Data? {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+        var buffer = 0
+        var bits = 0
+        var output = Data()
+        for ch in text.uppercased() where ch != " " && ch != "-" && ch != "=" {
+            guard let index = alphabet.firstIndex(of: ch) else { return nil }
+            buffer = (buffer << 5) | index
+            bits += 5
+            if bits >= 8 {
+                output.append(UInt8((buffer >> (bits - 8)) & 0xFF))
+                bits -= 8
+                buffer &= (1 << bits) - 1
+            }
+        }
+        return output
+    }
+
+    static func code(_ config: Config, at date: Date = Date()) -> String {
+        let counter = UInt64(date.timeIntervalSince1970) / UInt64(config.period)
+        let message = withUnsafeBytes(of: counter.bigEndian) { Data($0) }
+        let key = SymmetricKey(data: config.secret)
+        let mac: [UInt8]
+        switch config.algorithm {
+        case "SHA256": mac = Array(HMAC<SHA256>.authenticationCode(for: message, using: key))
+        case "SHA512": mac = Array(HMAC<SHA512>.authenticationCode(for: message, using: key))
+        default: mac = Array(HMAC<Insecure.SHA1>.authenticationCode(for: message, using: key))
+        }
+        let offset = Int(mac[mac.count - 1] & 0x0F)
+        let binary = (UInt32(mac[offset] & 0x7F) << 24)
+            | (UInt32(mac[offset + 1]) << 16)
+            | (UInt32(mac[offset + 2]) << 8)
+            | UInt32(mac[offset + 3])
+        var modulus: UInt32 = 1
+        for _ in 0..<config.digits { modulus *= 10 }
+        let number = Int(binary % modulus)
+        return String(format: "%0\(config.digits)d", number)
     }
 }

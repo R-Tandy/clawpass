@@ -1,824 +1,624 @@
-// VERSION_SINCED_2026_05_28_FINAL
 import SwiftUI
-import LocalAuthentication
-import UIKit
+
+// MARK: - Root
 
 struct ContentView: View {
-    @StateObject private var vaultManager = VaultManager.shared
-    @State private var showingSetup = false
-    @State private var showingConnection = false
-    @State private var showingRetrievePrompt = false
-    
+    @ObservedObject private var vaultManager = VaultManager.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("autoLockSeconds") private var autoLockSeconds = 60
+    @State private var leftAppAt: Date?
+    @State private var coverScreen = false
+
     var body: some View {
         ZStack {
-            if vaultManager.isUnlocked {
-                VaultView()
-            } else if vaultManager.isFirstPopulationPending {
-                IdentificationView()
-            } else if !vaultManager.hasAnyVault() {
-                // New UX: Connection Hub for users without a local vault
-                GetStartedView(
-                    onSetup: { showingSetup = true },
-                    onConnect: { showingConnection = true },
-                    onRetrieve: {
-                        showingRetrievePrompt = true
-                    }
-                )
-            } else {
-                UnlockView()
-            }
-        }
-        .onAppear {
-            checkVaultStatus()
-            SyncService.shared.startUDPListener()
-            SyncService.shared.startDiscovery()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SaltReady"))) { _ in
-            print("[UI] SaltReady notification received. Triggering refresh...")
-            vaultManager.objectWillChange.send()
-        }
-        .sheet(isPresented: $showingSetup) {
-            SetupView(onComplete: { showingSetup = false })
-        }
-        .sheet(isPresented: $showingConnection) {
-            SettingsView()
-        }
-        .sheet(isPresented: $showingRetrievePrompt) {
-            RetrievePromptView(onComplete: { showingRetrievePrompt = false })
-        }
-    }
-    
-    private func checkVaultStatus() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let vaultDir = docs.appendingPathComponent("ClawPass")
-        let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
-        let perVaultDbs = items.filter { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }.sorted()
-        print("[UI] Per-vault DBs present: \(perVaultDbs)")
-        if perVaultDbs.isEmpty {
-            print("[UI] No per-vault DB found. Flagging for setup.")
-        } else {
-            print("[UI] Vault database exists.")
-        }
-    }
-}
-
-struct RetrievePromptView: View {
-    @Environment(\.dismiss) var dismiss
-    var onComplete: () -> Void
-    
-    @State private var password = ""
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                Color(hex: "0B0C10").ignoresSafeArea()
-                
-                VStack(spacing: 30) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(Color(hex: "39FF14"))
-                    
-                    Text("Retrieve Vault")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color(hex: "C5A059"))
-                    
-                    VStack(spacing: 10) {
-                        Text("Enter your master password to verify your identity on the server.")
-                            .font(.subheadline)
-                            .foregroundColor(Color(hex: "94a3b8"))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                        
-                        if let error = VaultManager.shared.lastHandshakeError {
-                            Text(error)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
-                                .transition(.opacity)
-                        }
-                    }
-                    
-                    SecureField("Master Password", text: $password)
-                        .textContentType(.password)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .padding()
-                        .background(Color(hex: "1B1C21"))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                        .frame(maxWidth: 300)
-                        .onSubmit { performRetrieve() }
-                    
-                    Button(action: performRetrieve) {
-                        Text("Retrieve")
-                            .font(.headline)
-                            .frame(maxWidth: 280)
-                            .padding()
-                            .background(password.isEmpty ? Color.gray : Color(hex: "39FF14"))
-                            .foregroundColor(Color(hex: "0B0C10"))
-                            .cornerRadius(4)
-                            .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
-                    }
-                    .disabled(password.isEmpty)
-                    
-                    Spacer()
+            Group {
+                if vaultManager.isUnlocked {
+                    VaultView()
+                } else if vaultManager.isFirstPopulationPending {
+                    ConnectingView()
+                } else if !vaultManager.hasAnyVault() {
+                    WelcomeView()
+                } else {
+                    UnlockView()
                 }
-                .padding()
             }
-            .navigationBarHidden(true)
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") { }
-            } message: {
-                Text(errorMessage)
+            .transition(.opacity)
+
+            // Hides vault contents in the app switcher snapshot.
+            if coverScreen {
+                PrivacyCover()
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: vaultManager.isUnlocked)
+        .animation(.easeInOut(duration: 0.2), value: vaultManager.isFirstPopulationPending)
+        .screenBackground()
+        .onAppear { SyncService.shared.startUDPListener() }
+        .onChange(of: scenePhase) { phase in
+            switch phase {
+            case .active:
+                coverScreen = false
+                if let left = leftAppAt, vaultManager.isUnlocked,
+                   autoLockSeconds >= 0, Date().timeIntervalSince(left) >= Double(autoLockSeconds) {
+                    vaultManager.lock()
+                }
+                leftAppAt = nil
+            case .inactive:
+                coverScreen = vaultManager.isUnlocked
+            case .background:
+                coverScreen = vaultManager.isUnlocked
+                if leftAppAt == nil { leftAppAt = Date() }
+            @unknown default:
+                break
             }
         }
     }
-    
-    private func performRetrieve() {
-        // Clear previous error before attempting again
-        VaultManager.shared.lastHandshakeError = nil
-        
-        VaultManager.shared.retrieveVault(password: password)
-        
-        // We only dismiss if we are confident the operation started.
-        // If it's a "Retrieve" flow, we stay on the prompt unless 
-        // the VaultManager successfully transitions us to IdentificationView.
-        // To prevent the prompt from flickering away and then 
-        // having the user realize it failed, we'll check if it was 
-        // successful via a small delay or simply let the state drive it.
-        // For now, let's dismiss it and rely on IdentificationView or the
-        // error state.
-        onComplete()
-    }
 }
 
-struct GetStartedView: View {
-    @ObservedObject private var syncService = SyncService.shared
-    var onSetup: () -> Void
-    var onConnect: () -> Void
-    var onRetrieve: () -> Void
-    
+struct PrivacyCover: View {
     var body: some View {
         ZStack {
-            Color(hex: "0B0C10").ignoresSafeArea()
-            
-            VStack(spacing: 40) {
-                VStack(spacing: 16) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(Color(hex: "C5A059"))
-                    
-                    Text("ClawPass")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(Color(hex: "C5A059"))
-                    
-                    Text("Secure your digital life with a decentralized vault.")
-                        .font(.subheadline)
-                        .foregroundColor(Color(hex: "94a3b8"))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-                .padding(.top, 60)
-                
-                VStack(spacing: 16) {
-                    Button(action: onSetup) {
-                        HStack {
-                            Image(systemName: "plus.circle.fill")
-                            Text("CREATE NEW VAULT")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(Color(hex: "0B0C10"))
-                        .frame(maxWidth: 280)
-                        .padding()
-                        .background(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
-                    }
-                    
-                    Button(action: onRetrieve) {
-                        HStack {
-                            Image(systemName: "arrow.down.circle.fill")
-                            Text("RETRIEVE VAULT FROM SERVER")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(Color(hex: "0B0C10"))
-                        .frame(maxWidth: 280)
-                        .padding()
-                        .background(Color(hex: "39FF14"))
-                        .cornerRadius(4)
-                        .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
-                    }
-                    
-                    Button(action: onConnect) {
-                        HStack {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                            Text("MANUAL CONNECT TO SERVER")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(syncService.isConnected ? Color(hex: "5C5E66") : Color(hex: "C5A059"))
-                        .frame(maxWidth: 280)
-                        .padding()
-                        .background(syncService.isConnected ? Color(hex: "1B1C21").opacity(0.5) : Color(hex: "1B1C21"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(syncService.isConnected ? Color(hex: "5C5E66") : Color(hex: "C5A059"), lineWidth: 1))
-                    }
-                    .disabled(syncService.isConnected)
-                }
-                
-                if syncService.isConnected {
-                    HStack {
-                        Circle()
-                            .fill(Color(hex: "39FF14"))
-                            .frame(width: 8, height: 8)
-                        Text("AUTO-CONNECTED VIA BEACON")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(Color(hex: "39FF14"))
-                    }
-                    .padding(.top, 8)
-                }
-                
-                Spacer()
-                
-                Text("Vaults are encrypted locally and synced via your own secure server.")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(Color(hex: "5C5E66"))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 40)
-            }
+            Palette.background.ignoresSafeArea()
+            BrandMark(size: 96)
         }
     }
 }
 
-struct IdentificationView: View {
+// MARK: - Welcome (no vault on this device)
+
+private enum WelcomeSheet: String, Identifiable {
+    case create, restore, connection
+    var id: String { rawValue }
+}
+
+struct WelcomeView: View {
     @ObservedObject private var vaultManager = VaultManager.shared
     @ObservedObject private var syncService = SyncService.shared
-    
+    @State private var sheet: WelcomeSheet?
+
     var body: some View {
-        ZStack {
-            Color(hex: "0B0C10")
-                .ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                Image(systemName: "network")
-                    .font(.system(size: 80))
-                    .foregroundColor(Color(hex: "C5A059"))
-                
-                Text("Identifying Vault")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color(hex: "C5A059"))
-                
-                VStack(spacing: 20) {
-                    Text("Connecting to your server to retrieve vault identity...")
-                        .font(.subheadline)
-                        .foregroundColor(Color(hex: "94a3b8"))
+        ScrollView {
+            VStack(spacing: 28) {
+                VStack(spacing: 16) {
+                    BrandMark(size: 96)
+                    Text(AppBrand.name)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundColor(Palette.textPrimary)
+                    Text(AppBrand.tagline)
+                        .font(.title3)
+                        .foregroundColor(Palette.textSecondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    ScrollView(.vertical) {
-                        Text(syncService.logs)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(Color(hex: "39FF14"))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .background(Color(hex: "0B0C10"))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                    }
-                    .frame(height: 120)
-                    .padding(.horizontal)
                 }
-                
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "C5A059")))
-                    .padding()
+                .padding(.top, 56)
+
+                if let error = vaultManager.lastHandshakeError {
+                    InlineBanner(kind: .error, message: error)
+                        .onTapGesture { vaultManager.lastHandshakeError = nil }
+                }
+
+                VStack(spacing: 12) {
+                    Button { sheet = .create } label: {
+                        Label("Create a New Vault", systemImage: "plus.circle.fill")
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+
+                    Button { sheet = .restore } label: {
+                        Label("Restore from My Computer", systemImage: "desktopcomputer")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
+
+                VStack(spacing: 14) {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(syncService.isConnected ? Palette.success : Palette.textTertiary)
+                            .frame(width: 8, height: 8)
+                        Text(syncService.isConnected
+                             ? "Computer found on your network"
+                             : "Looking for your computer…")
+                            .font(.footnote)
+                            .foregroundColor(Palette.textSecondary)
+                    }
+                    .accessibilityElement(children: .combine)
+
+                    Button("Connection options") { sheet = .connection }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(Palette.accent)
+                }
+
+                Text("Everything is encrypted on this device. Syncing happens directly between your phone and your own computer. There is no cloud account.")
+                    .font(.caption)
+                    .foregroundColor(Palette.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 32)
+            }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
+        .sheet(item: $sheet) { item in
+            switch item {
+            case .create: CreateVaultView()
+            case .restore: RestoreVaultView()
+            case .connection: NavigationView { SettingsView(showsDone: true) }
             }
         }
     }
 }
+
+// MARK: - Create vault
+
+struct CreateVaultView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var password = ""
+    @State private var confirm = ""
+    @State private var errorMessage: String?
+    @State private var working = false
+
+    private var mismatch: Bool { !confirm.isEmpty && password != confirm }
+    private var canCreate: Bool { password.count >= 8 && password == confirm && !working }
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Choose a master password")
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(Palette.textPrimary)
+                    Text("It unlocks everything in your vault and cannot be recovered if you forget it, so pick something you will remember.")
+                        .font(.subheadline)
+                        .foregroundColor(Palette.textSecondary)
+
+                    FieldRow(title: "Master password", text: $password, secure: true, contentType: .newPassword)
+                    StrengthMeter(password: password)
+                    FieldRow(title: "Confirm password", text: $confirm, secure: true, contentType: .newPassword)
+
+                    if password.count > 0 && password.count < 8 {
+                        InlineBanner(kind: .info, message: "Use at least 8 characters.")
+                    } else if mismatch {
+                        InlineBanner(kind: .error, message: "The passwords do not match.")
+                    }
+                    if let errorMessage = errorMessage {
+                        InlineBanner(kind: .error, message: errorMessage)
+                    }
+
+                    Button(action: create) {
+                        if working { ProgressView().tint(Palette.onAccent) } else { Text("Create Vault") }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!canCreate)
+                    .padding(.top, 4)
+                }
+                .padding(24)
+            }
+            .screenBackground()
+            .navigationTitle("New Vault")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+        }
+    }
+
+    private func create() {
+        working = true
+        errorMessage = nil
+        // Key derivation takes a moment; let the spinner render first.
+        DispatchQueue.main.async {
+            do {
+                try VaultManager.shared.createVault(password: password)
+                dismiss()
+            } catch VaultError.alreadyInitialized {
+                errorMessage = "A vault with this password already exists on this device. Go back and unlock it instead."
+            } catch {
+                errorMessage = "The vault could not be created. Please try again."
+            }
+            working = false
+        }
+    }
+}
+
+// MARK: - Restore from computer
+
+struct RestoreVaultView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var syncService = SyncService.shared
+    @State private var password = ""
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Restore your vault")
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(Palette.textPrimary)
+                    Text("Make sure \(AppBrand.desktopName) is open on a computer connected to the same Wi-Fi network, then enter the master password for your vault.")
+                        .font(.subheadline)
+                        .foregroundColor(Palette.textSecondary)
+
+                    FieldRow(title: "Master password", text: $password, secure: true, contentType: .password)
+
+                    Button("Restore Vault") {
+                        VaultManager.shared.retrieveVault(password: password)
+                        dismiss()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(password.isEmpty)
+
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(syncService.isConnected ? Palette.success : Palette.textTertiary)
+                            .frame(width: 8, height: 8)
+                        Text(syncService.isConnected ? "Computer found" : "No computer found yet. It will connect automatically.")
+                            .font(.footnote)
+                            .foregroundColor(Palette.textSecondary)
+                    }
+                }
+                .padding(24)
+            }
+            .screenBackground()
+            .navigationTitle("Restore")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+        }
+    }
+}
+
+// MARK: - Connecting (restore in progress)
+
+struct ConnectingView: View {
+    @ObservedObject private var syncService = SyncService.shared
+    @State private var showDetails = false
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: Palette.accent))
+                .scaleEffect(1.6)
+                .padding(.bottom, 8)
+            Text(syncService.isConnected ? "Verifying your vault…" : "Looking for your computer…")
+                .font(.title2.weight(.bold))
+                .foregroundColor(Palette.textPrimary)
+            Text("Keep \(AppBrand.desktopName) open on the same Wi-Fi network. This usually takes a few seconds.")
+                .font(.subheadline)
+                .foregroundColor(Palette.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            DisclosureGroup("Details", isExpanded: $showDetails) {
+                ScrollView {
+                    Text(syncService.logs)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(Palette.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 110)
+            }
+            .font(.footnote)
+            .foregroundColor(Palette.textSecondary)
+            .padding(.horizontal, 32)
+
+            Spacer()
+
+            Button("Cancel") { VaultManager.shared.cancelRetrieve() }
+                .buttonStyle(SecondaryButtonStyle())
+                .padding(.horizontal, 32)
+                .padding(.bottom, 32)
+        }
+    }
+}
+
+// MARK: - Unlock
 
 struct UnlockView: View {
+    @ObservedObject private var vaultManager = VaultManager.shared
     @State private var password = ""
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var useBiometric = false
-    @ObservedObject private var syncService = SyncService.shared
-    
+    @State private var errorMessage: String?
+    @State private var working = false
+    @State private var showingEraseConfirm = false
+    @State private var canUseBiometrics = false
+    @State private var showingRestore = false
+
     var body: some View {
-        ZStack {
-            Color(hex: "0B0C10")
-                .ignoresSafeArea()
-            
-            VStack(spacing: 30) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(Color(hex: "C5A059"))
-                
-                Text("ClawPass")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color(hex: "C5A059"))
-                
-                SecureField("Master Password", text: $password)
-                    .textContentType(.password)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .padding()
-                    .background(Color(hex: "1B1C21"))
-                    .foregroundColor(Color(hex: "C5A059"))
-                    .cornerRadius(4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                    .frame(maxWidth: 300)
-                    .onSubmit { unlock() }
-                
-                Button(action: unlock) {
-                    Text("Unlock")
-                        .font(.headline)
-                        .frame(maxWidth: 280)
-                        .padding()
-                        .background(Color(hex: "C5A059"))
-                        .foregroundColor(Color(hex: "0B0C10"))
-                        .cornerRadius(4)
-                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 14) {
+                    BrandMark(size: 84)
+                    Text(AppBrand.name)
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundColor(Palette.textPrimary)
                 }
-                .disabled(password.isEmpty)
-                
-                Button(action: recoverVault) {
-                    Text("Retrieve Vault from Server")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: 280)
-                        .background(Color(hex: "1B1C21"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                }
-                .disabled(password.isEmpty)
-                
-                Button(action: unlockWithBiometric) {
-                    HStack {
-                        Image(systemName: "faceid")
-                        Text("Use Face ID")
-                    }
-                    .foregroundColor(Color(hex: "C5A059"))
-                }
-                .disabled(!LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil))
+                .padding(.top, 72)
 
-                Button(action: nuclearReset) {
-                    Text("Nuclear Reset")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.top, 20)
+                VStack(spacing: 14) {
+                    FieldRow(title: "Master password", text: $password, secure: true, contentType: .password)
+
+                    if let errorMessage = errorMessage {
+                        InlineBanner(kind: .error, message: errorMessage)
+                    }
+
+                    Button(action: unlock) {
+                        if working { ProgressView().tint(Palette.onAccent) } else { Text("Unlock") }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(password.isEmpty || working)
+
+                    if canUseBiometrics {
+                        Button(action: unlockWithBiometrics) {
+                            Label("Unlock with Face ID", systemImage: "faceid")
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
                 }
+
+                VStack(spacing: 14) {
+                    Button("Restore a vault from my computer") { showingRestore = true }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(Palette.accent)
+                    Button("Erase this device's vaults…", role: .destructive) { showingEraseConfirm = true }
+                        .font(.footnote)
+                        .foregroundColor(Palette.danger)
+                }
+                .padding(.top, 24)
             }
-            .padding()
+            .padding(.horizontal, 24)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
         }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
+        .onAppear {
+            canUseBiometrics = CryptoService.shared.biometricsAvailable && CryptoService.shared.hasSavedMasterPassword()
+        }
+        .sheet(isPresented: $showingRestore) { RestoreVaultView() }
+        .confirmationDialog("Erase every vault stored on this device?", isPresented: $showingEraseConfirm, titleVisibility: .visible) {
+            Button("Erase Vaults", role: .destructive) { vaultManager.nuclearReset() }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text(errorMessage)
+            Text("Vaults on your computer are not affected. You can restore them afterwards. This cannot be undone.")
         }
-        .overlay(
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("SINCED DEBUG")
-                        .font(.system(size: 9, weight: .bold))
-                    Spacer()
-                }
-                Text("Salt: \(VaultManager.shared.debugSaltHex)")
-                Text("Hash: \(VaultManager.shared.debugKeyHash)")
-                Text("Canary: \(VaultManager.shared.debugCanaryStatus)")
-            }
-            .font(.system(size: 8, design: .monospaced))
-            .foregroundColor(.green)
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.black.opacity(0.6))
-            .cornerRadius(8)
-            .padding()
-            .frame(maxHeight: 80)
-            .offset(y: 100), // Push it below the primary UI fold
-            alignment: .bottom
-        )
     }
-    
+
     private func unlock() {
-        VaultManager.shared.getDebugInfo(password: password)
-        do {
-            try VaultManager.shared.unlock(with: password)
-            
-            // Persist password to Keychain for future Biometric unlocks
-            try? CryptoService.shared.saveMasterPasswordToKeychain(password)
-            
-        } catch let err as VaultError {
-            switch err {
-            case .vaultNotFound:
-                errorMessage = "No vault exists for that password on this device. Tap 'Retrieve Vault from Server' to set it up."
-            default:
-                errorMessage = "Invalid password"
+        errorMessage = nil
+        working = true
+        let attempt = password
+        DispatchQueue.main.async {
+            defer { working = false }
+            do {
+                try VaultManager.shared.unlock(with: attempt)
+                password = ""
+            } catch VaultError.vaultNotFound {
+                errorMessage = "That password does not match any vault on this device. Check it and try again, or restore your vault from your computer."
+            } catch VaultError.saltMissing {
+                errorMessage = "This vault's key material is missing from this device. Restore it from your computer below."
+            } catch {
+                errorMessage = "The vault could not be opened. Please try again."
             }
-            showingError = true
-        } catch {
-            errorMessage = "Invalid password"
-            showingError = true
         }
     }
-    
-    private func recoverVault() {
-        VaultManager.shared.getDebugInfo(password: password)
-        VaultManager.shared.retrieveVault(password: password)
-    }
-    
-    private func nuclearReset() {
-        VaultManager.shared.nuclearReset()
-    }
-    
-    private func unlockWithBiometric() {
-        Task {
-            do {
-                let success = try await CryptoService.shared.authenticateWithBiometric(
-                    reason: "Unlock ClawPass"
-                )
-                if success {
-                    // Retrieve master password from Keychain for biometric unlock
-                    if let savedPassword = try? CryptoService.shared.retrieveMasterPasswordFromKeychain() {
-                        await MainActor.run {
-                            do {
-                                try VaultManager.shared.unlock(with: savedPassword)
-                            } catch {
-                                errorMessage = "Biometric unlock failed: Invalid password stored"
-                                showingError = true
-                            }
-                        }
-                    } else {
-                        await MainActor.run {
-                            errorMessage = "Master password not saved. Please unlock manually first."
-                            showingError = true
-                        }
-                    }
+
+    private func unlockWithBiometrics() {
+        errorMessage = nil
+        Task.detached {
+            let saved = try? CryptoService.shared.retrieveMasterPasswordFromKeychain(reason: "Unlock \(AppBrand.name)")
+            await MainActor.run {
+                guard let saved = saved else {
+                    errorMessage = "Face ID did not unlock the vault. Enter your master password."
+                    return
                 }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Biometric authentication failed"
-                    showingError = true
+                do {
+                    try VaultManager.shared.unlock(with: saved)
+                } catch {
+                    errorMessage = "The saved password no longer matches. Enter your master password."
                 }
             }
         }
     }
 }
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4) * 17, (int) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
-    }
-}
+// MARK: - Vault list
 
 struct VaultView: View {
-    @StateObject private var vaultManager = VaultManager.shared
+    @ObservedObject private var vaultManager = VaultManager.shared
     @ObservedObject private var syncService = SyncService.shared
     @State private var showingAddEntry = false
-    @State private var showingSync = false
-    @State private var isSearching = false
+    @State private var showingSettings = false
     @State private var searchText = ""
     @State private var selectedCategory: Category?
-    @FocusState private var isSearchFieldFocused: Bool
-    
-    var filteredEntries: [VaultEntry] {
+
+    private let favoritesId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    private var filteredEntries: [VaultEntry] {
         var entries = vaultManager.entries
-        
         if let category = selectedCategory {
-            if category.id == UUID(uuidString: "00000000-0000-0000-0000-000000000000") {
-                entries = entries.filter { $0.isFavorite }
-            } else {
-                entries = entries.filter { $0.categoryID == category.id }
-            }
+            entries = category.id == favoritesId
+                ? entries.filter { $0.isFavorite }
+                : entries.filter { $0.categoryID == category.id }
         }
-        
         if !searchText.isEmpty {
             entries = entries.filter {
                 $0.title.localizedCaseInsensitiveContains(searchText) ||
-                $0.username.localizedCaseInsensitiveContains(searchText)
+                $0.username.localizedCaseInsensitiveContains(searchText) ||
+                ($0.url ?? "").localizedCaseInsensitiveContains(searchText)
             }
         }
-        
-        // Primary sort: Favorites first, then Alphabetical by title
         return entries.sorted {
-            if $0.isFavorite != $1.isFavorite {
-                return $0.isFavorite && !$1.isFavorite
-            }
+            if $0.isFavorite != $1.isFavorite { return $0.isFavorite }
             return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
     }
-    
+
     var body: some View {
-        let currentTitle = vaultManager.vaultName
         NavigationView {
-            ZStack {
-                Color(hex: "0B0C10").ignoresSafeArea()
-                
-                VStack {
-                    // Key Status Banner
-                    if !vaultManager.keyStatus.isEmpty {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text("Key Status: \(vaultManager.keyStatus)")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.vertical, 4)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.red.opacity(0.8))
-                    }
-                    
-                    // Category Filter Menu
-                    HStack {
-                        Text("Filter by Category:")
-                            .font(.caption)
-                            .foregroundColor(Color(hex: "C5A059"))
-                        
-                        Menu {
-                            Button("All Items") {
-                                selectedCategory = nil
-                            }
-                            
-                            Divider()
-                            
-                            ForEach(vaultManager.categories) { category in
-                                Button(category.name) {
-                                    selectedCategory = category
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(selectedCategory?.name ?? "All Items")
-                                    .fontWeight(.medium)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "1B1C21"))
-                            .foregroundColor(Color(hex: "C5A059"))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    if isSearching {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(Color(hex: "94a3b8"))
-                            TextField("Search passwords...", text: $searchText)
-                                .textFieldStyle(PlainTextFieldStyle())
-                                .foregroundColor(.white)
-                                .focused($isSearchFieldFocused)
-                            
-                            Button(action: { 
-                                isSearching = false 
-                                isSearchFieldFocused = false
-                            }) {
-                                Text("Cancel")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(Color(hex: "C5A059"))
-                            }
-                        }
-                        .padding(10)
-                        .padding(.horizontal)
-                        .background(Color(hex: "1B1C21"))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                        .padding(.bottom, 8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    
+            VStack(spacing: 0) {
+                SyncStatusBar(isConnected: syncService.isConnected, error: vaultManager.lastHandshakeError)
+
+                if !vaultManager.categories.isEmpty {
+                    CategoryChips(categories: vaultManager.categories, selected: $selectedCategory)
+                }
+
+                if filteredEntries.isEmpty {
+                    EmptyVaultState(isFiltering: !searchText.isEmpty || selectedCategory != nil,
+                                    isSyncing: vaultManager.entries.isEmpty && syncService.isConnected && !syncService.firstSyncComplete,
+                                    addAction: { showingAddEntry = true })
+                } else {
                     List {
                         ForEach(filteredEntries) { entry in
                             NavigationLink(destination: EntryDetailView(entry: entry)) {
                                 EntryRowView(entry: entry)
                             }
-                            .listRowBackground(Color(hex: "0B0C10"))
+                            .listRowBackground(Palette.background)
+                            .listRowSeparatorTint(Palette.stroke)
                         }
                     }
-                    .listStyle(PlainListStyle())
-                }
-                
-                if (vaultManager.isFirstPopulationPending || !syncService.firstSyncComplete) && vaultManager.entries.isEmpty {
-                    ZStack {
-                        Color(hex: "0B0C10").opacity(0.9)
-                            .ignoresSafeArea()
-                        
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "C5A059")))
-                            
-                            Text("Syncing your vault...")
-                                .font(.headline)
-                                .foregroundColor(Color(hex: "C5A059"))
-                            
-                            Text("Retrieving your secure entries from the server")
-                                .font(.subheadline)
-                                .foregroundColor(Color(hex: "94a3b8"))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
-                    }
-                    .transition(.opacity)
+                    .listStyle(.plain)
                 }
             }
-            .navigationTitle(currentTitle)
+            .screenBackground()
+            .navigationTitle(vaultManager.vaultName)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search")
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(currentTitle)
-                        .font(.system(.headline, design: .monospaced))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    HStack {
-                        Button(action: {
-                            isSearching.toggle()
-                            isSearchFieldFocused = isSearching
-                        }) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(isSearching ? Color.white : Color(hex: "C5A059"))
-                        }
-
-                        Button(action: { vaultManager.lock() }) {
-                            Image(systemName: "lock.fill")
-                                .foregroundColor(Color(hex: "C5A059"))
-                        }
-                    }
+                    Button { vaultManager.lock() } label: { Image(systemName: "lock.fill") }
+                        .accessibilityLabel("Lock vault")
                 }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        Button(action: { showingSync = true }) {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .foregroundColor(vaultManager.syncStatus.contains("Connected") ? Color(hex: "39FF14") : Color(hex: "C5A059"))
-                        }
-
-                        Button(action: { showingAddEntry = true }) {
-                            Image(systemName: "plus")
-                                .foregroundColor(Color(hex: "C5A059"))
-                        }
-                    }
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button { showingSettings = true } label: { Image(systemName: "gearshape.fill") }
+                        .accessibilityLabel("Settings")
+                    Button { showingAddEntry = true } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Add entry")
                 }
             }
-            .sheet(isPresented: $showingAddEntry) {
-                AddEntryView()
-            }
-            .sheet(isPresented: $showingSync) {
-                SettingsView()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .vaultDataChanged)) { _ in
-                print("[UI] VaultView received vaultDataChanged notification. Refreshing...")
-                vaultManager.objectWillChange.send()
+            .tint(Palette.accent)
+            .sheet(isPresented: $showingAddEntry) { AddEntryView() }
+            .sheet(isPresented: $showingSettings) {
+                NavigationView { SettingsView(showsDone: true) }
             }
         }
+        .navigationViewStyle(.stack)
+        .tint(Palette.accent)
+    }
+}
+
+struct SyncStatusBar: View {
+    let isConnected: Bool
+    let error: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: isConnected ? "checkmark.icloud" : "icloud.slash")
+                .foregroundColor(isConnected ? Palette.success : Palette.textTertiary)
+            Text(isConnected
+                 ? "Synced with your computer"
+                 : (error ?? "Offline. Changes sync when your computer is reachable."))
+                .font(.caption)
+                .foregroundColor(Palette.textSecondary)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Palette.surface)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct CategoryChips: View {
+    let categories: [Category]
+    @Binding var selected: Category?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip("All", isOn: selected == nil) { selected = nil }
+                ForEach(categories) { category in
+                    chip(category.name, isOn: selected?.id == category.id) { selected = category }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func chip(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .foregroundColor(isOn ? Palette.onAccent : Palette.textPrimary)
+                .background(Capsule().fill(isOn ? Palette.accent : Palette.surfaceRaised))
+        }
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+struct EmptyVaultState: View {
+    let isFiltering: Bool
+    let isSyncing: Bool
+    let addAction: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            if isSyncing {
+                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: Palette.accent))
+                Text("Syncing your vault…")
+                    .font(.headline).foregroundColor(Palette.textPrimary)
+            } else if isFiltering {
+                Image(systemName: "magnifyingglass").font(.system(size: 40)).foregroundColor(Palette.textTertiary)
+                Text("No matches").font(.headline).foregroundColor(Palette.textPrimary)
+            } else {
+                Image(systemName: "key.viewfinder").font(.system(size: 44)).foregroundColor(Palette.accent)
+                Text("Your vault is empty").font(.title3.weight(.semibold)).foregroundColor(Palette.textPrimary)
+                Text("Add your first password to get started.")
+                    .font(.subheadline).foregroundColor(Palette.textSecondary)
+                Button("Add Password", action: addAction)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: 240)
+                    .padding(.top, 6)
+            }
+            Spacer()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
     }
 }
 
 struct EntryRowView: View {
     let entry: VaultEntry
-    
+
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.title)
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.surfaceRaised)
+                Text(String(entry.title.prefix(1)).uppercased())
                     .font(.headline)
-                    .foregroundColor(Color(hex: "C5A059"))
-                Text(entry.username)
-                    .font(.system(.subheadline, design: .monospaced))
-                    .foregroundColor(Color(hex: "94a3b8"))
+                    .foregroundColor(Palette.accent)
             }
-            
+            .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(Palette.textPrimary)
+                if !entry.username.isEmpty {
+                    Text(entry.username)
+                        .font(.subheadline)
+                        .foregroundColor(Palette.textSecondary)
+                        .lineLimit(1)
+                }
+            }
             Spacer()
-            
             if entry.isFavorite {
                 Image(systemName: "star.fill")
-                    .foregroundColor(Color(hex: "FFD700"))
+                    .foregroundColor(Palette.warning)
+                    .accessibilityLabel("Favorite")
             }
         }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
         .padding(.vertical, 4)
-    }
-}
-
-// MARK: - Setup View
-
-struct SetupView: View {
-    let onComplete: () -> Void
-    
-    @State private var password = ""
-    @State private var confirmPassword = ""
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 30) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.accentColor)
-                
-                Text("Welcome to ClawPass")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                Text("Create your master password to secure your vault.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                
-                VStack(spacing: 15) {
-                    SecureField("Master Password", text: $password)
-                        .textContentType(.newPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(maxWidth: 300)
-                    
-                    SecureField("Confirm Password", text: $confirmPassword)
-                        .textContentType(.newPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(maxWidth: 300)
-                }
-                
-                Button(action: createVault) {
-                    Text("Create Vault")
-                        .font(.headline)
-                        .frame(maxWidth: 280)
-                        .padding()
-                        .background(password.isEmpty || password != confirmPassword ? Color.gray : Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .disabled(password.isEmpty || password != confirmPassword)
-                
-                if !password.isEmpty && password != confirmPassword {
-                    Text("Passwords do not match")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.top, -10)
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .navigationBarHidden(true)
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") { }
-            } message: {
-                Text(errorMessage)
-            }
-        }
-    }
-    
-    private func createVault() {
-        guard password == confirmPassword else {
-            errorMessage = "Passwords do not match"
-            showingError = true
-            return
-        }
-        
-        guard password.count >= 8 else {
-            errorMessage = "Password must be at least 8 characters"
-            showingError = true
-            return
-        }
-        
-        // Start the new "Identity-First" setup flow
-        VaultManager.shared.setupVault(password: password)
     }
 }

@@ -8,6 +8,8 @@ class CameraManager: NSObject {
     
     var session: AVCaptureSession?
     var onCodeFound: ((String) -> Void)?
+    /// Vision reports the same QR on every frame; deliver the first result only.
+    private var delivered = false
     
     private override init() {
         super.init()
@@ -15,6 +17,7 @@ class CameraManager: NSObject {
     
     func setupAndStart(previewLayer: AVCaptureVideoPreviewLayer) {
         SyncService.shared.log("[CameraManager] Initializing Vision-based session...")
+        delivered = false
         
         let session = AVCaptureSession()
         session.sessionPreset = .high
@@ -93,9 +96,12 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
             }
             
             if let firstResult = results.first, let payload = firstResult.payloadStringValue {
-                SyncService.shared.log("[Vision] SUCCESS: Found QR code: \(payload)")
                 DispatchQueue.main.async {
+                    guard !self.delivered else { return }
+                    self.delivered = true
+                    SyncService.shared.log("[Vision] QR code scanned.")
                     self.onCodeFound?(payload)
+                    self.onCodeFound = nil
                 }
             }
         }

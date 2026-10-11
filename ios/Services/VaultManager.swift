@@ -4,6 +4,15 @@ import SQLite3
 import LocalAuthentication
 import CryptoKit
 
+/// Tells SQLite to copy bound strings/blobs instead of keeping the caller's pointer.
+let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+/// NULL-safe column read (a NULL column would otherwise crash String(cString:)).
+func columnText(_ stmt: OpaquePointer?, _ index: Int32) -> String {
+    guard let c = sqlite3_column_text(stmt, index) else { return "" }
+    return String(cString: c)
+}
+
 enum VaultError: Error {
     case notInitialized
     case alreadyInitialized
@@ -16,6 +25,8 @@ enum VaultError: Error {
     /// should route the user to `setupVault` (the 'Retrieve Vault from
     /// Server' flow) instead.
     case vaultNotFound(String)
+    /// The vault database exists but its encryption salt is not on this device.
+    case saltMissing
 }
 
 extension Notification.Name {
@@ -46,8 +57,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     private var encryptionKey: SymmetricKey?
     private let cryptoService = CryptoService.shared
     private var syncService = SyncService.shared
-    private var pendingUnlockPassword: String?
     private var pendingSetupPassword: String?
+    /// Master password held in memory only while unlocked, so local entries can be
+    /// re-keyed if the server's salt differs from the one this device generated.
+    private var sessionPassword: String?
+    private var retrieveWatchdog: DispatchWorkItem?
+    /// Entries sent to the server this session: id -> modified time (ms) at send.
+    /// Marked synced once the server answers the follow-up sync request.
+    private var inFlight: [String: Int64] = [:]
     /// True while applying server-sent sync responses. Suppresses the
     /// sync-push in saveEntry/deleteEntry so we don't echo back entries
     /// the server just sent us. Set/cleared in the SyncServiceDelegate
@@ -82,7 +99,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         return vaultDir.appendingPathComponent(currentVaultDbFilename()).path
     }
     
+    private func closeDatabase() {
+        if let handle = db { sqlite3_close(handle) }
+        db = nil
+    }
+
     private func openDatabase(path: String) -> Bool {
+        closeDatabase()
         if sqlite3_open(path, &db) != SQLITE_OK {
             let err = db == nil ? "Unknown error" : String(cString: sqlite3_errmsg(db))
             print("[SQLite3] Error opening database: \(err)")
@@ -131,9 +154,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         if sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK {
             while sqlite3_step(stmt) == SQLITE_ROW {
-                let idStr = String(cString: sqlite3_column_text(stmt, 0))
-                let title = String(cString: sqlite3_column_text(stmt, 1))
-                let username = String(cString: sqlite3_column_text(stmt, 2))
+                let idStr = columnText(stmt, 0)
+                let title = columnText(stmt, 1)
+                let username = columnText(stmt, 2)
                 
                 var entry = VaultEntry(id: UUID(uuidString: idStr) ?? UUID(), title: title, username: username, password: "", url: nil, notes: nil, categoryID: nil, totpSecret: nil, isFavorite: false)
                 
@@ -159,6 +182,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                     entry.totpSecret = String(cString: totpPtr)
                 }
                 
+                let createdTs = sqlite3_column_double(stmt, 8)
+                let modifiedTs = sqlite3_column_double(stmt, 9)
+                if createdTs > 0 { entry.createdAt = Date(timeIntervalSince1970: createdTs) }
+                if modifiedTs > 0 { entry.modifiedAt = Date(timeIntervalSince1970: modifiedTs) }
                 entry.isFavorite = sqlite3_column_int(stmt, 10) != 0
                 loadedEntries.append(entry)
             }
@@ -171,10 +198,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         if sqlite3_prepare_v2(db, catQuery, -1, &catStmt, nil) == SQLITE_OK {
             while sqlite3_step(catStmt) == SQLITE_ROW {
-                let idStr = String(cString: sqlite3_column_text(catStmt, 0))
-                let name = String(cString: sqlite3_column_text(catStmt, 1))
-                let icon = String(cString: sqlite3_column_text(catStmt, 2))
-                let color = String(cString: sqlite3_column_text(catStmt, 3))
+                let idStr = columnText(catStmt, 0)
+                let name = columnText(catStmt, 1)
+                let icon = columnText(catStmt, 2)
+                let color = columnText(catStmt, 3)
                 loadedCats.append(Category(id: UUID(uuidString: idStr) ?? UUID(), name: name, icon: icon, color: color))
             }
         }
@@ -195,56 +222,61 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
     }
     
-    func saveEntry(_ entry: VaultEntry) {
+    /// Persists an entry. Local edits (`fromRemote == false`) are stamped with the
+    /// current time and flagged `pending` until pushed to the server. Entries applied
+    /// from the server keep the sender's timestamps and are flagged `synced`, so
+    /// "newest wins" holds in both directions.
+    func saveEntry(_ source: VaultEntry, fromRemote: Bool = false, keepTimestamp: Bool = false) {
         guard let db = db else { return }
+        var entry = source
+        if !fromRemote && !keepTimestamp { entry.modifiedAt = Date() }
         
         let insert = "INSERT OR REPLACE INTO entries (id, title, username, encrypted_password, url, encrypted_notes, category_id, totp_secret, created_at, modified_at, is_favorite, sync_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
         var stmt: OpaquePointer?
 
         if sqlite3_prepare_v2(db, insert, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, (entry.id.uuidString as NSString).utf8String, -1, nil)
-            sqlite3_bind_text(stmt, 2, (entry.title as NSString).utf8String, -1, nil)
-            sqlite3_bind_text(stmt, 3, (entry.username as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, entry.id.uuidString, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, entry.title, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, entry.username, -1, SQLITE_TRANSIENT)
             
             if !entry.encryptedPassword.isEmpty {
                 _ = entry.encryptedPassword.withUnsafeBytes { bytes in
-                    sqlite3_bind_blob(stmt, 4, bytes.baseAddress, Int32(entry.encryptedPassword.count), nil)
+                    sqlite3_bind_blob(stmt, 4, bytes.baseAddress, Int32(entry.encryptedPassword.count), SQLITE_TRANSIENT)
                 }
             } else {
                 sqlite3_bind_null(stmt, 4)
             }
             
             if let url = entry.url {
-                sqlite3_bind_text(stmt, 5, (url as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 5, url, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(stmt, 5)
             }
             
             if let notes = entry.encryptedNotes, !notes.isEmpty {
                 _ = notes.withUnsafeBytes { bytes in
-                    sqlite3_bind_blob(stmt, 6, bytes.baseAddress, Int32(notes.count), nil)
+                    sqlite3_bind_blob(stmt, 6, bytes.baseAddress, Int32(notes.count), SQLITE_TRANSIENT)
                 }
             } else {
                 sqlite3_bind_null(stmt, 6)
             }
             
             if let catID = entry.categoryID {
-                sqlite3_bind_text(stmt, 7, (catID.uuidString as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 7, catID.uuidString, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(stmt, 7)
             }
             
             if let totp = entry.totpSecret {
-                sqlite3_bind_text(stmt, 8, (totp as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 8, totp, -1, SQLITE_TRANSIENT)
             } else {
                 sqlite3_bind_null(stmt, 8)
             }
             
-            let now = Date().timeIntervalSince1970
-            sqlite3_bind_double(stmt, 9, now)
-            sqlite3_bind_double(stmt, 10, now)
+            sqlite3_bind_double(stmt, 9, entry.createdAt.timeIntervalSince1970)
+            sqlite3_bind_double(stmt, 10, entry.modifiedAt.timeIntervalSince1970)
             sqlite3_bind_int(stmt, 11, entry.isFavorite ? 1 : 0)
-            sqlite3_bind_text(stmt, 12, "synced", -1, nil)
+            sqlite3_bind_text(stmt, 12, (fromRemote ? "synced" : "pending"), -1, SQLITE_TRANSIENT)
             
             if sqlite3_step(stmt) != SQLITE_DONE {
                 print("[SQLite3] Failed to save entry: \(String(cString: sqlite3_errmsg(db)))")
@@ -266,9 +298,93 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // applying a server-sent sync response (the echo-back would be a loop).
         // Also no-op while the handshake hasn't completed (sendEntryUpdate
         // itself guards on that and logs a notice).
-        if !isApplyingRemoteUpdate {
+        if !fromRemote && !isApplyingRemoteUpdate {
             SyncService.shared.sendEntryUpdate(entry: entry)
         }
+    }
+
+    /// Called by SyncService when an entry update was written to the socket.
+    func noteEntrySent(_ entry: VaultEntry) {
+        let ms = Int64(entry.modifiedAt.timeIntervalSince1970 * 1000)
+        DispatchQueue.main.async { self.inFlight[entry.id.uuidString.uppercased()] = ms }
+    }
+
+    /// The server answered a sync request, so everything sent before it was processed
+    /// (TCP preserves order). Flip those entries from pending to synced unless they
+    /// were edited again after being sent.
+    func syncServiceDidCompleteSync(_ service: SyncService) {
+        DispatchQueue.main.async {
+            guard let db = self.db, !self.inFlight.isEmpty else { return }
+            var stmt: OpaquePointer?
+            let sql = "UPDATE entries SET sync_status = 'synced' WHERE upper(id) = ? AND CAST(modified_at * 1000 AS INTEGER) <= ?;"
+            if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+                for (id, ms) in self.inFlight {
+                    sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
+                    sqlite3_bind_int64(stmt, 2, ms + 1)
+                    sqlite3_step(stmt)
+                    sqlite3_reset(stmt)
+                }
+            }
+            sqlite3_finalize(stmt)
+            self.inFlight.removeAll()
+        }
+    }
+
+    /// Flags entries as delivered to the server so they are not re-sent on reconnect.
+    func markEntriesSynced(ids: [String]) {
+        guard let db = db, !ids.isEmpty else { return }
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let sql = "UPDATE entries SET sync_status = 'synced' WHERE id IN (\(placeholders));"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            for (i, id) in ids.enumerated() {
+                sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
+            }
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// When (ms since epoch) a pending local delete was made, or nil if not in the outbox.
+    func tombstoneMillis(id: String) -> Int64? {
+        guard let db = db else { return nil }
+        var stmt: OpaquePointer?
+        var result: Int64? = nil
+        if sqlite3_prepare_v2(db, "SELECT created_at FROM pending_tombstones WHERE lower(id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
+            if sqlite3_step(stmt) == SQLITE_ROW {
+                result = Int64(sqlite3_column_double(stmt, 0) * 1000)
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    /// Modified time (ms since epoch) of the local copy of an entry, or nil if absent.
+    private func localModifiedMillis(id: String) -> Int64? {
+        guard let db = db else { return nil }
+        var stmt: OpaquePointer?
+        var result: Int64? = nil
+        if sqlite3_prepare_v2(db, "SELECT modified_at FROM entries WHERE lower(id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
+            if sqlite3_step(stmt) == SQLITE_ROW {
+                result = Int64(sqlite3_column_double(stmt, 0) * 1000)
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    private func isPendingTombstone(_ id: String) -> Bool {
+        guard let db = db else { return false }
+        var stmt: OpaquePointer?
+        var found = false
+        if sqlite3_prepare_v2(db, "SELECT 1 FROM pending_tombstones WHERE lower(id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
+            found = sqlite3_step(stmt) == SQLITE_ROW
+        }
+        sqlite3_finalize(stmt)
+        return found
     }
 
     func deleteEntry(id: UUID) {
@@ -282,7 +398,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         var stmt: OpaquePointer?
 
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, (id.uuidString as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
             if sqlite3_step(stmt) != SQLITE_DONE {
                 print("[SQLite3] Failed to delete entry: \(String(cString: sqlite3_errmsg(db)))")
             }
@@ -323,28 +439,61 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         return encryptionKey
     }
     
-    func setupVault(password: String) {
+    /// Creates a brand-new vault entirely on this device. No server is needed; sync
+    /// links up later if a desktop vault with the same master password exists.
+    func createVault(password: String) throws {
         let derivedVaultId = cryptoService.deriveVaultId(password: password)
+        if vaultFileExists(forVaultId: derivedVaultId) { throw VaultError.alreadyInitialized }
         SyncService.shared.setVaultId(derivedVaultId)
-        SyncService.shared.startUDPListener()
-        SyncService.shared.triggerHandshake()
-        self.isFirstPopulationPending = true
-        self.pendingSetupPassword = password
+        let salt = Data.randomBytes(count: 32)
+        try storeSalt(salt, for: derivedVaultId)
+        try initializeWithSalt(password: password, salt: salt)
+        sessionPassword = password
+        saveBiometricPasswordIfEnabled(password)
+        lastHandshakeError = nil
+        beginBackgroundSync()
     }
 
-    /// Lightweight retrieval flow. Triggered by 'Retrieve Vault from Server'.
-    /// Unlike `setupVault`, this does NOT set `isFirstPopulationPending`,
-    /// signaling that we are recovering an existing identity rather than 
-    /// initializing a brand new local vault.
+    /// Recovers an existing vault from the desktop. Shows the "connecting" screen until
+    /// the salt arrives, the server refuses, the user cancels, or the watchdog expires.
     func retrieveVault(password: String) {
         let derivedVaultId = cryptoService.deriveVaultId(password: password)
+        SyncService.shared.disconnect()
         SyncService.shared.setVaultId(derivedVaultId)
         SyncService.shared.startUDPListener()
+
+        lastHandshakeError = nil
+        isFirstPopulationPending = true
+        pendingSetupPassword = password
         SyncService.shared.triggerHandshake()
-        
-        self.isFirstPopulationPending = false
-        self.pendingSetupPassword = password
-        print("[VaultManager] Retrieval initiated for vaultId: \(derivedVaultId.prefix(12))...")
+
+        retrieveWatchdog?.cancel()
+        let watchdog = DispatchWorkItem { [weak self] in
+            guard let self = self, self.isFirstPopulationPending else { return }
+            self.failRetrieve("Could not reach your computer. Open the desktop app on the same Wi-Fi network, or connect manually from Settings.")
+        }
+        retrieveWatchdog = watchdog
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25, execute: watchdog)
+    }
+
+    /// Abandons an in-progress retrieve (Cancel button, timeout, or server refusal).
+    func cancelRetrieve() { failRetrieve(nil) }
+
+    private func failRetrieve(_ message: String?) {
+        retrieveWatchdog?.cancel()
+        retrieveWatchdog = nil
+        pendingSetupPassword = nil
+        isFirstPopulationPending = false
+        if let message = message { lastHandshakeError = message }
+        SyncService.shared.disconnect()
+    }
+
+    /// Connects (best effort) and runs the sync pipeline for an unlocked vault.
+    private func beginBackgroundSync() {
+        SyncService.shared.disconnect()
+        SyncService.shared.startUDPListener()
+        SyncService.shared.startDiscovery()
+        SyncService.shared.triggerHandshake()
     }
     
     func initializeWithSalt(password: String, salt: Data) throws {
@@ -410,9 +559,14 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         } else if let stored = try? retrieveSalt(for: derivedVaultId) {
             effectiveSalt = stored
         } else {
-            effectiveSalt = Data()
+            // The vault file exists but its salt is gone (e.g. keychain reset). Opening it
+            // with an empty salt would silently produce a useless key, so ask the caller to
+            // restore the vault from the desktop instead, which re-adopts the real salt.
+            throw VaultError.saltMissing
         }
         try initializeWithSalt(password: password, salt: effectiveSalt)
+        sessionPassword = password
+        saveBiometricPasswordIfEnabled(password)
         print("[VaultManager] unlock: init OK, entries.count=\(entries.count), db!=nil=\(db != nil)")
 
         // Clear the key-status banner. Previously only the salt-receive
@@ -476,9 +630,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // on the 'Identifying Vault' page forever.
         SyncService.shared.disconnect()
         self.encryptionKey = nil
+        self.sessionPassword = nil
+        self.inFlight.removeAll()
         self.isUnlocked = false
         self.isReady = false
-        self.db = nil
+        self.closeDatabase()
         self.entries = []
         // Reset vaultName so a vault switch doesn't briefly show the
         // previous vault's name. The new value is loaded (or derived as
@@ -497,7 +653,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let sql = "INSERT OR REPLACE INTO settings (key, value) VALUES ('vault_name', ?);"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, (name as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
             sqlite3_step(stmt)
         }
         sqlite3_finalize(stmt)
@@ -652,6 +808,10 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // clean for the next init).
         let allKeychain: [String: Any] = [kSecClass as String: kSecClassGenericPassword]
         SecItemDelete(allKeychain as CFDictionary)
+        // Per-vault sync bookmarks.
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("lastSyncTimestamp_") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
         // Belt-and-braces: also wipe the UserDefaults fallback salts.
         let defaults = UserDefaults.standard
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("vault_salt_fallback_") {
@@ -665,10 +825,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         print("[VaultManager] Nuclear reset completed")
     }
     
-    func addEntry(_ entry: VaultEntry, password: String, notes: String?) throws {
+    func addEntry(_ entry: VaultEntry, password: String, notes: String?, totpSecret: String? = nil) throws {
         guard let key = encryptionKey else { throw VaultError.notInitialized }
         
         var newEntry = entry
+        newEntry.totpSecret = try encryptTOTP(totpSecret ?? "")
         if !password.isEmpty {
             newEntry.encryptedPassword = try cryptoService.encrypt(password, using: key)
         }
@@ -685,24 +846,126 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         return try cryptoService.decrypt(entry.encryptedPassword, using: key)
     }
     
+    /// One-time-code secrets are encrypted like passwords and stored as "enc1:<base64>".
+    func encryptTOTP(_ secret: String) throws -> String? {
+        let trimmed = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        return "enc1:" + (try cryptoService.encrypt(trimmed, using: key)).base64EncodedString()
+    }
+
+    func decryptTOTP(for entry: VaultEntry) throws -> String {
+        guard let stored = entry.totpSecret, !stored.isEmpty else { return "" }
+        guard stored.hasPrefix("enc1:") else { return stored } // older plaintext value
+        guard let key = encryptionKey else { throw VaultError.notInitialized }
+        guard let data = Data(base64Encoded: String(stored.dropFirst(5))) else { throw VaultError.decryptionFailed }
+        return try cryptoService.decrypt(data, using: key)
+    }
+
     func decryptNotes(for entry: VaultEntry) throws -> String? {
         guard let key = encryptionKey else { throw VaultError.notInitialized }
         guard let enc = entry.encryptedNotes, !enc.isEmpty else { return nil }
         return try cryptoService.decrypt(enc, using: key)
     }
     
-    func updateEntry(_ entry: VaultEntry, newPassword: String, newNotes: String) throws {
+    /// `newPassword == nil` leaves the stored password untouched; an empty `newNotes`
+    /// clears the notes.
+    func updateEntry(_ entry: VaultEntry, newPassword: String?, newNotes: String, newTotp: String? = nil) throws {
         guard let key = encryptionKey else { throw VaultError.notInitialized }
         
         var updated = entry
-        if !newPassword.isEmpty {
-            updated.encryptedPassword = try cryptoService.encrypt(newPassword, using: key)
+        if let newTotp = newTotp { updated.totpSecret = try encryptTOTP(newTotp) }
+        if let newPassword = newPassword {
+            updated.encryptedPassword = newPassword.isEmpty ? Data() : try cryptoService.encrypt(newPassword, using: key)
         }
-        if !newNotes.isEmpty {
-            let enc = try cryptoService.encrypt(newNotes, using: key)
-            updated.encryptedNotes = enc
-        }
+        updated.encryptedNotes = newNotes.isEmpty ? nil : try cryptoService.encrypt(newNotes, using: key)
         saveEntry(updated)
+    }
+
+    // MARK: - Categories
+
+    private static let favoritesID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    /// True while local category edits have not yet been sent to the computer.
+    private var categoriesDirtyKey: String { "categoriesDirty_\(SyncService.shared.vaultId)" }
+    var categoriesDirty: Bool {
+        get { UserDefaults.standard.bool(forKey: categoriesDirtyKey) }
+        set { UserDefaults.standard.set(newValue, forKey: categoriesDirtyKey) }
+    }
+
+    func saveCategory(_ category: Category) {
+        guard let db = db, category.id != Self.favoritesID else { return }
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO categories (id, name, icon, color) VALUES (?, ?, ?, ?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, category.id.uuidString, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 2, category.name, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 3, category.icon, -1, SQLITE_TRANSIENT)
+            sqlite3_bind_text(stmt, 4, category.color, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+        loadData()
+        categoriesChanged()
+    }
+
+    /// Deleting a category keeps its entries; they simply become uncategorized.
+    func deleteCategory(id: UUID) {
+        guard let db = db, id != Self.favoritesID else { return }
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM categories WHERE lower(id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+        if sqlite3_prepare_v2(db, "UPDATE entries SET category_id = NULL, modified_at = ?, sync_status = 'pending' WHERE lower(category_id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_double(stmt, 1, Date().timeIntervalSince1970)
+            sqlite3_bind_text(stmt, 2, id.uuidString, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+        loadData()
+        categoriesChanged()
+    }
+
+    private func categoriesChanged() {
+        categoriesDirty = true
+        SyncService.shared.startFullSyncPipeline()
+    }
+
+    /// Custom categories as stored on disk (the virtual Favorites list is never synced).
+    func localCategoriesForSync() -> [SyncCategory] {
+        guard let db = db else { return [] }
+        var result: [SyncCategory] = []
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT id, name, icon, color FROM categories;", -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let id = columnText(stmt, 0)
+                if id.lowercased() == Self.favoritesID.uuidString.lowercased() { continue }
+                result.append(SyncCategory(id: id.lowercased(), name: columnText(stmt, 1), icon: columnText(stmt, 2), color: columnText(stmt, 3)))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    // MARK: - Face ID
+
+    private var faceIDEnabled: Bool {
+        UserDefaults.standard.object(forKey: "faceIDUnlock") as? Bool ?? true
+    }
+
+    /// Stores the session password for biometric unlock, if the user has not opted out.
+    func saveBiometricPasswordIfEnabled(_ password: String) {
+        guard faceIDEnabled, cryptoService.biometricsAvailable else { return }
+        try? cryptoService.saveMasterPasswordToKeychain(password)
+    }
+
+    func setBiometricUnlock(_ enabled: Bool) {
+        if enabled, let password = sessionPassword {
+            saveBiometricPasswordIfEnabled(password)
+        } else if !enabled {
+            cryptoService.deleteMasterPasswordFromKeychain()
+        }
     }
     
     func getPendingEntries(completion: @escaping ([VaultEntry], [String]) -> Void) {
@@ -718,9 +981,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // drops rows as a dedup (in case the server sends the same id
         // back as part of its tombstone list).
         guard let db = db else {
-            completion(entries, [])
+            completion([], [])
             return
         }
+        var pendingIds = Set<String>()
+        var pendingStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT id FROM entries WHERE sync_status = 'pending';", -1, &pendingStmt, nil) == SQLITE_OK {
+            while sqlite3_step(pendingStmt) == SQLITE_ROW {
+                if let c = sqlite3_column_text(pendingStmt, 0) { pendingIds.insert(String(cString: c).uppercased()) }
+            }
+        }
+        sqlite3_finalize(pendingStmt)
+        let pendingEntries = entries.filter { pendingIds.contains($0.id.uuidString.uppercased()) }
         let query = "SELECT id FROM pending_tombstones;"
         var stmt: OpaquePointer?
         var ids: [String] = []
@@ -732,7 +1004,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
             }
         }
         sqlite3_finalize(stmt)
-        completion(entries, ids)
+        completion(pendingEntries, ids)
     }
 
     /// Insert an entry id into the durable offline-delete outbox.
@@ -743,7 +1015,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let sql = "INSERT OR IGNORE INTO pending_tombstones (id, created_at) VALUES (?, ?);"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
             sqlite3_bind_double(stmt, 2, Date().timeIntervalSince1970)
             if sqlite3_step(stmt) != SQLITE_DONE {
                 print("[SQLite3] Failed to record tombstone: \(String(cString: sqlite3_errmsg(db)))")
@@ -771,7 +1043,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             for (i, id) in ids.enumerated() {
-                sqlite3_bind_text(stmt, Int32(i + 1), (id as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, Int32(i + 1), id, -1, SQLITE_TRANSIENT)
             }
             if sqlite3_step(stmt) != SQLITE_DONE {
                 print("[SQLite3] Failed to clear sent tombstones: \(String(cString: sqlite3_errmsg(db)))")
@@ -790,7 +1062,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let sql = "DELETE FROM pending_tombstones WHERE lower(id) = lower(?);"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
             sqlite3_step(stmt)
         }
         sqlite3_finalize(stmt)
@@ -819,23 +1091,18 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         for syncEntry in incoming {
             do {
-                _ = try cryptoService.decrypt(Data(syncEntry.encrypted_password), using: key)
-                
-                var entry = VaultEntry(
-                    id: UUID(uuidString: syncEntry.id) ?? UUID(),
-                    title: syncEntry.title,
-                    username: syncEntry.username,
-                    password: "",
-                    url: syncEntry.url,
-                    notes: nil,
-                    categoryID: syncEntry.category_id.flatMap { UUID(uuidString: $0) },
-                    totpSecret: syncEntry.totp_secret,
-                    isFavorite: syncEntry.is_favorite
-                )
-                entry.encryptedPassword = Data(syncEntry.encrypted_password)
-                entry.encryptedNotes = syncEntry.encrypted_notes.map { Data($0) }
-                
-                saveEntry(entry)
+                // Entries saved without a password legitimately carry no ciphertext.
+                if !syncEntry.encrypted_password.isEmpty {
+                    _ = try cryptoService.decrypt(Data(syncEntry.encrypted_password), using: key)
+                }
+
+                // A delete the user made offline wins until the server has seen it.
+                if isPendingTombstone(syncEntry.id) { continue }
+                // Newest wins: keep the local copy when it is at least as new.
+                if let localMs = localModifiedMillis(id: syncEntry.id), localMs >= syncEntry.modified_at { continue }
+
+                let entry = try syncEntry.toVaultEntry()
+                saveEntry(entry, fromRemote: true)
             } catch {
                 print("[Sync] Skipping entry \(syncEntry.id) due to decryption failure")
             }
@@ -845,13 +1112,20 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         
         loadData()
         DispatchQueue.main.async {
-            self.vaultSyncStatus = "Last sync: \(timestamp)"
+            self.vaultSyncStatus = "Last sync: \(Date().formatted(date: .abbreviated, time: .shortened))"
             self.objectWillChange.send()
         }
     }
     
     func syncService(_ service: SyncService, didReceiveCategories categories: [SyncCategory]) {
         guard let db = db else { return }
+
+        // Edits made here that the computer has not seen yet win; send them instead of overwriting.
+        // An empty list from the computer never wipes categories that only exist on this phone.
+        if categoriesDirty || (categories.isEmpty && !localCategoriesForSync().isEmpty) {
+            SyncService.shared.pushCategories()
+            return
+        }
         
         sqlite3_exec(db, "BEGIN TRANSACTION;", nil, nil, nil)
         
@@ -860,21 +1134,32 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         if sqlite3_prepare_v2(db, insertCat, -1, &stmt, nil) == SQLITE_OK {
             for cat in categories {
-                sqlite3_bind_text(stmt, 1, (cat.id as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (cat.name as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 3, (cat.icon as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 4, (cat.color as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, cat.id, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, cat.name, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, cat.icon, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 4, cat.color, -1, SQLITE_TRANSIENT)
                 sqlite3_step(stmt)
                 sqlite3_reset(stmt)
             }
         }
         sqlite3_finalize(stmt)
+
+        // The computer's list is the truth: drop categories it no longer has.
+        let keep = Set(categories.map { $0.id.lowercased() })
+        for local in localCategoriesForSync() where !keep.contains(local.id) {
+            var del: OpaquePointer?
+            if sqlite3_prepare_v2(db, "DELETE FROM categories WHERE lower(id) = ?;", -1, &del, nil) == SQLITE_OK {
+                sqlite3_bind_text(del, 1, local.id, -1, SQLITE_TRANSIENT)
+                sqlite3_step(del)
+            }
+            sqlite3_finalize(del)
+        }
         
         sqlite3_exec(db, "COMMIT;", nil, nil, nil)
         loadData()
     }
     
-    func syncService(_ service: SyncService, didReceiveTombstones deletedIds: [String]) {
+    func syncService(_ service: SyncService, didReceiveTombstones deletedIds: [String], deletedAt: [String: Int64]) {
         guard let db = db else { return }
 
         // Re-entrancy guard for symmetry with didReceiveSyncEntries. The
@@ -896,7 +1181,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         if sqlite3_prepare_v2(db, del, -1, &stmt, nil) == SQLITE_OK {
             for id in deletedIds {
-                sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+                // Newest wins: keep a local copy that was edited after the other side deleted it.
+                if let deletedMs = deletedAt[id.lowercased()], let localMs = localModifiedMillis(id: id), localMs > deletedMs {
+                    continue
+                }
+                sqlite3_bind_text(stmt, 1, id, -1, SQLITE_TRANSIENT)
                 sqlite3_step(stmt)
                 sqlite3_reset(stmt)
                 // Offline-DELETE outbox dedup: if the server's tombstone
@@ -916,79 +1205,81 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         loadData()
     }
     
-    func syncService(_ service: SyncService, didEncounterHandshakeError message: String) {
-        DispatchQueue.main.async {
-            self.lastHandshakeError = message
-            self.isFirstPopulationPending = false
-            self.objectWillChange.send()
-            print("[VaultManager] Handshake failed: \(message)")
-        }
-    }
-    
     func syncServiceDidReceiveSalt(_ service: SyncService, salt: [UInt8]) {
         DispatchQueue.main.async {
             self.keyStatus = ""
-            let serverSaltData = Data(salt)
-            do {
-                let currentVaultId = SyncService.shared.vaultId
-                if let localSalt = try self.retrieveSalt(for: currentVaultId) {
-                    if localSalt != serverSaltData {
-                        try self.storeSalt(serverSaltData, for: currentVaultId)
-                    }
-                } else {
-                    try self.storeSalt(serverSaltData, for: currentVaultId)
-                }
-                self.debugSaltHex = serverSaltData.map { String(format: "%02x", $0) }.joined()
-                print("[VaultManager] Salt received from server: \(self.debugSaltHex.prefix(16))...; current vaultId=\(currentVaultId)")
-                
-                if let password = self.pendingSetupPassword {
-                    do {
-                        // Single-pass init with the server salt — no second unlock call.
-                        // The previous code re-derived the key with saltOverride==nil
-                        // (i.e. empty salt) immediately after, producing a key that
-                        // didn't match what entries were encrypted with. That left
-                        // entries un-decryptable, showing zero entries in the UI.
-                        try self.initializeWithSalt(password: password, salt: serverSaltData)
-                        let resolvedPath = self.currentVaultDbPath()
-                        print("[VaultManager] init OK; DB=\(resolvedPath); key=\(self.encryptionKey != nil ? "valid" : "INVALID")")
-                        self.pendingSetupPassword = nil
-                        self.isFirstPopulationPending = false
-                        DispatchQueue.main.async { self.isUnlocked = true; self.objectWillChange.send() }
-                        if self.db != nil { SyncService.shared.startFullSyncPipeline() }
-                    } catch {
-                        print("[VaultManager] setup init failed: \(error)")
-                        self.isFirstPopulationPending = false
-                    }
-                } else if let password = self.pendingUnlockPassword {
-                    do {
-                        try self.unlock(with: password, saltOverride: serverSaltData, skipHandshake: true, forceLock: true)
-                        self.pendingUnlockPassword = nil
-                        DispatchQueue.main.async { self.isUnlocked = true; self.objectWillChange.send() }
-                        if self.db != nil { SyncService.shared.startFullSyncPipeline() }
-                    } catch { }
-                } else if self.isUnlocked {
-                    // Reconnect path: vault is already unlocked and we just
-                    // received a salt from the server after a reconnect
-                    // (e.g., iOS came back online after being offline). The
-                    // previous code skipped the sync pipeline in this case
-                    // because neither pendingSetupPassword nor
-                    // pendingUnlockPassword was set. Result: flushOutbox()
-                    // never ran, so offline-edited/added entries on iOS were
-                    // never pushed to Desktop, AND requestSync() never
-                    // fired, so Desktop-side edits made while iOS was
-                    // offline never reached iOS. This single branch makes
-                    // bidirectional sync work after a reconnect.
-                    //
-                    // Order: flushOutbox (push local pending changes) ->
-                    // requestSync (pull server changes since lastTimestamp).
-                    // The re-entrancy guard in saveEntry/didReceiveSyncEntries
-                    // keeps the resulting broadcasts from echoing back.
+            let serverSalt = Data(salt)
+            let vaultId = SyncService.shared.vaultId
+            self.debugSaltHex = serverSalt.map { String(format: "%02x", $0) }.joined()
+
+            if let password = self.pendingSetupPassword {
+                // Retrieve flow: adopt the server's salt and open the vault with it.
+                do {
+                    try self.storeSalt(serverSalt, for: vaultId)
+                    try self.initializeWithSalt(password: password, salt: serverSalt)
+                    self.sessionPassword = password
+                    self.saveBiometricPasswordIfEnabled(password)
+                    self.retrieveWatchdog?.cancel()
+                    self.pendingSetupPassword = nil
+                    self.isFirstPopulationPending = false
+                    self.lastHandshakeError = nil
                     SyncService.shared.startFullSyncPipeline()
+                } catch {
+                    self.failRetrieve("Could not open the vault. Please try again.")
                 }
-            } catch { self.keyStatus = "Salt Store Error" }
+            } else if self.isUnlocked {
+                // Reconnect (or first link of a vault created on this phone).
+                let localSalt = try? self.retrieveSalt(for: vaultId)
+                if let local = localSalt, local != serverSalt {
+                    // The desktop's vault has its own salt: re-encrypt local entries
+                    // with the key derived from it, then adopt it.
+                    do { try self.rekeyLocalEntries(toSalt: serverSalt, vaultId: vaultId) }
+                    catch {
+                        self.keyStatus = "Key mismatch with desktop"
+                        self.lastHandshakeError = "This vault's key does not match the desktop vault. Sync paused."
+                        self.saltReady = true
+                        return
+                    }
+                }
+                SyncService.shared.startFullSyncPipeline()
+            }
             self.saltReady = true
             self.objectWillChange.send()
             NotificationCenter.default.post(name: Notification.Name("SaltReady"), object: nil)
+        }
+    }
+
+    /// Re-encrypts every local entry from the current key to the key derived from
+    /// `salt`, keeping modification times so "newest wins" is unaffected. All entries
+    /// are decrypted first; nothing is written if any one fails.
+    private func rekeyLocalEntries(toSalt salt: Data, vaultId: String) throws {
+        guard let oldKey = encryptionKey, let password = sessionPassword else { throw VaultError.notInitialized }
+        let newKey = try cryptoService.deriveKey(from: password, salt: salt)
+        var rekeyed: [VaultEntry] = []
+        for var entry in entries {
+            if !entry.encryptedPassword.isEmpty {
+                let plain = try cryptoService.decrypt(entry.encryptedPassword, using: oldKey)
+                entry.encryptedPassword = try cryptoService.encrypt(plain, using: newKey)
+            }
+            if let notes = entry.encryptedNotes, !notes.isEmpty {
+                let plain = try cryptoService.decrypt(notes, using: oldKey)
+                entry.encryptedNotes = try cryptoService.encrypt(plain, using: newKey)
+            }
+            rekeyed.append(entry)
+        }
+        try storeSalt(salt, for: vaultId)
+        encryptionKey = newKey
+        for entry in rekeyed { saveEntry(entry, fromRemote: false, keepTimestamp: true) }
+        print("[VaultManager] Re-keyed \(rekeyed.count) entries to the desktop salt")
+    }
+
+    func syncService(_ service: SyncService, didEncounterHandshakeError message: String) {
+        DispatchQueue.main.async {
+            if self.isFirstPopulationPending {
+                self.failRetrieve(message)
+            } else {
+                self.lastHandshakeError = message
+            }
         }
     }
     

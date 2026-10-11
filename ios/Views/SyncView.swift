@@ -1,445 +1,411 @@
-// VERSION_SINCED_2026_06_22_SETTINGS
 import SwiftUI
 import Network
-import AVFoundation
 
+/// Vault preferences and connection options. Connection options only manage the link to
+/// the desktop app; restoring a vault lives on the welcome screen and nowhere else.
 struct SettingsView: View {
+    var showsDone = false
 
-    @StateObject private var vaultManager = VaultManager.shared
-    @StateObject private var syncService = SyncService.shared
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var vaultManager = VaultManager.shared
+    @ObservedObject private var syncService = SyncService.shared
+    @AppStorage("autoLockSeconds") private var autoLockSeconds = 60
+    @AppStorage("faceIDUnlock") private var faceIDUnlock = true
+
+    @State private var vaultName = ""
     @State private var ipAddress = ""
     @State private var port = "7878"
-    @State private var showingConnectionError = false
-    @State private var errorMessage = ""
     @State private var showingQRScanner = false
-    @State private var retrievePassword = ""
-    @State private var showingRetrievePrompt = false
-    
+    @State private var connectionError: String?
+
     var body: some View {
-        ZStack {
-            Color(hex: "0B0C10").ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 24) {
-                    Text("VAULT SETTINGS")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top)
-                    
-                    // Vault Identity Plate
-                    IdentityPlate(vaultManager: vaultManager)
-                    
-                    // Key Status Plate
-                    KeyStatusPlate(vaultManager: vaultManager)
-                    
-                    Divider()
-                        .background(Color(hex: "2D2E35"))
-                        .padding(.vertical, 8)
-                    
-                    Text("SERVER LINK")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    StatusPlate(isConnected: syncService.isConnected, status: syncService.syncStatus)
-                    
-                    BeaconPlate(devices: syncService.discoveredDevices) { device in
-                        syncService.connect(to: device)
-                    }
-                    
-                    ConnectionPlate(ip: $ipAddress, port: $port, onConnect: {
-                        let host = NWEndpoint.Host(ipAddress)
-                        let portNum = UInt16(port) ?? 7878
-                        let endpoint = NWEndpoint.hostPort(host: host, port: NWEndpoint.Port(integerLiteral: portNum))
-                        
-                        let device = SyncDevice(
-                            name: "Manual Connection",
-                            endpoint: endpoint,
-                            host: ipAddress,
-                            port: portNum,
-                            remoteDeviceId: "manual"
-                        )
-                        syncService.connect(to: device)
-                    })
-                    
-                    // QR Scanner Trigger
-                    Button(action: {
-                        showingQRScanner = true
-                    }) {
-                        HStack {
-                            Image(systemName: "qrcode.viewfinder")
-                                .foregroundColor(Color(hex: "C5A059"))
-                            Text("SCAN CONNECTION QR")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color(hex: "0B0C10"))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .padding()
-                        .background(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
-                    }
-                    .padding(.top, 12)
-                    
-                    // RETRIEVE VAULT BUTTON - Appears when connected but no vault unlocked
-                    if syncService.isConnected && !vaultManager.isUnlocked && !vaultManager.hasAnyVault() {
-                        VStack(spacing: 12) {
-                            Text("VAULT RECOVERY")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color(hex: "C5A059"))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            SecureField("Master Password", text: $retrievePassword)
-                                .textContentType(.password)
-                                .textFieldStyle(PlainTextFieldStyle())
-                                .padding()
-                                .background(Color(hex: "1B1C21"))
-                                .foregroundColor(Color(hex: "C5A059"))
-                                .cornerRadius(4)
-                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                                .font(.system(.body, design: .monospaced))
-                            
-                            Button(action: {
-                                guard !retrievePassword.isEmpty else { return }
-                                VaultManager.shared.retrieveVault(password: retrievePassword)
-                                retrievePassword = ""
-                            }) {
-                                HStack {
-                                    Image(systemName: "arrow.down.circle.fill")
-                                    Text("RETRIEVE VAULT FROM SERVER")
-                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                }
-                                .foregroundColor(Color(hex: "0B0C10"))
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color(hex: "39FF14"))
-                                .cornerRadius(4)
-                                .shadow(color: Color(hex: "2E8B2E"), radius: 2, x: 0, y: 2)
-                            }
-                            .disabled(retrievePassword.isEmpty)
-                        }
-                        .padding()
-                        .background(Color(hex: "1B1C21"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "39FF14"), lineWidth: 1))
-                    }
-                    
-                    LogPlate(logs: syncService.logs)
-                }
-                .padding()
+        Form {
+            if vaultManager.isUnlocked {
+                vaultSection
+                securitySection
             }
+            syncSection
+            diagnosticsSection
+            aboutSection
         }
-        .onAppear {
-            syncService.startUDPListener()
-        }
+        .scrollContentBackground(.hidden)
+        .screenBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
+        .toolbar {
+            if showsDone {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .tint(Palette.accent)
+        .onAppear {
+            vaultName = vaultManager.vaultName
+            syncService.startUDPListener()
+        }
         .sheet(isPresented: $showingQRScanner) {
             QRScannerView { scannedUri in
-                if scannedUri.hasPrefix("clawpass://") {
-                    let stripped = scannedUri.replacingOccurrences(of: "clawpass://", with: "")
-                    let components = stripped.split(separator: ":")
-                    if components.count == 2 {
-                        let host = String(components[0])
-                        let port = UInt16(components[1]) ?? 7878
-                        
-                        let endpoint = NWEndpoint.hostPort(
-                            host: NWEndpoint.Host(host), 
-                            port: NWEndpoint.Port(integerLiteral: port)
-                        )
-                        
-                        let device = SyncDevice(
-                            name: "QR Scanned Device",
-                            endpoint: endpoint,
-                            host: host,
-                            port: port,
-                            remoteDeviceId: "qr_scanned"
-                        )
-                        syncService.connect(to: device)
-                    }
-                }
+                showingQRScanner = false
+                connectFromQR(scannedUri)
             }
         }
-        .alert("Connection Error", isPresented: $showingConnectionError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage)
-        }
     }
-}
 
-struct IdentityPlate: View {
-    @ObservedObject var vaultManager: VaultManager
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            Text("VAULT IDENTITY")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "94a3b8"))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
+    // MARK: Sections
+
+    private var vaultSection: some View {
+        Section {
             HStack {
-                Text("NAME:")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "94a3b8"))
-                
-                TextField("Enter vault name...", text: Binding(
-                    get: {
-                        return vaultManager.vaultName
-                    },
-                    set: { newValue in
-                        // Don't use `try?` here — the failure mode is
-                        // "vault is locked" (db == nil), in which case
-                        // the user has typed a name into the settings
-                        // field and silently lost it. The Binding set
-                        // closure can't throw, so we capture the error
-                        // in a do/catch and log. The user sees no
-                        // visible error in the field, but the next time
-                        // they open the app the field will reflect the
-                        // last successfully-persisted value.
-                        do {
-                            try vaultManager.updateVaultName(newValue)
-                        } catch {
-                            print("[IdentityPlate] updateVaultName failed: \(error)")
-                        }
-                    }
-                ))
-                .textFieldStyle(PlainTextFieldStyle())
-                .foregroundColor(Color(hex: "C5A059"))
-                .padding(8)
-                .background(Color(hex: "0B0C10"))
-                .cornerRadius(4)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+                Text("Name")
+                TextField("My Vault", text: $vaultName)
+                    .multilineTextAlignment(.trailing)
+                    .submitLabel(.done)
+                    .onSubmit(saveName)
             }
+            NavigationLink("Categories") { CategoriesView() }
+        } header: {
+            Text("Vault")
         }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+        .listRowBackground(Palette.surface)
+        .onDisappear(perform: saveName)
     }
-}
 
-struct KeyStatusPlate: View {
-    @ObservedObject var vaultManager: VaultManager
-    
-    var body: some View {
-        let keyStatus = vaultManager.verifyCurrentKey()
-        VStack(spacing: 12) {
-            HStack {
-                Text("CRYPTOGRAPHIC STATE:")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "94a3b8"))
-                Spacer()
-                
+    private var securitySection: some View {
+        Section {
+            Picker("Auto-lock", selection: $autoLockSeconds) {
+                Text("Immediately").tag(0)
+                Text("After 1 minute").tag(60)
+                Text("After 5 minutes").tag(300)
+                Text("Never").tag(-1)
+            }
+            if CryptoService.shared.biometricsAvailable {
+                Toggle("Unlock with Face ID", isOn: $faceIDUnlock)
+                    .onChange(of: faceIDUnlock) { enabled in
+                        vaultManager.setBiometricUnlock(enabled)
+                    }
+            }
+            Button("Lock Now") {
+                dismiss()
+                vaultManager.lock()
+            }
+        } header: {
+            Text("Security")
+        } footer: {
+            Text("The vault locks when the app has been in the background for the chosen time.")
+        }
+        .listRowBackground(Palette.surface)
+    }
+
+    private var syncSection: some View {
+        Group {
+            Section {
                 HStack {
                     Circle()
-                        .fill(keyStatus == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
-                        .frame(width: 8, height: 8)
-                    
-                    Text(keyStatus.uppercased())
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(keyStatus == "Key Valid" ? Color(hex: "39FF14") : Color(hex: "C5A059"))
+                        .fill(syncService.isConnected ? Palette.success : Palette.textTertiary)
+                        .frame(width: 10, height: 10)
+                    Text(syncService.isConnected ? "Connected to your computer" : "Not connected")
+                    Spacer()
                 }
-            }
-        }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-    }
-}
+                .accessibilityElement(children: .combine)
 
-struct StatusPlate: View {
-    let isConnected: Bool
-    let status: String
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("SATELLITE LINK:")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "94a3b8"))
-                Spacer()
-                
-                HStack {
-                    Circle()
-                        .fill(isConnected ? Color(hex: "39FF14") : Color(hex: "5C5E66"))
-                        .frame(width: 8, height: 8)
-                        .shadow(color: isConnected ? Color(hex: "39FF14") : Color.clear, radius: 4)
-                    
-                    Text(isConnected ? "ESTABLISHED" : "DISCONNECTED")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(isConnected ? Color(hex: "39FF14") : Color(hex: "C5A059"))
+                if let error = vaultManager.lastHandshakeError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundColor(Palette.warning)
                 }
+                if let connectionError = connectionError {
+                    Text(connectionError)
+                        .font(.footnote)
+                        .foregroundColor(Palette.danger)
+                }
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text("Sync happens directly with \(AppBrand.desktopName) on your Wi-Fi network. Nothing is sent to the cloud.")
             }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("SYNC STATUS:")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "94a3b8"))
-                
-                Text(status)
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundColor(Color(hex: "C5A059"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-    }
-}
+            .listRowBackground(Palette.surface)
 
-struct BeaconPlate: View {
-    let devices: [SyncDevice]
-    var onConnect: (SyncDevice) -> Void
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .foregroundColor(Color(hex: "C5A059"))
-                Text("DETECTED BEACONS")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "C5A059"))
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            if devices.isEmpty {
-                Text("Scanning for signals...")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(Color(hex: "5C5E66"))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(devices) { device in
-                        Button(action: { onConnect(device) }) {
+            Section {
+                if syncService.discoveredDevices.isEmpty {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Searching your network…").foregroundColor(Palette.textSecondary)
+                    }
+                } else {
+                    ForEach(syncService.discoveredDevices) { device in
+                        Button {
+                            syncService.connect(to: device)
+                        } label: {
                             HStack {
-                                Text("SIGNAL: \(device.host)")
-                                    .font(.system(size: 13, design: .monospaced))
-                                    .foregroundColor(Color(hex: "C5A059"))
+                                Image(systemName: "desktopcomputer")
+                                Text(device.host)
                                 Spacer()
-                                Text("CONNECT")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color(hex: "C5A059"))
-                                    .foregroundColor(Color(hex: "0B0C10"))
-                                    .cornerRadius(2)
+                                Text("Connect").foregroundColor(Palette.accent)
                             }
-                            .padding()
-                            .background(Color(hex: "1B1C21"))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
                         }
                     }
                 }
+            } header: {
+                Text("Computers Found")
             }
-        }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-    }
-}
+            .listRowBackground(Palette.surface)
 
-struct ConnectionPlate: View {
-    @Binding var ip: String
-    @Binding var port: String
-    var onConnect: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("MANUAL CONNECTION")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "C5A059"))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("IP ADDRESS")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(hex: "94a3b8"))
-                    TextField("192.168.1.x", text: $ip)
-                        .padding()
-                        .background(Color(hex: "0B0C10"))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                        .font(.system(.body, design: .monospaced))
+            Section {
+                HStack {
+                    Text("Address")
+                    TextField("192.168.1.20", text: $ipAddress)
+                        .multilineTextAlignment(.trailing)
+                        .keyboardType(.numbersAndPunctuation)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                 }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("PORT")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(hex: "94a3b8"))
+                HStack {
+                    Text("Port")
                     TextField("7878", text: $port)
-                        .padding()
-                        .background(Color(hex: "0B0C10"))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                        .font(.system(.body, design: .monospaced))
+                        .multilineTextAlignment(.trailing)
+                        .keyboardType(.numberPad)
                 }
+                Button("Connect") { connectManually() }
+                    .disabled(ipAddress.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button {
+                    showingQRScanner = true
+                } label: {
+                    Label("Scan Connection QR Code", systemImage: "qrcode.viewfinder")
+                }
+            } header: {
+                Text("Manual Connection")
+            } footer: {
+                Text("Use this if your computer is not found automatically. The QR code is shown in \(AppBrand.desktopName).")
             }
-            
-            Button(action: onConnect) {
-                Text("INITIATE HANDSHAKE")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "0B0C10"))
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(hex: "C5A059"))
-                    .cornerRadius(4)
-                    .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
-            }
+            .listRowBackground(Palette.surface)
         }
-        .padding()
-        .background(Color(hex: "1B1C21"))
-        .cornerRadius(4)
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+    }
+
+    private var diagnosticsSection: some View {
+        Section {
+            NavigationLink("Connection Log") { ConnectionLogView() }
+        } header: {
+            Text("Diagnostics")
+        }
+        .listRowBackground(Palette.surface)
+    }
+
+    private var aboutSection: some View {
+        Section {
+            HStack {
+                Text("Version")
+                Spacer()
+                Text(Self.versionString).foregroundColor(Palette.textSecondary)
+            }
+        } header: {
+            Text("About")
+        }
+        .listRowBackground(Palette.surface)
+    }
+
+    // MARK: Actions
+
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+
+    private func saveName() {
+        let trimmed = vaultName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard vaultManager.isUnlocked, !trimmed.isEmpty, trimmed != vaultManager.vaultName else { return }
+        try? vaultManager.updateVaultName(trimmed)
+    }
+
+    private func connectManually() {
+        connectionError = nil
+        let host = ipAddress.trimmingCharacters(in: .whitespaces)
+        guard let portNumber = UInt16(port.trimmingCharacters(in: .whitespaces)), portNumber > 0 else {
+            connectionError = "Enter a valid port number (usually 7878)."
+            return
+        }
+        connect(host: host, port: portNumber, name: "Manual Connection", id: "manual")
+    }
+
+    private func connectFromQR(_ uri: String) {
+        connectionError = nil
+        // The desktop app encodes its address as clawpass://<ip>:<port>
+        guard let range = uri.range(of: "://") else {
+            connectionError = "That QR code is not a \(AppBrand.name) connection code."
+            return
+        }
+        let parts = uri[range.upperBound...].split(separator: ":")
+        guard parts.count == 2, let portNumber = UInt16(parts[1]) else {
+            connectionError = "That QR code is not a \(AppBrand.name) connection code."
+            return
+        }
+        connect(host: String(parts[0]), port: portNumber, name: "QR Scanned Device", id: "qr_scanned")
+    }
+
+    private func connect(host: String, port: UInt16, name: String, id: String) {
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else { return }
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: nwPort)
+        let device = SyncDevice(name: name, endpoint: endpoint, host: host, port: port, remoteDeviceId: id)
+        syncService.connect(to: device)
     }
 }
 
-struct LogPlate: View {
-    let logs: String
-    
+/// Read-only view of the connection log with copy/share, for troubleshooting.
+struct ConnectionLogView: View {
+    @ObservedObject private var syncService = SyncService.shared
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("SYSTEM LOGS")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "C5A059"))
+        ScrollView {
+            Text(syncService.logs)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(Palette.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
-            ScrollView {
-                Text(logs)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(Color(hex: "39FF14"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color(hex: "0B0C10"))
-                    .cornerRadius(4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+                .padding()
+                .textSelection(.enabled)
+        }
+        .screenBackground()
+        .navigationTitle("Connection Log")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                ShareLink(item: syncService.logs) { Image(systemName: "square.and.arrow.up") }
             }
-            .frame(height: 200)
-            
-            Button(action: {
-                SyncService.shared.uploadLogs()
-            }) {
-                Text("DUMP LOGS TO SERVER")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color(hex: "0B0C10"))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color(hex: "C5A059"))
-                    .cornerRadius(4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+        }
+    }
+}
+
+// MARK: - Categories
+
+struct CategoriesView: View {
+    @ObservedObject private var vaultManager = VaultManager.shared
+    @State private var editing: Category?
+    @State private var showingNew = false
+
+    private let favoritesID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+    private var custom: [Category] { vaultManager.categories.filter { $0.id != favoritesID } }
+
+    var body: some View {
+        List {
+            if custom.isEmpty {
+                Text("No categories yet. Add one to group your entries.")
+                    .foregroundColor(Palette.textSecondary)
+                    .listRowBackground(Color.clear)
             }
+            ForEach(custom) { category in
+                Button { editing = category } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: category.icon)
+                            .foregroundColor(Color(hex: category.color))
+                            .frame(width: 28)
+                        Text(category.name).foregroundColor(Palette.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.footnote)
+                            .foregroundColor(Palette.textTertiary)
+                    }
+                }
+            }
+            .onDelete { offsets in
+                offsets.map { custom[$0] }.forEach { vaultManager.deleteCategory(id: $0.id) }
+            }
+            .listRowBackground(Palette.surface)
+        }
+        .scrollContentBackground(.hidden)
+        .screenBackground()
+        .navigationTitle("Categories")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showingNew = true } label: { Image(systemName: "plus") }
+                    .accessibilityLabel("Add category")
+            }
+        }
+        .sheet(item: $editing) { CategoryEditor(category: $0) }
+        .sheet(isPresented: $showingNew) { CategoryEditor(category: nil) }
+        .tint(Palette.accent)
+    }
+}
+
+struct CategoryEditor: View {
+    let category: Category?
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var icon: String
+    @State private var color: String
+
+    private static let icons = ["folder.fill", "briefcase.fill", "creditcard.fill", "cart.fill", "house.fill", "gamecontroller.fill",
+                                "envelope.fill", "heart.fill", "graduationcap.fill", "airplane", "wrench.and.screwdriver.fill", "globe"]
+    private static let colors = ["#C5A059", "#5AC8FA", "#34C759", "#FF9F0A", "#FF453A", "#BF5AF2", "#64D2FF", "#8E8E93"]
+
+    init(category: Category?) {
+        self.category = category
+        _name = State(initialValue: category?.name ?? "")
+        _icon = State(initialValue: category?.icon ?? "folder.fill")
+        _color = State(initialValue: category?.color ?? "#C5A059")
+    }
+
+    private var iconChoices: [String] { Self.icons.contains(icon) ? Self.icons : [icon] + Self.icons }
+    private var colorChoices: [String] { Self.colors.contains { $0.caseInsensitiveCompare(color) == .orderedSame } ? Self.colors : [color] + Self.colors }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 14) {
+                        ForEach(iconChoices, id: \.self) { symbol in
+                            Button { icon = symbol } label: {
+                                Image(systemName: symbol)
+                                    .font(.title3)
+                                    .frame(width: 40, height: 40)
+                                    .foregroundColor(icon == symbol ? Palette.onAccent : Palette.textPrimary)
+                                    .background(Circle().fill(icon == symbol ? Palette.accent : Palette.surfaceRaised))
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                } header: {
+                    Text("Icon")
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 14) {
+                        ForEach(colorChoices, id: \.self) { hex in
+                            Button { color = hex } label: {
+                                Circle()
+                                    .fill(Color(hex: hex))
+                                    .frame(width: 28, height: 28)
+                                    .overlay(Circle().stroke(Palette.textPrimary, lineWidth: color.caseInsensitiveCompare(hex) == .orderedSame ? 2 : 0).padding(-3))
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                } header: {
+                    Text("Color")
+                }
+                .listRowBackground(Palette.surface)
+            }
+            .scrollContentBackground(.hidden)
+            .screenBackground()
+            .navigationTitle(category == nil ? "New Category" : "Edit Category")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        VaultManager.shared.saveCategory(Category(id: category?.id ?? UUID(), name: trimmed, icon: icon, color: color))
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .tint(Palette.accent)
         }
     }
 }

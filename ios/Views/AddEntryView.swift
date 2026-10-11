@@ -1,186 +1,149 @@
-// VERSION_SINCED_2026_05_28_FINAL
 import SwiftUI
 
 struct AddEntryView: View {
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var vaultManager = VaultManager.shared
+
     @State private var title = ""
     @State private var username = ""
     @State private var password = ""
     @State private var url = ""
     @State private var notes = ""
-    @State private var selectedCategory: Category?
+    @State private var selectedCategory: UUID?
     @State private var isFavorite = false
-    
+    @State private var showPassword = false
+    @State private var totp = ""
+    @State private var showingTOTPScanner = false
+    @State private var errorMessage: String?
+
+    private let favoritesId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    private var assignableCategories: [Category] {
+        vaultManager.categories.filter { $0.id != favoritesId }
+    }
+
     var body: some View {
-        ZStack {
-            Color(hex: "0B0C10").ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 24) {
-                    Text("NEW ENTRY")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top)
-                    
-                    VStack(spacing: 16) {
-                        InputField(label: "Title", text: $title)
-                        InputField(label: "Username", text: $username)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("PASSWORD")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color(hex: "94a3b8"))
-                            
-                            HStack {
-                                SecureField("", text: $password)
-                                    .padding()
-                                    .background(Color(hex: "0B0C10"))
-                                    .foregroundColor(Color(hex: "C5A059"))
-                                    .cornerRadius(4)
-                                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                                    .font(.system(.body, design: .monospaced))
-                                
-                                Button(action: generatePassword) {
-                                    Image(systemName: "gearshape.fill")
-                                        .foregroundColor(Color(hex: "C5A059"))
-                                        .padding()
-                                        .background(Color(hex: "1B1C21"))
-                                        .cornerRadius(4)
-                                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                                }
+        NavigationView {
+            Form {
+                Section {
+                    TextField("Title", text: $title)
+                    TextField("Username or email", text: $username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textContentType(.username)
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    HStack {
+                        Group {
+                            if showPassword {
+                                TextField("Password", text: $password)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            } else {
+                                SecureField("Password", text: $password)
                             }
                         }
-                        
-                        InputField(label: "URL", text: $url)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("NOTES")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color(hex: "94a3b8"))
-                            
-                            TextEditor(text: $notes)
-                                .frame(height: 100)
-                                .padding(4)
-                                .background(Color(hex: "0B0C10"))
-                                .foregroundColor(Color(hex: "C5A059"))
-                                .cornerRadius(4)
-                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                                .font(.system(.body, design: .monospaced))
+                        .textContentType(.newPassword)
+
+                        Button { showPassword.toggle() } label: {
+                            Image(systemName: showPassword ? "eye.slash" : "eye")
+                                .foregroundColor(Palette.textSecondary)
                         }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("CATEGORY")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color(hex: "94a3b8"))
-                            
-                            Picker("Category", selection: $selectedCategory) {
-                                Text("None").tag(Optional<Category>.none)
-                                ForEach(VaultManager.shared.categories) { category in
-                                    Text(category.name).tag(Optional(category))
-                                }
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .padding()
-                            .background(Color(hex: "0B0C10"))
-                            .foregroundColor(Color(hex: "C5A059"))
-                            .cornerRadius(4)
-                            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                        }
-                        
-                        Toggle(isOn: $isFavorite) {
-                            HStack {
-                                Image(systemName: "star.fill")
-                                    .foregroundColor(isFavorite ? Color(hex: "FFD700") : Color(hex: "C5A059"))
-                                Text("Mark as Favorite")
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundColor(Color(hex: "C5A059"))
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .padding()
-                        .background(Color(hex: "1B1C21"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(showPassword ? "Hide password" : "Show password")
                     }
-                    .padding()
-                    .background(Color(hex: "1B1C21"))
-                    .cornerRadius(4)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                    
-                    HStack(spacing: 12) {
-                        Button("Cancel") {
-                            dismiss()
+                    StrengthMeter(password: password)
+                    Button {
+                        password = CryptoService.shared.generatePassword()
+                        showPassword = true
+                    } label: {
+                        Label("Generate Strong Password", systemImage: "wand.and.stars")
+                    }
+                } header: {
+                    Text("Password")
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    TextField("Website", text: $url)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(assignableCategories) { category in
+                            Text(category.name).tag(UUID?.some(category.id))
                         }
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(Color(hex: "C5A059"))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(hex: "1B1C21"))
-                        .cornerRadius(4)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5A059"), lineWidth: 1))
-                        
-                        Button("Save Entry") {
-                            saveEntry()
-                            dismiss()
-                        }
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(Color(hex: "0B0C10"))
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(hex: "C5A059"))
-                        .cornerRadius(4)
-                        .shadow(color: Color(hex: "8B6B32"), radius: 2, x: 0, y: 2)
+                    }
+                    Toggle("Favorite", isOn: $isFavorite)
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 90)
+                } header: {
+                    Text("Notes")
+                }
+                .listRowBackground(Palette.surface)
+
+                Section {
+                    DisclosureGroup("One-time code (optional)") {
+                        TOTPFields(secret: $totp, showingScanner: $showingTOTPScanner)
                     }
                 }
-                .padding()
+                .listRowBackground(Palette.surface)
+
+                if let errorMessage = errorMessage {
+                    Section { InlineBanner(kind: .error, message: errorMessage) }
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .screenBackground()
+            .navigationTitle("New Entry")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .tint(Palette.accent)
+            .sheet(isPresented: $showingTOTPScanner) {
+                QRScannerView { scanned in
+                    totp = scanned
+                    showingTOTPScanner = false
+                }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color(hex: "1B1C21"), for: .navigationBar)
     }
-    
-    private func generatePassword() {
-        password = CryptoService.shared.generatePassword()
-    }
-    
-    private func saveEntry() {
-        let newEntry = VaultEntry(
-            title: title,
-            username: username,
-            password: "", // Encrypted version handled by Manager
-            url: url,
-            notes: "",    // Encrypted version handled by Manager
-            categoryID: selectedCategory?.id,
+
+    private func save() {
+        if !totp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && TOTP.parse(totp) == nil {
+            errorMessage = "That one-time code key isn't valid. Paste the setup key or the otpauth:// link."
+            return
+        }
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let entry = VaultEntry(
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+            password: "", // encrypted by the manager
+            url: trimmedURL.isEmpty ? nil : trimmedURL,
+            notes: nil,   // encrypted by the manager
+            categoryID: selectedCategory,
             totpSecret: nil,
             isFavorite: isFavorite
         )
-        
-        do {
-            try VaultManager.shared.addEntry(newEntry, password: password, notes: notes.isEmpty ? nil : notes)
-        } catch {
-            print("Save failed: \(error)")
-        }
-    }
-}
 
-struct InputField: View {
-    let label: String
-    @Binding var text: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label.uppercased())
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "94a3b8"))
-            
-            TextField("", text: $text)
-                .padding()
-                .background(Color(hex: "0B0C10"))
-                .foregroundColor(Color(hex: "C5A059"))
-                .cornerRadius(4)
-                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "2D2E35"), lineWidth: 1))
-                .font(.system(.body, design: .monospaced))
+        do {
+            try VaultManager.shared.addEntry(entry, password: password, notes: notes.isEmpty ? nil : notes, totpSecret: totp)
+            dismiss()
+        } catch {
+            errorMessage = "The entry could not be saved. Please unlock the vault and try again."
         }
     }
 }
