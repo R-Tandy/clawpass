@@ -229,7 +229,7 @@ struct SettingsView: View {
 
     private func connectFromQR(_ uri: String) {
         connectionError = nil
-        // The desktop app encodes its address as clawpass://<ip>:<port>
+        // The desktop app encodes its address as layer://<ip>:<port>
         guard let range = uri.range(of: "://") else {
             connectionError = "That QR code is not a \(AppBrand.name) connection code."
             return
