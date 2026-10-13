@@ -1,4 +1,4 @@
-// SINCED_VERSION_2026_06_06_STABILITY_FIX
+// SYNC_VERSION_STABILITY_FIX
 import Foundation
 import Network
 import CryptoKit
@@ -35,6 +35,7 @@ enum SyncMessage: Codable {
     case requestTombstones(vaultId: String)
     case tombstonesResponse(deletedIds: [String], deletedAt: [String: Int64])
     case deleteVault(vaultId: String)
+    case registerVault(salt: [UInt8], verify: [UInt8])
     
     enum CodingKeys: String, CodingKey {
         case type
@@ -52,6 +53,7 @@ enum SyncMessage: Codable {
         case deleted_at = "deleted_at"
         case message
         case logs
+        case verify
     }
     
     func encode(to encoder: Encoder) throws {
@@ -110,6 +112,10 @@ enum SyncMessage: Codable {
         case .deleteVault(let vaultId):
             try container.encode("delete_vault", forKey: .type)
             try container.encode(vaultId, forKey: .vault_id)
+        case .registerVault(let salt, let verify):
+            try container.encode("register_vault", forKey: .type)
+            try container.encode(salt, forKey: .salt)
+            try container.encode(verify, forKey: .verify)
         default:
             try container.encode("unknown", forKey: .type)
         }
@@ -183,6 +189,10 @@ enum SyncMessage: Codable {
         case "delete_vault":
             let vaultId = try container.decode(String.self, forKey: .vault_id)
             self = .deleteVault(vaultId: vaultId)
+        case "register_vault":
+            let salt = try container.decode([UInt8].self, forKey: .salt)
+            let verify = try container.decode([UInt8].self, forKey: .verify)
+            self = .registerVault(salt: salt, verify: verify)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(type)")
         }
@@ -432,10 +442,10 @@ class SyncService: ObservableObject {
 
 
     init() {
-        log("SINCED_VERSION_V3_BETA: Initial initializing SyncService")
+        log("SYNC_V4: Initial initializing SyncService")
         let savedHost = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
         let savedPort = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
-        print("[SINCED] Loaded last connection: \(savedHost):\(savedPort)")
+        print("[SYNC] Loaded last connection: \(savedHost):\(savedPort)")
     }
     
     func log(_ message: String) {
@@ -480,34 +490,36 @@ class SyncService: ObservableObject {
         // server entry on every reconnect).
         if let stored = UserDefaults.standard.object(forKey: "lastSyncTimestamp_\(id)") as? Int64 {
             self.lastSyncTimestamp = stored
-            log("SINCED: Restored lastSyncTimestamp=\(stored) for vault \(id.prefix(12))...")
+            log("SYNC: Restored lastSyncTimestamp=\(stored) for vault \(id.prefix(12))...")
         } else {
             self.lastSyncTimestamp = 0
         }
-        log("SINCED: Vault Identity set to \(id)")
+        log("SYNC: Vault Identity set to \(id)")
     }
 
     private var isHandshaking = false
     private var awaitingHandshakeAck = false
+    /// True between sending a new-vault registration and the computer's answer.
+    private var awaitingRegisterAck = false
     private var wireSession: WireSession?
     private var pendingClientNonce: Data?
     private let wireLock = NSLock()
 
     func triggerHandshake() {
         guard !isHandshaking else {
-            log("SINCED: Handshake already in progress. Ignoring request.")
+            log("SYNC: Handshake already in progress. Ignoring request.")
             return
         }
         
         guard isConnected else {
-            log("SINCED: Not connected. Attempting proactive connection...")
+            log("SYNC: Not connected. Attempting proactive connection...")
             pendingHandshake = true
             
             if let targetDevice = discoveredDevices.first {
-                log("SINCED: Proactively connecting to discovered device: \(targetDevice.host)")
+                log("SYNC: Proactively connecting to discovered device: \(targetDevice.host)")
                 connect(to: targetDevice)
             } else {
-                log("SINCED: No discovered devices available to connect to.")
+                log("SYNC: No discovered devices available to connect to.")
             }
             return
         }
@@ -521,7 +533,7 @@ class SyncService: ObservableObject {
             if case let .hostPort(host, port) = existing.endpoint,
                host.debugDescription.contains(device.host),
                port.debugDescription.contains("\(device.port)") {
-                log("SINCED: Already connected to \(device.host):\(device.port). Skipping redundant connection.")
+                log("SYNC: Already connected to \(device.host):\(device.port). Skipping redundant connection.")
                 return
             }
         }
@@ -530,14 +542,14 @@ class SyncService: ObservableObject {
         if let existing = connection {
             switch existing.state {
             case .preparing, .setup:
-                log("SINCED: Connection already preparing for \(device.host). Skipping.")
+                log("SYNC: Connection already preparing for \(device.host). Skipping.")
                 return
             default:
                 break
             }
         }
         
-        log("SINCED: Initiating clean connection to \(device.name) (\(device.host):\(device.port))...")
+        log("SYNC: Initiating clean connection to \(device.name) (\(device.host):\(device.port))...")
         
         // 2. Total teardown of any lingering state
         disconnect() 
@@ -553,7 +565,7 @@ class SyncService: ObservableObject {
                 guard let self = self else { return }
                 switch state {
                 case .ready:
-                    self.log("SINCED: Connection established to \(device.host)")
+                    self.log("SYNC: Connection established to \(device.host)")
                     DispatchQueue.main.async {
                         self.isConnected = true
                         self.syncStatus = "Connected"
@@ -572,14 +584,14 @@ class SyncService: ObservableObject {
                     self.receiveLoop()
 
                     if self.pendingHandshake {
-                        self.log("SINCED: Executing pending handshake...")
+                        self.log("SYNC: Executing pending handshake...")
                         self.startHandshake()
                         self.pendingHandshake = false
                     } else {
                         self.startHandshake()
                     }
                 case .failed(let error):
-                    self.log("SINCED: Connection failed: \(error)")
+                    self.log("SYNC: Connection failed: \(error)")
                     self.handleDisconnect()
                 case .cancelled:
                     self.handleDisconnect()
@@ -600,22 +612,31 @@ class SyncService: ObservableObject {
             let listener = try NWListener(using: .udp, on: beaconPort)
             listener.newConnectionHandler = { [weak self] connection in
                 guard let self = self else { return }
+                // Drop the flow when it ends so beacon connections can't pile up over a long session.
+                connection.stateUpdateHandler = { [weak self, weak connection] state in
+                    switch state {
+                    case .cancelled, .failed:
+                        guard let connection = connection else { return }
+                        self?.beaconConnections.removeAll { $0 === connection }
+                    default: break
+                    }
+                }
                 connection.start(queue: self.syncQueue)
                 self.beaconConnections.append(connection)
                 self.receiveBeacons(on: connection)
             }
             listener.stateUpdateHandler = { [weak self] state in
                 if case .failed(let error) = state {
-                    self?.log("SINCED: Beacon listener failed: \(error)")
+                    self?.log("SYNC: Beacon listener failed: \(error)")
                     self?.beaconListener?.cancel()
                     self?.beaconListener = nil
                 }
             }
             listener.start(queue: syncQueue)
             beaconListener = listener
-            log("SINCED: UDP Beacon Listener started on port \(beaconPort)")
+            log("SYNC: UDP Beacon Listener started on port \(beaconPort)")
         } catch {
-            log("SINCED: Failed to start UDP listener: \(error)")
+            log("SYNC: Failed to start UDP listener: \(error)")
         }
     }
 
@@ -645,7 +666,7 @@ class SyncService: ObservableObject {
                             if self.discoveredDevices[index].host != host { self.discoveredDevices[index] = device }
                         } else {
                             self.discoveredDevices.append(device)
-                            self.log("SINCED: Discovered desktop at \(host).")
+                            self.log("SYNC: Discovered desktop at \(host).")
                         }
                     }
                     if (VaultManager.shared.isUnlocked || self.pendingHandshake) && !self.isConnected {
@@ -679,14 +700,14 @@ class SyncService: ObservableObject {
             defer { wireLock.unlock() }
             guard let session = wireSession else { return }
             sendFrame(try session.seal(jsonData))
-        } catch { print("[SINCED] Outbound encoding failed: \(error)") }
+        } catch { print("[SYNC] Outbound encoding failed: \(error)") }
     }
 
     private func sendFrame(_ body: Data) {
         var length = UInt32(body.count).bigEndian
         let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
         connection?.send(content: lengthData + body, completion: .contentProcessed({ error in
-            if let error = error { print("[SINCED] Outbound packet error: \(error)") }
+            if let error = error { print("[SYNC] Outbound packet error: \(error)") }
         }))
     }
 
@@ -698,7 +719,7 @@ class SyncService: ObservableObject {
     @discardableResult
     func sendEntryUpdate(entry: VaultEntry) -> Bool {
         guard handshakeCompleted else {
-            log("SINCED: Offline - entry update queued for the next sync.")
+            log("SYNC: Offline - entry update queued for the next sync.")
             return false
         }
         guard let key = VaultManager.shared.getEncryptionKey() else {
@@ -711,14 +732,14 @@ class SyncService: ObservableObject {
             VaultManager.shared.noteEntrySent(entry)
             return true
         } catch {
-            print("[SINCED] Failed to prepare entry update: \(error)")
+            print("[SYNC] Failed to prepare entry update: \(error)")
             return false
         }
     }
 
     func sendEntryDelete(entryId: String) {
         guard handshakeCompleted else {
-            log("SINCED: Blocked EntryDelete - Handshake not completed. Entry will be sent during next flush.")
+            log("SYNC: Blocked EntryDelete - Handshake not completed. Entry will be sent during next flush.")
             return
         }
         let deleteMsg = SyncMessage.entryDelete(entryId: entryId.lowercased(),
@@ -729,10 +750,10 @@ class SyncService: ObservableObject {
 
     func deleteVault() {
         guard isConnected && handshakeCompleted else {
-            log("SINCED: Cannot delete vault - not connected or handshake not completed.")
+            log("SYNC: Cannot delete vault - not connected or handshake not completed.")
             return
         }
-        log("SINCED: Requesting wipe of this vault on the computer...")
+        log("SYNC: Requesting wipe of this vault on the computer...")
         let request = SyncMessage.deleteVault(vaultId: "")
         let packet = SyncPacket(deviceId: deviceId, message: request)
         sendPacket(packet)
@@ -747,12 +768,12 @@ class SyncService: ObservableObject {
 
     func startFullSyncPipeline() {
         guard !isSyncing else {
-            log("SINCED: Sync pipeline already active. Skipping redundant trigger.")
+            log("SYNC: Sync pipeline already active. Skipping redundant trigger.")
             return
         }
 
         isSyncing = true
-        log("SINCED: Starting automated sync pipeline...")
+        log("SYNC: Starting automated sync pipeline...")
 
         syncQueue.async { [weak self] in
             guard let self = self else { return }
@@ -765,7 +786,7 @@ class SyncService: ObservableObject {
             // Caller (VaultManager after salt/unlock) is responsible for sequencing.
             DispatchQueue.main.async {
                 self.isSyncing = false
-                self.log("SINCED: Sync pipeline cycle complete.")
+                self.log("SYNC: Sync pipeline cycle complete.")
             }
         }
     }
@@ -799,10 +820,10 @@ class SyncService: ObservableObject {
 
     func requestSalt() {
         guard handshakeCompleted else { 
-            log("SINCED: Cannot request salt - Handshake not completed.")
+            log("SYNC: Cannot request salt - Handshake not completed.")
             return 
         }
-        log("SINCED-TX: Requesting vault salt.")
+        log("SYNC-TX: Requesting vault salt.")
         let request = SyncMessage.requestSalt(vaultId: "")
         let packet = SyncPacket(deviceId: deviceId, message: request)
         sendPacket(packet)
@@ -834,10 +855,10 @@ class SyncService: ObservableObject {
 
     func uploadLogs() {
         guard isConnected else {
-            log("SINCED: Cannot upload logs - not connected.")
+            log("SYNC: Cannot upload logs - not connected.")
             return
         }
-        log("SINCED-TX: Uploading current logs to server...")
+        log("SYNC-TX: Uploading current logs to server...")
         let uploadMsg = SyncMessage.logUpload(logs: self.logs)
         let packet = SyncPacket(deviceId: deviceId, message: uploadMsg)
         sendPacket(packet)
@@ -868,31 +889,31 @@ class SyncService: ObservableObject {
         pendingClientNonce = nil
         
         delegate?.syncServiceDidDisconnect(self)
-        log("SINCED: Connection fully torn down and state reset.")
+        log("SYNC: Connection fully torn down and state reset.")
     }
 
     private func handleDisconnect() {
         // Only trigger a full reset if the connection is actually gone
         // and not currently being replaced by a new one.
         if connection == nil {
-            log("SINCED: No active connection to reset.")
+            log("SYNC: No active connection to reset.")
             return
         }
         
-        log("SINCED: Handling connection loss... initiating hard reset.")
+        log("SYNC: Handling connection loss... initiating hard reset.")
         disconnect()
     }
 
 
     private func startHandshake() {
         if vaultId.isEmpty {
-            log("SINCED: Blocked handshake - vault identity not yet derived (empty vaultId).")
+            log("SYNC: Blocked handshake - vault identity not yet derived (empty vaultId).")
             return
         }
         
         isHandshaking = true
         awaitingHandshakeAck = true
-        log("SINCED: Starting secure handshake...")
+        log("SYNC: Starting secure handshake...")
         let nonce = WireCrypto.randomNonce()
         pendingClientNonce = nonce
         sendPlainJSON(["type": "hello", "device_id": deviceId, "version": Int(currentProtocolVersion), "client_nonce": WireCrypto.hex(nonce)])
@@ -903,7 +924,7 @@ class SyncService: ObservableObject {
         guard let clientNonce = pendingClientNonce,
               let serverHex = json["server_nonce"] as? String,
               let serverNonce = WireCrypto.fromHex(serverHex), serverNonce.count == 16 else {
-            log("SINCED: Malformed challenge from the computer.")
+            log("SYNC: Malformed challenge from the computer.")
             return
         }
         pendingClientNonce = nil
@@ -913,13 +934,16 @@ class SyncService: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             guard let proof = WireCrypto.proof(localId: id, clientNonce: clientNonce, serverNonce: serverNonce) else {
-                self.log("SINCED: Could not compute the handshake proof.")
+                self.log("SYNC: Could not compute the handshake proof.")
                 return
             }
             self.wireLock.lock()
             self.wireSession = WireSession(localId: id, clientNonce: clientNonce, serverNonce: serverNonce)
             self.wireLock.unlock()
-            self.sendPlainJSON(["type": "auth", "device_id": device, "proof": proof])
+            var auth: [String: Any] = ["type": "auth", "device_id": device, "proof": proof]
+            // A vault created on this phone that the computer has not seen yet: ask it to accept the new id.
+            if UserDefaults.standard.string(forKey: "pendingRegister_\(id)") != nil { auth["register_id"] = id }
+            self.sendPlainJSON(auth)
         }
     }
 
@@ -938,7 +962,7 @@ class SyncService: ObservableObject {
 
                 // Safety valve: the desktop never sends frames anywhere near this size.
                 if length > 8 * 1024 * 1024 {
-                    self.log("SINCED: Received absurd packet length (\(length)). Forcing disconnect.")
+                    self.log("SYNC: Received absurd packet length (\(length)). Forcing disconnect.")
                     self.handleDisconnect()
                     return
                 }
@@ -981,7 +1005,7 @@ class SyncService: ObservableObject {
                 if (json["type"] as? String) == "challenge" { handleChallenge(json); return }
                 if let packet = try? JSONDecoder().decode(SyncPacket.self, from: data) { handlePlainError(packet); return }
             }
-            log("SINCED: Unexpected unencrypted packet ignored.")
+            log("SYNC: Unexpected unencrypted packet ignored.")
             return
         }
 
@@ -995,17 +1019,17 @@ class SyncService: ObservableObject {
                 handlePlainError(packet)
                 return
             }
-            log("SINCED: Dropping a packet that failed authentication.")
+            log("SYNC: Dropping a packet that failed authentication.")
             handleDisconnect()
         }
     }
 
     private func handlePlainError(_ packet: SyncPacket) {
         guard case .error(let message) = packet.message, awaitingHandshakeAck || isHandshaking else {
-            log("SINCED: Unexpected unencrypted packet ignored.")
+            log("SYNC: Unexpected unencrypted packet ignored.")
             return
         }
-        log("SINCED: Handshake failed with server error: \(message)")
+        log("SYNC: Handshake failed with server error: \(message)")
         isHandshaking = false
         awaitingHandshakeAck = false
         DispatchQueue.main.async {
@@ -1016,32 +1040,60 @@ class SyncService: ObservableObject {
     private func handleIncomingPacket(_ packet: SyncPacket) {
         switch packet.message {
         case .handshake(let deviceId, let version, let vaultId):
-            self.log("SINCED: Handshake received from \(deviceId).")
+            self.log("SYNC: Handshake received from \(deviceId).")
             
         case .ack:
             if awaitingHandshakeAck {
-                self.log("SINCED: Handshake ACK received.")
+                self.log("SYNC: Handshake ACK received.")
                 self.isHandshaking = false
                 self.awaitingHandshakeAck = false
                 self.handshakeCompleted = true
-                self.log("SINCED: Connection established and verified.")
-                
+                self.log("SYNC: Connection established and verified.")
+
+                if let verifyHex = UserDefaults.standard.string(forKey: "pendingRegister_\(vaultId)"),
+                   let verify = WireCrypto.fromHex(verifyHex),
+                   let salt = try? VaultManager.shared.localSalt(for: vaultId) {
+                    // New vault made on this phone: hand the computer its salt and key verifier first.
+                    log("SYNC: Registering the new vault on the computer...")
+                    awaitingRegisterAck = true
+                    sendPacket(SyncPacket(deviceId: deviceId, message: .registerVault(salt: [UInt8](salt), verify: [UInt8](verify))))
+                    return
+                }
+
                 // Crucial: Request salt immediately after handshake to proceed with setup or unlock
                 self.requestSalt()
-                log("SINCED: Automatically requesting vault salt...")
+                log("SYNC: Automatically requesting vault salt...")
                 
                 // REMOVED: automatic startFullSyncPipeline() call. 
                 // The VaultManager must trigger this once the DB is actually open.
+            } else if awaitingRegisterAck {
+                awaitingRegisterAck = false
+                UserDefaults.standard.removeObject(forKey: "pendingRegister_\(vaultId)")
+                log("SYNC: New vault registered on the computer.")
+                DispatchQueue.main.async { self.objectWillChange.send() }
+                requestSalt()
             } else {
                 // Generic ACKs are noisy and usually just confirm receipt of 
                 // an entry update or similar. Silencing to keep logs clean.
-                // self.log("SINCED: Received generic ACK.")
+                // self.log("SYNC: Received generic ACK.")
             }
 
         case .error(let message):
-            self.log("SINCED SERVER ERROR: \(message)")
+            self.log("SYNC SERVER ERROR: \(message)")
+            if awaitingRegisterAck {
+                awaitingRegisterAck = false
+                if message.contains("declined") {
+                    // Stays flagged "Not yet synced to PC"; asked again on the next connection.
+                    DispatchQueue.main.async { self.objectWillChange.send() }
+                    return
+                }
+                // The computer already has this vault (or refused): fall back to the normal salt exchange.
+                UserDefaults.standard.removeObject(forKey: "pendingRegister_\(vaultId)")
+                requestSalt()
+                return
+            }
             if isHandshaking || awaitingHandshakeAck {
-                self.log("SINCED: Handshake failed with server error: \(message)")
+                self.log("SYNC: Handshake failed with server error: \(message)")
                 self.isHandshaking = false
                 self.awaitingHandshakeAck = false
                 DispatchQueue.main.async {
@@ -1050,11 +1102,11 @@ class SyncService: ObservableObject {
             }
             
         case .saltResponse(let salt):
-            self.log("SINCED: Salt response received.")
+            self.log("SYNC: Salt response received.")
             self.delegate?.syncServiceDidReceiveSalt(self, salt: salt)
             
         case .syncResponse(let entries, let timestamp):
-            self.log("SINCED: Sync response received (\(entries.count) entries).")
+            self.log("SYNC: Sync response received (\(entries.count) entries).")
             DispatchQueue.main.async {
                 self.firstSyncComplete = true
                 // Persist the server's "since" marker so the next
@@ -1095,7 +1147,7 @@ class SyncService: ObservableObject {
             }
             
         case .categoriesResponse(let categories):
-            self.log("SINCED: Categories response received (\(categories.count) categories).")
+            self.log("SYNC: Categories response received (\(categories.count) categories).")
             // Dispatch to main for the same race-avoidance reason as
             // .syncResponse above: VaultManager.didReceiveCategories does
             // SQLite work and reads `self.db` (set on main by the salt
@@ -1105,13 +1157,13 @@ class SyncService: ObservableObject {
             }
 
         case .tombstonesResponse(let deletedIds, let deletedAt):
-            self.log("SINCED: Tombstones response received (\(deletedIds.count) IDs).")
+            self.log("SYNC: Tombstones response received (\(deletedIds.count) IDs).")
             DispatchQueue.main.async {
                 self.delegate?.syncService(self, didReceiveTombstones: deletedIds, deletedAt: deletedAt)
             }
             
         case .entryUpdate(let entry):
-            self.log("SINCED: Individual entry update received: \(entry.title)")
+            self.log("SYNC: Individual entry update received: \(entry.title)")
             // Wall-clock as **millis** since epoch. The receiving path
             // (didReceiveSyncEntries) updates `lastSyncTimestamp` from
             // this value, and the server filter compares it against
@@ -1126,28 +1178,28 @@ class SyncService: ObservableObject {
             }
 
         case .entryDelete(let entryId, let deletedAt):
-            self.log("SINCED: Individual entry deletion received: \(entryId)")
+            self.log("SYNC: Individual entry deletion received: \(entryId)")
             DispatchQueue.main.async {
                 self.delegate?.syncService(self, didReceiveTombstones: [entryId],
                                            deletedAt: deletedAt.map { [entryId.lowercased(): $0] } ?? [:])
             }
             
         case .error(let message):
-            self.log("SINCED SERVER ERROR: \(message)")
+            self.log("SYNC SERVER ERROR: \(message)")
             
         case .ping:
-            self.log("SINCED: Ping received.")
+            self.log("SYNC: Ping received.")
             self.sendPacket(SyncPacket(deviceId: deviceId, message: .pong))
             
         case .pong:
-            self.log("SINCED: Pong received.")
+            self.log("SYNC: Pong received.")
             
         case .deleteVault:
-            self.log("SINCED: Server-initiated vault deletion? (Unexpected)")
+            self.log("SYNC: Server-initiated vault deletion? (Unexpected)")
         case .logUpload:
-            self.log("SINCED: Server requested log upload? (Unexpected)")
+            self.log("SYNC: Server requested log upload? (Unexpected)")
         case .syncRequest, .requestSalt, .requestCategories, .requestTombstones:
-            self.log("SINCED: Received request message from server (usually client-initiated).")
+            self.log("SYNC: Received request message from server (usually client-initiated).")
         }
     }
 }

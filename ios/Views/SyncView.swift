@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var port = "7878"
     @State private var showingQRScanner = false
     @State private var connectionError: String?
+    @State private var confirmingDeleteVault = false
 
     var body: some View {
         Form {
@@ -42,6 +43,15 @@ struct SettingsView: View {
             vaultName = vaultManager.vaultName
             syncService.startUDPListener()
         }
+        .confirmationDialog("Are you sure you want to delete this vault?", isPresented: $confirmingDeleteVault, titleVisibility: .visible) {
+            Button("Delete this Vault", role: .destructive) {
+                vaultManager.deleteCurrentVault()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Note: this will not delete the vault from your Computer.")
+        }
         .sheet(isPresented: $showingQRScanner) {
             QRScannerView { scannedUri in
                 showingQRScanner = false
@@ -62,6 +72,7 @@ struct SettingsView: View {
                     .onSubmit(saveName)
             }
             NavigationLink("Categories") { CategoriesView() }
+            Button("Delete this Vault", role: .destructive) { confirmingDeleteVault = true }
         } header: {
             Text("Vault")
         }
@@ -182,7 +193,8 @@ struct SettingsView: View {
 
     private var diagnosticsSection: some View {
         Section {
-            NavigationLink("Connection Log") { ConnectionLogView() }
+            Button("Send logs to PC") { syncService.uploadLogs() }
+                .disabled(!syncService.isConnected)
         } header: {
             Text("Diagnostics")
         }
@@ -208,7 +220,7 @@ struct SettingsView: View {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = info?["CFBundleVersion"] as? String ?? "1"
-        return "\(version) (\(build))"
+        return "\(version) (\(build)) Beta"
     }
 
     private func saveName() {
@@ -250,30 +262,6 @@ struct SettingsView: View {
     }
 }
 
-/// Read-only view of the connection log with copy/share, for troubleshooting.
-struct ConnectionLogView: View {
-    @ObservedObject private var syncService = SyncService.shared
-
-    var body: some View {
-        ScrollView {
-            Text(syncService.logs)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(Palette.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .textSelection(.enabled)
-        }
-        .screenBackground()
-        .navigationTitle("Connection Log")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                ShareLink(item: syncService.logs) { Image(systemName: "square.and.arrow.up") }
-            }
-        }
-    }
-}
-
 // MARK: - Categories
 
 struct CategoriesView: View {
@@ -294,7 +282,7 @@ struct CategoriesView: View {
             ForEach(custom) { category in
                 Button { editing = category } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: category.icon)
+                        CategoryGlyph(icon: category.icon)
                             .foregroundColor(Color(hex: category.color))
                             .frame(width: 28)
                         Text(category.name).foregroundColor(Palette.textPrimary)
@@ -359,7 +347,7 @@ struct CategoryEditor: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 14) {
                         ForEach(iconChoices, id: \.self) { symbol in
                             Button { icon = symbol } label: {
-                                Image(systemName: symbol)
+                                CategoryGlyph(icon: symbol)
                                     .font(.title3)
                                     .frame(width: 40, height: 40)
                                     .foregroundColor(icon == symbol ? Palette.onAccent : Palette.textPrimary)

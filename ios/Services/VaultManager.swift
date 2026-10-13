@@ -1,4 +1,4 @@
-// MARK: - VERSION_SINCED_2026_06_27_CLEAN_REWRITE_WITH_API
+// MARK: - VERSION_SYNC_2026_06_27_CLEAN_REWRITE_WITH_API
 import Foundation
 import SQLite3
 import LocalAuthentication
@@ -94,7 +94,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     /// SyncService vaultId. Callers use this to open/initialize against the
     /// correct per-vault file.
     private func currentVaultDbPath() -> String {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
         try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
         return vaultDir.appendingPathComponent(currentVaultDbFilename()).path
     }
@@ -128,7 +128,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // optimistically. didReceiveTombstones() also removes a row if
         // the server happens to echo the id back (covers the case where
         // the same entry was deleted on both sides). The table lives
-        // in the same per-vault .db file as entries. nuclearReset() removes
+        // in the same per-vault .db file as entries. deleteLocalVault() removes
         // every per-vault `vault_<id>.db` in the ClawPass directory (NOT
         // the un-suffixed legacy `vault.db`), which wipes the outbox table
         // automatically with no extra code.
@@ -448,6 +448,11 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         let salt = Data.randomBytes(count: 32)
         try storeSalt(salt, for: derivedVaultId)
         try initializeWithSalt(password: password, salt: salt)
+        // Remember to register this new vault with the computer on the first connection.
+        if let key = encryptionKey {
+            let verify = cryptoService.sha256(key.withUnsafeBytes { Data($0) })
+            UserDefaults.standard.set(WireCrypto.hex(verify), forKey: "pendingRegister_\(derivedVaultId)")
+        }
         sessionPassword = password
         saveBiometricPasswordIfEnabled(password)
         lastHandshakeError = nil
@@ -720,7 +725,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     /// vaults when `vaultId` is unset. The bare `vault.db` is LEGACY-V2 and
     /// deliberately excluded from v3 enumeration.
     func availableVaultFilenames() -> [String] {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
         return items.filter { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }.sorted()
@@ -735,7 +740,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         guard !vaultId.isEmpty else { return false }
         let filename = "vault_\(vaultId).db"
         let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("ClawPass")
+            .appendingPathComponent("Layer")
             .appendingPathComponent(filename)
             .path
         return FileManager.default.fileExists(atPath: dbPath)
@@ -743,6 +748,8 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
     // MARK: - Keychain Salt Management
     
+    func localSalt(for vaultId: String) throws -> Data? { try retrieveSalt(for: vaultId) }
+
     func storeSalt(_ salt: Data, for vaultId: String) throws {
         let account = "vault_salt_\(vaultId)"
         let query = [kSecClass: kSecClassGenericPassword, kSecAttrAccount: account, kSecValueData: salt] as [String: Any]
@@ -771,7 +778,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // True if any per-vault `vault_<id>.db` exists. Matches Desktop's
         // expectation that 'any present vault' gates Unlock vs Setup.
         // v3+ explicitly excludes the un-suffixed legacy `vault.db`.
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return false }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
         return items.contains { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }
@@ -791,40 +798,38 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         return "Key Invalid"
     }
 
-    func nuclearReset() {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("ClawPass")
-        // v3+ wipe target: ONLY the per-vault suffixed `vault_<id>.db` files.
-        // The un-suffixed legacy `vault.db` (LEGACY-V2) is DELIBERATELY
-        // EXCLUDED to preserve Reno's pre-v3 vault. Same constraint as
-        // Desktop's `hard_reset_dot_clawpass` / `wipe_all_vaults` helpers.
+    /// Deletes ONE vault from this device only: the vault the given password opens.
+    /// The vault on the computer is never touched. Returns false when no such vault exists here.
+    @discardableResult
+    func deleteLocalVault(password: String) -> Bool {
+        deleteLocalVault(id: cryptoService.deriveVaultId(password: password))
+    }
+
+    /// Deletes the currently open vault from this device only.
+    @discardableResult
+    func deleteCurrentVault() -> Bool { deleteLocalVault(id: SyncService.shared.vaultId) }
+
+    @discardableResult
+    private func deleteLocalVault(id: String) -> Bool {
+        guard vaultFileExists(forVaultId: id) else { return false }
+        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
         if let items = try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path) {
-            for name in items where name.hasSuffix(".db") && name.hasPrefix("vault_") && name != "vault.db" {
+            for name in items where name.contains(id) {
                 try? FileManager.default.removeItem(atPath: vaultDir.appendingPathComponent(name).path)
             }
         }
-        
-        // Wipe every vault_salt_* keychain item (single-class delete matches
-        // a deletion-by-service query; we then re-add nothing, leaving Keychain
-        // clean for the next init).
-        let allKeychain: [String: Any] = [kSecClass as String: kSecClassGenericPassword]
-        SecItemDelete(allKeychain as CFDictionary)
-        // Per-vault sync bookmarks.
-        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("lastSyncTimestamp_") {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
-        // Belt-and-braces: also wipe the UserDefaults fallback salts.
-        let defaults = UserDefaults.standard
-        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("vault_salt_fallback_") {
-            defaults.removeObject(forKey: key)
-        }
-        defaults.synchronize()
-        
-        self.lock()
-        self.isFirstPopulationPending = false
-        self.objectWillChange.send()
-        print("[VaultManager] Nuclear reset completed")
+        SecItemDelete([kSecClass as String: kSecClassGenericPassword,
+                       kSecAttrAccount as String: "vault_salt_\(id)"] as CFDictionary)
+        UserDefaults.standard.removeObject(forKey: "vault_salt_fallback_\(id)")
+        UserDefaults.standard.removeObject(forKey: "lastSyncTimestamp_\(id)")
+        UserDefaults.standard.removeObject(forKey: "categoriesDirty_\(id)")
+        UserDefaults.standard.removeObject(forKey: "pendingRegister_\(id)")
+        lock()
+        isFirstPopulationPending = false
+        objectWillChange.send()
+        return true
     }
-    
+
     func addEntry(_ entry: VaultEntry, password: String, notes: String?, totpSecret: String? = nil) throws {
         guard let key = encryptionKey else { throw VaultError.notInitialized }
         

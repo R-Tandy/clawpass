@@ -238,7 +238,7 @@ struct RestoreVaultView: View {
 
                     FieldRow(title: "Master password", text: $password, secure: true, contentType: .password)
 
-                    Button("Restore Vault") {
+                    Button("Retrieve Vault") {
                         VaultManager.shared.retrieveVault(password: password)
                         dismiss()
                     }
@@ -270,7 +270,6 @@ struct RestoreVaultView: View {
 
 struct ConnectingView: View {
     @ObservedObject private var syncService = SyncService.shared
-    @State private var showDetails = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -287,19 +286,6 @@ struct ConnectingView: View {
                 .foregroundColor(Palette.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-
-            DisclosureGroup("Details", isExpanded: $showDetails) {
-                ScrollView {
-                    Text(syncService.logs)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(Palette.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(height: 110)
-            }
-            .font(.footnote)
-            .foregroundColor(Palette.textSecondary)
-            .padding(.horizontal, 32)
 
             Spacer()
 
@@ -355,12 +341,13 @@ struct UnlockView: View {
                 }
 
                 VStack(spacing: 14) {
-                    Button("Restore a vault from my computer") { showingRestore = true }
+                    Button("Retrieve Vault from PC") { showingRestore = true }
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(Palette.accent)
-                    Button("Erase this device's vaults…", role: .destructive) { showingEraseConfirm = true }
+                    Button("Delete this Vault…", role: .destructive) { showingEraseConfirm = true }
                         .font(.footnote)
                         .foregroundColor(Palette.danger)
+                        .disabled(password.isEmpty)
                 }
                 .padding(.top, 24)
             }
@@ -372,11 +359,14 @@ struct UnlockView: View {
             canUseBiometrics = CryptoService.shared.biometricsAvailable && CryptoService.shared.hasSavedMasterPassword()
         }
         .sheet(isPresented: $showingRestore) { RestoreVaultView() }
-        .confirmationDialog("Erase every vault stored on this device?", isPresented: $showingEraseConfirm, titleVisibility: .visible) {
-            Button("Erase Vaults", role: .destructive) { vaultManager.nuclearReset() }
+        .confirmationDialog("Are you sure you want to delete this vault?", isPresented: $showingEraseConfirm, titleVisibility: .visible) {
+            Button("Delete this Vault", role: .destructive) {
+                if vaultManager.deleteLocalVault(password: password) { password = ""; errorMessage = nil }
+                else { errorMessage = "No vault on this device matches that password." }
+            }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Vaults on your computer are not affected. You can restore them afterwards. This cannot be undone.")
+            Text("Note: this will not delete the vault from your Computer.")
         }
     }
 
@@ -426,9 +416,19 @@ struct VaultView: View {
     @State private var showingAddEntry = false
     @State private var showingSettings = false
     @State private var searchText = ""
+    @State private var isSearching = false
     @State private var selectedCategory: Category?
+    @State private var selectedIds = Set<UUID>()
+    @State private var confirmingDelete = false
+    @State private var showSyncedBanner = false
+    @FocusState private var searchFocused: Bool
 
     private let favoritesId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+
+    /// A vault created on this phone that the computer has not accepted yet.
+    private var notYetSynced: Bool {
+        UserDefaults.standard.string(forKey: "pendingRegister_\(syncService.vaultId)") != nil
+    }
 
     private var filteredEntries: [VaultEntry] {
         var entries = vaultManager.entries
@@ -453,10 +453,42 @@ struct VaultView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                SyncStatusBar(isConnected: syncService.isConnected, error: vaultManager.lastHandshakeError)
+                // The "synced" confirmation is shown for a few seconds; problems and offline stay visible.
+                if !syncService.isConnected || vaultManager.lastHandshakeError != nil || showSyncedBanner || notYetSynced {
+                    SyncStatusBar(isConnected: syncService.isConnected, error: vaultManager.lastHandshakeError, notSynced: notYetSynced)
+                }
+
+                if isSearching {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundColor(Palette.textTertiary)
+                        TextField("Search", text: $searchText)
+                            .focused($searchFocused)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !searchText.isEmpty {
+                            Button { searchText = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(Palette.textTertiary) }
+                        }
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.surfaceRaised))
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                }
 
                 if !vaultManager.categories.isEmpty {
                     CategoryChips(categories: vaultManager.categories, selected: $selectedCategory)
+                }
+
+                if !selectedIds.isEmpty {
+                    HStack {
+                        Text("\(selectedIds.count) selected").font(.subheadline).foregroundColor(Palette.textSecondary)
+                        Spacer()
+                        Button("Clear") { selectedIds.removeAll() }
+                        Button("Delete Selected", role: .destructive) { confirmingDelete = true }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Palette.surface)
                 }
 
                 if filteredEntries.isEmpty {
@@ -466,8 +498,17 @@ struct VaultView: View {
                 } else {
                     List {
                         ForEach(filteredEntries) { entry in
-                            NavigationLink(destination: EntryDetailView(entry: entry)) {
-                                EntryRowView(entry: entry)
+                            HStack(spacing: 12) {
+                                Button { toggle(entry.id) } label: {
+                                    Image(systemName: selectedIds.contains(entry.id) ? "checkmark.square.fill" : "square")
+                                        .font(.title3)
+                                        .foregroundColor(selectedIds.contains(entry.id) ? Palette.accent : Palette.textTertiary)
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Select \(entry.title)")
+                                NavigationLink(destination: EntryDetailView(entry: entry)) {
+                                    EntryRowView(entry: entry)
+                                }
                             }
                             .listRowBackground(Palette.background)
                             .listRowSeparatorTint(Palette.stroke)
@@ -479,9 +520,13 @@ struct VaultView: View {
             .screenBackground()
             .navigationTitle(vaultManager.vaultName)
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    Button {
+                        isSearching.toggle()
+                        if isSearching { searchFocused = true } else { searchText = "" }
+                    } label: { Image(systemName: isSearching ? "xmark" : "magnifyingglass") }
+                        .accessibilityLabel(isSearching ? "Close search" : "Search")
                     Button { vaultManager.lock() } label: { Image(systemName: "lock.fill") }
                         .accessibilityLabel("Lock vault")
                 }
@@ -497,21 +542,40 @@ struct VaultView: View {
             .sheet(isPresented: $showingSettings) {
                 NavigationView { SettingsView(showsDone: true) }
             }
+            .confirmationDialog("Delete \(selectedIds.count) selected?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    selectedIds.forEach { vaultManager.deleteEntry(id: $0) }
+                    selectedIds.removeAll()
+                }
+                Button("Cancel", role: .cancel) { }
+            }
+            .onChange(of: syncService.isConnected) { connected in
+                guard connected else { showSyncedBanner = false; return }
+                showSyncedBanner = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) { showSyncedBanner = false }
+            }
         }
         .navigationViewStyle(.stack)
         .tint(Palette.accent)
+    }
+
+    private func toggle(_ id: UUID) {
+        if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) }
     }
 }
 
 struct SyncStatusBar: View {
     let isConnected: Bool
     let error: String?
+    var notSynced = false
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: isConnected ? "checkmark.icloud" : "icloud.slash")
-                .foregroundColor(isConnected ? Palette.success : Palette.textTertiary)
-            Text(isConnected
+            Image(systemName: isConnected && !notSynced ? "checkmark.icloud" : "icloud.slash")
+                .foregroundColor(isConnected && !notSynced ? Palette.success : Palette.textTertiary)
+            Text(notSynced
+                 ? "Not yet synced to PC"
+                 : isConnected
                  ? "Synced with your computer"
                  : (error ?? "Offline. Changes sync when your computer is reachable."))
                 .font(.caption)
@@ -526,16 +590,33 @@ struct SyncStatusBar: View {
     }
 }
 
+/// Renders a category icon that may be an SF Symbol name (iOS-made) or an emoji (desktop-made).
+struct CategoryGlyph: View {
+    let icon: String
+
+    var body: some View {
+        if icon.unicodeScalars.allSatisfy({ $0.isASCII }) {
+            Image(systemName: icon)
+        } else {
+            Text(icon)
+        }
+    }
+}
+
+/// Icon-only category bar: tap an icon to filter, tap it again (or the all-items key) to clear.
 struct CategoryChips: View {
     let categories: [Category]
     @Binding var selected: Category?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip("All", isOn: selected == nil) { selected = nil }
+            HStack(spacing: 10) {
+                chip(icon: AnyView(Image(systemName: "square.grid.2x2.fill")), label: "All", isOn: selected == nil, tint: Palette.accent) { selected = nil }
                 ForEach(categories) { category in
-                    chip(category.name, isOn: selected?.id == category.id) { selected = category }
+                    chip(icon: AnyView(CategoryGlyph(icon: category.icon)), label: category.name,
+                         isOn: selected?.id == category.id, tint: Color(hex: category.color)) {
+                        selected = selected?.id == category.id ? nil : category
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -543,15 +624,15 @@ struct CategoryChips: View {
         }
     }
 
-    private func chip(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+    private func chip(icon: AnyView, label: String, isOn: Bool, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .foregroundColor(isOn ? Palette.onAccent : Palette.textPrimary)
-                .background(Capsule().fill(isOn ? Palette.accent : Palette.surfaceRaised))
+            icon
+                .font(.title3)
+                .frame(width: 44, height: 44)
+                .foregroundColor(isOn ? Palette.onAccent : tint)
+                .background(Circle().fill(isOn ? tint : Palette.surfaceRaised))
         }
+        .accessibilityLabel(label)
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
@@ -593,14 +674,6 @@ struct EntryRowView: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.surfaceRaised)
-                Text(String(entry.title.prefix(1)).uppercased())
-                    .font(.headline)
-                    .foregroundColor(Palette.accent)
-            }
-            .frame(width: 40, height: 40)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title)
                     .font(.body.weight(.semibold))
