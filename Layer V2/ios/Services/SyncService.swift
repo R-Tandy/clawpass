@@ -1,0 +1,1207 @@
+// SYNC_VERSION_STABILITY_FIX
+import Foundation
+import Network
+import CryptoKit
+import UIKit
+import CommonCrypto
+
+// MARK: - Sync Packet (Matches Desktop Wrapper)
+struct SyncPacket: Codable {
+    let deviceId: String
+    let message: SyncMessage
+    
+    enum CodingKeys: String, CodingKey {
+        case deviceId = "device_id"
+        case message
+    }
+}
+
+// MARK: - Sync Message Protocol ( Matches Desktop ) 
+enum SyncMessage: Codable {
+    case logUpload(logs: String)
+    case handshake(deviceId: String, version: UInt32, vaultId: String)
+    case syncRequest(lastTimestamp: Int64)
+    case syncResponse(entries: [SyncVaultEntry], timestamp: Int64)
+    case entryUpdate(entry: SyncVaultEntry)
+    case entryDelete(entryId: String, deletedAt: Int64?)
+    case ack
+    case ping
+    case pong
+    case error(message: String)
+    case requestSalt(vaultId: String)
+    case saltResponse(salt: [UInt8])
+    case requestCategories(vaultId: String)
+    case categoriesResponse(categories: [SyncCategory])
+    case requestTombstones(vaultId: String)
+    case tombstonesResponse(deletedIds: [String], deletedAt: [String: Int64])
+    case deleteVault(vaultId: String)
+    case registerVault(salt: [UInt8], verify: [UInt8])
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case device_id = "device_id"
+        case version
+        case vault_id = "vault_id"
+        case last_timestamp = "last_timestamp"
+        case entries
+        case timestamp
+        case entry
+        case entry_id = "entry_id"
+        case salt
+        case categories
+        case deleted_ids = "deleted_ids"
+        case deleted_at = "deleted_at"
+        case message
+        case logs
+        case verify
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .logUpload(let logs):
+            try container.encode("log_upload", forKey: .type)
+            try container.encode(logs, forKey: .logs)
+        case .handshake(let deviceId, let version, let vaultId):
+            try container.encode("handshake", forKey: .type)
+            try container.encode(deviceId, forKey: .device_id)
+            try container.encode(version, forKey: .version)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .syncRequest(let lastTimestamp):
+            try container.encode("sync_request", forKey: .type)
+            try container.encode(lastTimestamp, forKey: .last_timestamp)
+        case .syncResponse(let entries, let timestamp):
+            try container.encode("sync_response", forKey: .type)
+            try container.encode(entries, forKey: .entries)
+            try container.encode(timestamp, forKey: .timestamp)
+        case .entryUpdate(let entry):
+            try container.encode("entry_update", forKey: .type)
+            try container.encode(entry, forKey: .entry)
+        case .entryDelete(let entryId, let deletedAt):
+            try container.encode("entry_delete", forKey: .type)
+            try container.encode(entryId, forKey: .entry_id)
+            if let deletedAt = deletedAt { try container.encode(deletedAt, forKey: .deleted_at) }
+        case .ack:
+            try container.encode("ack", forKey: .type)
+        case .ping:
+            try container.encode("ping", forKey: .type)
+        case .pong:
+            try container.encode("pong", forKey: .type)
+        case .error(let message):
+            try container.encode("error", forKey: .type)
+            try container.encode(message, forKey: .message)
+        case .requestSalt(let vaultId):
+            try container.encode("request_salt", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .saltResponse(let salt):
+            try container.encode("salt_response", forKey: .type)
+            try container.encode(salt, forKey: .salt)
+        case .requestCategories(let vaultId):
+            try container.encode("request_categories", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .categoriesResponse(let categories):
+            try container.encode("categories_response", forKey: .type)
+            try container.encode(categories, forKey: .categories)
+        case .requestTombstones(let vaultId):
+            try container.encode("request_tombstones", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .tombstonesResponse(let deletedIds, let deletedAt):
+            try container.encode("tombstones_response", forKey: .type)
+            try container.encode(deletedIds, forKey: .deleted_ids)
+            try container.encode(deletedAt, forKey: .deleted_at)
+        case .deleteVault(let vaultId):
+            try container.encode("delete_vault", forKey: .type)
+            try container.encode(vaultId, forKey: .vault_id)
+        case .registerVault(let salt, let verify):
+            try container.encode("register_vault", forKey: .type)
+            try container.encode(salt, forKey: .salt)
+            try container.encode(verify, forKey: .verify)
+        default:
+            try container.encode("unknown", forKey: .type)
+        }
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        let type: String
+        if let decodedType = try? container.decode(String.self, forKey: .type) {
+            type = decodedType.lowercased()
+        } else {
+            if let _ = try? container.decode(String.self, forKey: .entry_id) {
+                type = "entry_delete"
+            } else {
+                throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Missing 'type' field")
+            }
+        }
+        
+        switch type {
+        case "log_upload":
+            let logs = try container.decode(String.self, forKey: .logs)
+            self = .logUpload(logs: logs)
+        case "handshake":
+            let deviceId = try container.decode(String.self, forKey: .device_id)
+            let version = try container.decode(UInt32.self, forKey: .version)
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .handshake(deviceId: deviceId, version: version, vaultId: vaultId)
+        case "sync_request":
+            let lastTimestamp = try container.decode(Int64.self, forKey: .last_timestamp)
+            self = .syncRequest(lastTimestamp: lastTimestamp)
+        case "sync_response":
+            let entries = try container.decode([SyncVaultEntry].self, forKey: .entries)
+            let timestamp = try container.decode(Int64.self, forKey: .timestamp)
+            self = .syncResponse(entries: entries, timestamp: timestamp)
+        case "entry_update":
+            let entry = try container.decode(SyncVaultEntry.self, forKey: .entry)
+            self = .entryUpdate(entry: entry)
+        case "entry_delete", "entrydelete":
+            let entryId = try container.decode(String.self, forKey: .entry_id)
+            let deletedAt = try? container.decodeIfPresent(Int64.self, forKey: .deleted_at)
+            self = .entryDelete(entryId: entryId, deletedAt: deletedAt ?? nil)
+        case "ack":
+            self = .ack
+        case "ping":
+            self = .ping
+        case "pong":
+            self = .pong
+        case "error":
+            let message = try container.decode(String.self, forKey: .message)
+            self = .error(message: message)
+        case "request_salt":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .requestSalt(vaultId: vaultId)
+        case "salt_response":
+            let salt = try container.decode([UInt8].self, forKey: .salt)
+            self = .saltResponse(salt: salt)
+        case "request_categories":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .requestCategories(vaultId: vaultId)
+        case "categories_response":
+            let categories = try container.decode([SyncCategory].self, forKey: .categories)
+            self = .categoriesResponse(categories: categories)
+        case "request_tombstones":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .requestTombstones(vaultId: vaultId)
+        case "tombstones_response":
+            let deletedIds = try container.decode([String].self, forKey: .deleted_ids)
+            let deletedAt = (try? container.decodeIfPresent([String: Int64].self, forKey: .deleted_at)) ?? nil
+            self = .tombstonesResponse(deletedIds: deletedIds, deletedAt: deletedAt ?? [:])
+        case "delete_vault":
+            let vaultId = try container.decode(String.self, forKey: .vault_id)
+            self = .deleteVault(vaultId: vaultId)
+        case "register_vault":
+            let salt = try container.decode([UInt8].self, forKey: .salt)
+            let verify = try container.decode([UInt8].self, forKey: .verify)
+            self = .registerVault(salt: salt, verify: verify)
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown message type: \(type)")
+        }
+    }
+}
+
+struct SyncCategory: Codable {
+    let id: String
+    let name: String
+    let icon: String
+    let color: String
+}
+
+struct SyncVaultEntry: Codable {
+    let id: String
+    let title: String
+    let username: String
+    let encrypted_password: [UInt8]
+    let url: String?
+    let encrypted_notes: [UInt8]?
+    let category_id: String?
+    let totp_secret: String?
+    let created_at: Int64
+    let modified_at: Int64
+    let is_favorite: Bool
+    
+    init(id: String, title: String, username: String, password: String, url: String?, notes: String?, categoryId: String?, totpSecret: String?, createdAt: Int64, modifiedAt: Int64, isFavorite: Bool) {
+        self.id = id
+        self.title = title
+        self.username = username
+        self.encrypted_password = Array(password.utf8)
+        self.url = url
+        if let notes = notes {
+            self.encrypted_notes = Array(notes.utf8)
+        } else {
+            self.encrypted_notes = nil
+        }
+        self.category_id = categoryId
+        self.totp_secret = totpSecret
+        self.created_at = createdAt
+        self.modified_at = modifiedAt
+        self.is_favorite = isFavorite
+    }
+    
+    init(from entry: VaultEntry, vaultKey: SymmetricKey) throws {
+        self.id = entry.id.uuidString
+        self.title = entry.title
+        self.username = entry.username
+        self.encrypted_password = entry.encryptedPassword.map { UInt8($0) }
+        self.url = entry.url
+        self.encrypted_notes = entry.encryptedNotes?.map { UInt8($0) }
+        self.category_id = entry.categoryID?.uuidString
+        self.totp_secret = entry.totpSecret
+        // Server-side filter is `e.modified_at > ts` where `ts` is
+        // `chrono::Utc::now().timestamp_millis()` (millis since epoch).
+        // Previously we sent `Date().timeIntervalSince1970` which is
+        // seconds since epoch — about 1000x too small. With a zero initial
+        // `lastSyncTimestamp`, every entry passed the filter on every
+        // reconnect, the server sent back its full state, and iOS blindly
+        // `INSERT OR REPLACE`d it, overwriting the actual newer entry
+        // that hadn't been confirmed by the server yet. Multiplied by
+        // 1000 to match. See commit "Wire-protocol timestamps in millis".
+        self.created_at = Int64(entry.createdAt.timeIntervalSince1970 * 1000)
+        self.modified_at = Int64(entry.modifiedAt.timeIntervalSince1970 * 1000)
+        self.is_favorite = entry.isFavorite
+    }
+
+    func toVaultEntry() throws -> VaultEntry {
+        guard let uuid = UUID(uuidString: self.id) else { throw SyncError.invalidEntryId }
+        let categoryUUID = self.category_id.flatMap { UUID(uuidString: $0) }
+        // Wire `created_at`/`modified_at` are millis-since-epoch
+        // (server-side convention). Divide by 1000 to reconstruct a
+        // `Date`. Wall-clock precision in iOS DB is still receive-time
+        // because didReceiveSyncEntries builds a fresh VaultEntry; the
+        // entry's true modification time stays on the server. For LWW
+        // the server's wall clock is authoritative anyway.
+        let createdAt  = Date(timeIntervalSince1970: TimeInterval(self.created_at)  / 1000.0)
+        let modifiedAt = Date(timeIntervalSince1970: TimeInterval(self.modified_at) / 1000.0)
+        var entry = VaultEntry(
+            id: uuid, title: self.title, username: self.username, password: "",
+            url: self.url, notes: nil, categoryID: categoryUUID, totpSecret: self.totp_secret, isFavorite: self.is_favorite
+        )
+        entry.createdAt = createdAt
+        entry.modifiedAt = modifiedAt
+        entry.encryptedPassword = Data(self.encrypted_password)
+        if let notes = self.encrypted_notes {
+            entry.encryptedNotes = Data(notes)
+        } else {
+            entry.encryptedNotes = nil
+        }
+        return entry
+    }
+}
+
+enum SyncError: Error {
+    case invalidEntryId, notConnected, authenticationFailed, encodingFailed, decodingFailed, networkError(Error)
+}
+
+protocol SyncServiceDelegate: AnyObject {
+    func syncServiceDidConnect(_ service: SyncService)
+    func syncServiceDidDisconnect(_ service: SyncService)
+    func syncService(_ service: SyncService, didReceiveSyncEntries entries: [SyncVaultEntry], timestamp: Int64)
+    func syncService(_ service: SyncService, didEncounterError error: Error)
+    func syncService(_ service: SyncService, didEncounterHandshakeError message: String)
+    func syncService(_ service: SyncService, didDiscoverDevices devices: [SyncDevice])
+    func syncServiceDidReceiveSalt(_ service: SyncService, salt: [UInt8])
+    func syncService(_ service: SyncService, didReceiveCategories categories: [SyncCategory])
+    func syncService(_ service: SyncService, didReceiveTombstones deletedIds: [String], deletedAt: [String: Int64])
+    func syncServiceDidCompleteSync(_ service: SyncService)
+}
+
+let currentProtocolVersion: UInt32 = 4
+
+// MARK: - Wire security (protocol v4)
+// The vault id is never sent. The phone proves it knows the id with a slow PBKDF2 hash bound to fresh
+// nonces from both sides, then both ends derive one AES-256-GCM key per direction from the id and the
+// nonces. Matches desktop/src-tauri/src/sync_crypto.rs byte for byte.
+enum WireCrypto {
+    static let proofIterations: UInt32 = 200_000
+    static let proofLabel = Data("CLAWPASS_WIRE_PROOF_V4".utf8)
+
+    static func randomNonce() -> Data {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes)
+    }
+
+    static func hex(_ data: Data) -> String { data.map { String(format: "%02x", $0) }.joined() }
+
+    static func fromHex(_ text: String) -> Data? {
+        guard text.count % 2 == 0 else { return nil }
+        var out = Data()
+        var index = text.startIndex
+        while index < text.endIndex {
+            let next = text.index(index, offsetBy: 2)
+            guard let byte = UInt8(text[index..<next], radix: 16) else { return nil }
+            out.append(byte)
+            index = next
+        }
+        return out
+    }
+
+    static func proof(localId: String, clientNonce: Data, serverNonce: Data) -> String? {
+        let password = Array(localId.utf8)
+        let salt = [UInt8](proofLabel + clientNonce + serverNonce)
+        var derived = [UInt8](repeating: 0, count: 32)
+        let status = password.withUnsafeBufferPointer { pw in
+            pw.withMemoryRebound(to: Int8.self) { pwChars in
+                CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), pwChars.baseAddress, password.count,
+                                     salt, salt.count, CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
+                                     proofIterations, &derived, derived.count)
+            }
+        }
+        return status == kCCSuccess ? hex(Data(derived)) : nil
+    }
+}
+
+final class WireSession {
+    private let sendKey: SymmetricKey
+    private let recvKey: SymmetricKey
+    private let sendDir: UInt32 = 0   // client to server
+    private let recvDir: UInt32 = 1   // server to client
+    private var sendCounter: UInt64 = 0
+    private var recvLast: UInt64?
+
+    init(localId: String, clientNonce: Data, serverNonce: Data) {
+        let ikm = SymmetricKey(data: Data(localId.utf8))
+        let salt = clientNonce + serverNonce
+        sendKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: ikm, salt: salt, info: Data("clawpass-sync-v4-c2s".utf8), outputByteCount: 32)
+        recvKey = HKDF<SHA256>.deriveKey(inputKeyMaterial: ikm, salt: salt, info: Data("clawpass-sync-v4-s2c".utf8), outputByteCount: 32)
+    }
+
+    private static func nonceBytes(dir: UInt32, counter: UInt64) -> Data {
+        var data = Data()
+        withUnsafeBytes(of: dir.bigEndian) { data.append(contentsOf: $0) }
+        withUnsafeBytes(of: counter.bigEndian) { data.append(contentsOf: $0) }
+        return data
+    }
+
+    /// counter (8 bytes, big endian) || ciphertext || tag
+    func seal(_ plaintext: Data) throws -> Data {
+        let counter = sendCounter
+        sendCounter += 1
+        let nonceData = WireSession.nonceBytes(dir: sendDir, counter: counter)
+        let box = try AES.GCM.seal(plaintext, using: sendKey, nonce: AES.GCM.Nonce(data: nonceData), authenticating: nonceData)
+        var body = Data()
+        withUnsafeBytes(of: counter.bigEndian) { body.append(contentsOf: $0) }
+        body.append(box.ciphertext)
+        body.append(box.tag)
+        return body
+    }
+
+    func open(_ body: Data) throws -> Data {
+        let bytes = [UInt8](body)
+        guard bytes.count >= 8 + 16 else { throw SyncError.decodingFailed }
+        var counter: UInt64 = 0
+        for i in 0..<8 { counter = (counter << 8) | UInt64(bytes[i]) }
+        if let last = recvLast, counter <= last { throw SyncError.decodingFailed }
+        let nonceData = WireSession.nonceBytes(dir: recvDir, counter: counter)
+        let ciphertext = Data(bytes[8..<(bytes.count - 16)])
+        let tag = Data(bytes[(bytes.count - 16)...])
+        let box = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonceData), ciphertext: ciphertext, tag: tag)
+        let plain = try AES.GCM.open(box, using: recvKey, authenticating: nonceData)
+        recvLast = counter
+        return plain
+    }
+}
+
+struct SyncDevice: Identifiable {
+    var id: String { remoteDeviceId }
+    let name: String
+    let endpoint: NWEndpoint
+    let host: String
+    let port: UInt16
+    let remoteDeviceId: String
+}
+
+class SyncService: ObservableObject {
+    static let shared = SyncService()
+    @Published var isConnected = false
+    @Published var isDiscovering = false
+    @Published var discoveredDevices: [SyncDevice] = []
+    @Published var lastSyncTimestamp: Int64 = 0
+    @Published var syncStatus: String = "Idle"
+    @Published var logs: String = "System initialized. Awaiting connection...\n"
+    @Published private(set) var vaultSyncStatus: String = ""
+    @Published var keyStatus: String = "Unknown"
+    @Published var saltReady = false
+    @Published var firstSyncComplete = false
+    private var isSyncing = false
+    
+    private var handshakeCompleted = false
+    private var pendingHandshake = false
+    weak var delegate: SyncServiceDelegate?
+    private var connection: NWConnection?
+    private var beaconListener: NWListener?
+    private var beaconConnections: [NWConnection] = []
+    private let beaconPort: NWEndpoint.Port = 7879
+    private let syncQueue = DispatchQueue(label: "com.clawpass.sync", qos: .userInitiated)
+    private var deviceId: String { UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString }
+    
+    /// Empty until the user enters a password and `setupVault` derives it. We
+    /// intentionally do NOT default this to "vault_1" because that masked the
+    /// per-vault file selection in the original code. `vault_<id>.db` is the
+    /// canonical name from Desktop's `format!("vault_{}.db", vault_id)`.
+    var vaultId: String = ""
+
+
+    init() {
+        log("SYNC_V4: Initial initializing SyncService")
+        let savedHost = UserDefaults.standard.string(forKey: "last_sync_host") ?? ""
+        let savedPort = UserDefaults.standard.string(forKey: "last_sync_port") ?? "7878"
+        print("[SYNC] Loaded last connection: \(savedHost):\(savedPort)")
+    }
+    
+    func log(_ message: String) {
+        DispatchQueue.main.async {
+            self.logs += "\(message)\n"
+            // Bound memory: keep only the most recent ~400 lines.
+            if self.logs.count > 40_000 {
+                self.logs = String(self.logs.suffix(30_000))
+            }
+        }
+    }
+    
+    func getLocalIP() -> String? {
+        var address: String?
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        if getifaddrs(&ifaddr) == 0 {
+            var ptr = ifaddr
+            while let current = ptr {
+                let interface = current.pointee
+                let addrFamily = interface.ifa_addr?.pointee.sa_family
+                if addrFamily == UInt8(AF_INET) {
+                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    if getnameinfo(interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST) == 0 {
+                        address = String(cString: hostname)
+                    }
+                }
+                ptr = interface.ifa_next
+            }
+            freeifaddrs(ifaddr)
+        }
+        return address
+    }
+
+    func setVaultId(_ id: String) {
+        self.vaultId = id
+        // Restore the per-vault last-sync timestamp so the next
+        // requestSync asks for only entries the server has changed
+        // since the last successful handshake, instead of every entry
+        // (the previous version inited lastSyncTimestamp to 0 on every
+        // app launch, which combined with the wire-protocol millis
+        // mismatch caused iOS to blindly INSERT OR REPLACE every
+        // server entry on every reconnect).
+        if let stored = UserDefaults.standard.object(forKey: "lastSyncTimestamp_\(id)") as? Int64 {
+            self.lastSyncTimestamp = stored
+            log("SYNC: Restored lastSyncTimestamp=\(stored) for vault \(id.prefix(12))...")
+        } else {
+            self.lastSyncTimestamp = 0
+        }
+        log("SYNC: Vault Identity set to \(id)")
+    }
+
+    private var isHandshaking = false
+    private var awaitingHandshakeAck = false
+    /// True between sending a new-vault registration and the computer's answer.
+    private var awaitingRegisterAck = false
+    private var wireSession: WireSession?
+    private var pendingClientNonce: Data?
+    private let wireLock = NSLock()
+
+    func triggerHandshake() {
+        guard !isHandshaking else {
+            log("SYNC: Handshake already in progress. Ignoring request.")
+            return
+        }
+        
+        guard isConnected else {
+            log("SYNC: Not connected. Attempting proactive connection...")
+            pendingHandshake = true
+            
+            if let targetDevice = discoveredDevices.first {
+                log("SYNC: Proactively connecting to discovered device: \(targetDevice.host)")
+                connect(to: targetDevice)
+            } else {
+                log("SYNC: No discovered devices available to connect to.")
+            }
+            return
+        }
+        startHandshake()
+    }
+
+
+    func connect(to device: SyncDevice) {
+        // 1. Guard: If we are already connected to this exact host/port, skip.
+        if let existing = connection, existing.state == .ready {
+            if case let .hostPort(host, port) = existing.endpoint,
+               host.debugDescription.contains(device.host),
+               port.debugDescription.contains("\(device.port)") {
+                log("SYNC: Already connected to \(device.host):\(device.port). Skipping redundant connection.")
+                return
+            }
+        }
+
+        // 2. Prevent connection storms: If we are already preparing, stop.
+        if let existing = connection {
+            switch existing.state {
+            case .preparing, .setup:
+                log("SYNC: Connection already preparing for \(device.host). Skipping.")
+                return
+            default:
+                break
+            }
+        }
+        
+        log("SYNC: Initiating clean connection to \(device.name) (\(device.host):\(device.port))...")
+        
+        // 2. Total teardown of any lingering state
+        disconnect() 
+        
+        // Small delay to allow the OS to release the port and clear the socket buffer
+        syncQueue.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            let host = NWEndpoint.Host(device.host)
+            let port = NWEndpoint.Port(integerLiteral: device.port)
+            self.connection = NWConnection(host: host, port: port, using: .tcp)
+            
+            self.connection?.stateUpdateHandler = { [weak self] state in
+                guard let self = self else { return }
+                switch state {
+                case .ready:
+                    self.log("SYNC: Connection established to \(device.host)")
+                    DispatchQueue.main.async {
+                        self.isConnected = true
+                        self.syncStatus = "Connected"
+                        self.delegate?.syncServiceDidConnect(self)
+                    }
+                    
+                    self.isHandshaking = false
+                    self.awaitingHandshakeAck = false
+                    self.handshakeCompleted = false
+                    self.wireLock.lock(); self.wireSession = nil; self.wireLock.unlock()
+                    self.pendingClientNonce = nil
+
+                    // Exactly one reader per connection. Starting another one per
+                    // handshake made two readers interleave on the socket and
+                    // misparse frames ("absurd packet length").
+                    self.receiveLoop()
+
+                    if self.pendingHandshake {
+                        self.log("SYNC: Executing pending handshake...")
+                        self.startHandshake()
+                        self.pendingHandshake = false
+                    } else {
+                        self.startHandshake()
+                    }
+                case .failed(let error):
+                    self.log("SYNC: Connection failed: \(error)")
+                    self.handleDisconnect()
+                case .cancelled:
+                    self.handleDisconnect()
+                default:
+                    break
+                }
+            }
+            self.connection?.start(queue: self.syncQueue)
+        }
+    }
+
+    /// Starts the UDP beacon listener once. Safe to call repeatedly (the old code
+    /// created a new listener on every call, leaking the previous one and failing
+    /// with "address in use").
+    func startUDPListener() {
+        guard beaconListener == nil else { return }
+        do {
+            let listener = try NWListener(using: .udp, on: beaconPort)
+            listener.newConnectionHandler = { [weak self] connection in
+                guard let self = self else { return }
+                // Drop the flow when it ends so beacon connections can't pile up over a long session.
+                connection.stateUpdateHandler = { [weak self, weak connection] state in
+                    switch state {
+                    case .cancelled, .failed:
+                        guard let connection = connection else { return }
+                        self?.beaconConnections.removeAll { $0 === connection }
+                    default: break
+                    }
+                }
+                connection.start(queue: self.syncQueue)
+                self.beaconConnections.append(connection)
+                self.receiveBeacons(on: connection)
+            }
+            listener.stateUpdateHandler = { [weak self] state in
+                if case .failed(let error) = state {
+                    self?.log("SYNC: Beacon listener failed: \(error)")
+                    self?.beaconListener?.cancel()
+                    self?.beaconListener = nil
+                }
+            }
+            listener.start(queue: syncQueue)
+            beaconListener = listener
+            log("SYNC: UDP Beacon Listener started on port \(beaconPort)")
+        } catch {
+            log("SYNC: Failed to start UDP listener: \(error)")
+        }
+    }
+
+    func stopUDPListener() {
+        beaconListener?.cancel()
+        beaconListener = nil
+        beaconConnections.forEach { $0.cancel() }
+        beaconConnections.removeAll()
+    }
+
+    /// Keeps reading beacons from the same UDP flow. Each flow used to be read only
+    /// once, so every beacon after the first was ignored.
+    private func receiveBeacons(on connection: NWConnection) {
+        connection.receiveMessage { [weak self, weak connection] (data, _, _, error) in
+            guard let self = self, let connection = connection else { return }
+            if error != nil {
+                connection.cancel()
+                self.beaconConnections.removeAll { $0 === connection }
+                return
+            }
+            if let data = data, let msg = String(data: data, encoding: .utf8), msg.hasPrefix("CLAWPASS_BEACON:") {
+                let remoteId = String(msg.dropFirst("CLAWPASS_BEACON:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                if let host = self.extractHost(from: connection.endpoint) {
+                    let device = SyncDevice(name: "Vault Server", endpoint: connection.endpoint, host: host, port: 7878, remoteDeviceId: remoteId)
+                    DispatchQueue.main.async {
+                        if let index = self.discoveredDevices.firstIndex(where: { $0.remoteDeviceId == remoteId }) {
+                            if self.discoveredDevices[index].host != host { self.discoveredDevices[index] = device }
+                        } else {
+                            self.discoveredDevices.append(device)
+                            self.log("SYNC: Discovered desktop at \(host).")
+                        }
+                    }
+                    if (VaultManager.shared.isUnlocked || self.pendingHandshake) && !self.isConnected {
+                        self.connect(to: device)
+                    }
+                }
+            }
+            self.receiveBeacons(on: connection)
+        }
+    }
+
+    private func extractHost(from endpoint: NWEndpoint) -> String? {
+        if case let .hostPort(host, _) = endpoint {
+            var text = host.debugDescription.components(separatedBy: " ").last ?? ""
+            if let pct = text.firstIndex(of: "%") { text = String(text[..<pct]) }
+            return text.isEmpty ? nil : text
+        }
+        return nil
+    }
+
+    func startDiscovery() {
+        // Discovery handled by UDP Beacons
+    }
+
+    /// Encrypts with the session keys and sends. Nothing leaves the phone in the clear once connected.
+    func sendPacket(_ packet: SyncPacket) {
+        do {
+            let jsonData = try JSONEncoder().encode(packet)
+            // Sealing and queueing happen under one lock so counters reach the socket in order.
+            wireLock.lock()
+            defer { wireLock.unlock() }
+            guard let session = wireSession else { return }
+            sendFrame(try session.seal(jsonData))
+        } catch { print("[SYNC] Outbound encoding failed: \(error)") }
+    }
+
+    private func sendFrame(_ body: Data) {
+        var length = UInt32(body.count).bigEndian
+        let lengthData = Data(bytes: &length, count: MemoryLayout<UInt32>.size)
+        connection?.send(content: lengthData + body, completion: .contentProcessed({ error in
+            if let error = error { print("[SYNC] Outbound packet error: \(error)") }
+        }))
+    }
+
+    private func sendPlainJSON(_ object: [String: Any]) {
+        guard let body = try? JSONSerialization.data(withJSONObject: object) else { return }
+        sendFrame(body)
+    }
+
+    @discardableResult
+    func sendEntryUpdate(entry: VaultEntry) -> Bool {
+        guard handshakeCompleted else {
+            log("SYNC: Offline - entry update queued for the next sync.")
+            return false
+        }
+        guard let key = VaultManager.shared.getEncryptionKey() else {
+            log("Error: Vault not unlocked, cannot send entry update.")
+            return false
+        }
+        do {
+            let syncEntry = try SyncVaultEntry(from: entry, vaultKey: key)
+            sendPacket(SyncPacket(deviceId: deviceId, message: .entryUpdate(entry: syncEntry)))
+            VaultManager.shared.noteEntrySent(entry)
+            return true
+        } catch {
+            print("[SYNC] Failed to prepare entry update: \(error)")
+            return false
+        }
+    }
+
+    func sendEntryDelete(entryId: String) {
+        guard handshakeCompleted else {
+            log("SYNC: Blocked EntryDelete - Handshake not completed. Entry will be sent during next flush.")
+            return
+        }
+        let deleteMsg = SyncMessage.entryDelete(entryId: entryId.lowercased(),
+                                                deletedAt: VaultManager.shared.tombstoneMillis(id: entryId) ?? Int64(Date().timeIntervalSince1970 * 1000))
+        let packet = SyncPacket(deviceId: deviceId, message: deleteMsg)
+        sendPacket(packet)
+    }
+
+    func deleteVault() {
+        guard isConnected && handshakeCompleted else {
+            log("SYNC: Cannot delete vault - not connected or handshake not completed.")
+            return
+        }
+        log("SYNC: Requesting wipe of this vault on the computer...")
+        let request = SyncMessage.deleteVault(vaultId: "")
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        sendPacket(packet)
+    }
+
+    func requestTombstones() {
+        guard handshakeCompleted else { return }
+        let request = SyncMessage.requestTombstones(vaultId: "")
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        sendPacket(packet)
+    }
+
+    func startFullSyncPipeline() {
+        guard !isSyncing else {
+            log("SYNC: Sync pipeline already active. Skipping redundant trigger.")
+            return
+        }
+
+        isSyncing = true
+        log("SYNC: Starting automated sync pipeline...")
+
+        syncQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.flushOutbox()
+            self.requestTombstones()
+            self.syncCategories()
+            self.requestSync()
+
+            // Strict deterministic flow — no timers.
+            // Caller (VaultManager after salt/unlock) is responsible for sequencing.
+            DispatchQueue.main.async {
+                self.isSyncing = false
+                self.log("SYNC: Sync pipeline cycle complete.")
+            }
+        }
+    }
+
+    /// Sends local category edits if there are any, otherwise asks the computer for its list.
+    func syncCategories() {
+        guard handshakeCompleted else { return }
+        if VaultManager.shared.categoriesDirty { pushCategories() } else { requestCategories() }
+    }
+
+    func pushCategories() {
+        guard handshakeCompleted else { return }
+        let message = SyncMessage.categoriesResponse(categories: VaultManager.shared.localCategoriesForSync())
+        sendPacket(SyncPacket(deviceId: deviceId, message: message))
+        VaultManager.shared.categoriesDirty = false
+    }
+
+    func requestCategories() {
+        guard handshakeCompleted else { return }
+        let request = SyncMessage.requestCategories(vaultId: "")
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        sendPacket(packet)
+    }
+
+    func requestSync() {
+        guard handshakeCompleted else { return }
+        let request = SyncMessage.syncRequest(lastTimestamp: self.lastSyncTimestamp)
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        sendPacket(packet)
+    }
+
+    func requestSalt() {
+        guard handshakeCompleted else { 
+            log("SYNC: Cannot request salt - Handshake not completed.")
+            return 
+        }
+        log("SYNC-TX: Requesting vault salt.")
+        let request = SyncMessage.requestSalt(vaultId: "")
+        let packet = SyncPacket(deviceId: deviceId, message: request)
+        sendPacket(packet)
+    }
+
+    func flushOutbox() {
+        guard isConnected && handshakeCompleted else { return }
+        VaultManager.shared.getPendingEntries { [weak self] (updates, deletes) in
+            guard let self = self else { return }
+            for entry in updates {
+                self.sendEntryUpdate(entry: entry)
+            }
+            for entryId in deletes {
+                self.sendEntryDelete(entryId: entryId)
+            }
+            // Offline-DELETE outbox cleanup: every id we just sent is
+            // optimistically considered delivered (TCP is reliable
+            // within a session; if the server crashes mid-handle the
+            // worst case is the entry reappearing until the next
+            // user-driven delete). Drop the outbox rows so a future
+            // flushOutbox (e.g. after another reconnect) doesn't
+            // re-send deletes the server has already processed. Safe
+            // to call with an empty array.
+            if !deletes.isEmpty {
+                VaultManager.shared.markTombstonesSent(ids: deletes)
+            }
+        }
+    }
+
+    func uploadLogs() {
+        guard isConnected else {
+            log("SYNC: Cannot upload logs - not connected.")
+            return
+        }
+        log("SYNC-TX: Uploading current logs to server...")
+        let uploadMsg = SyncMessage.logUpload(logs: self.logs)
+        let packet = SyncPacket(deviceId: deviceId, message: uploadMsg)
+        sendPacket(packet)
+    }
+
+    func disconnect() {
+        // 1. STRIP HANDLERS FIRST
+        // This is critical: preventing the .cancelled or .failed state from 
+        // triggering handleDisconnect() during a manual teardown.
+        connection?.stateUpdateHandler = nil
+        
+        // 2. Cancel the connection
+        connection?.cancel()
+        connection = nil
+        
+        // 3. Hard reset all session flags
+        if Thread.isMainThread {
+            isConnected = false
+            syncStatus = "Disconnected"
+        } else {
+            DispatchQueue.main.async { self.isConnected = false; self.syncStatus = "Disconnected" }
+        }
+        handshakeCompleted = false
+        isHandshaking = false
+        awaitingHandshakeAck = false
+        pendingHandshake = false
+        wireLock.lock(); wireSession = nil; wireLock.unlock()
+        pendingClientNonce = nil
+        
+        delegate?.syncServiceDidDisconnect(self)
+        log("SYNC: Connection fully torn down and state reset.")
+    }
+
+    private func handleDisconnect() {
+        // Only trigger a full reset if the connection is actually gone
+        // and not currently being replaced by a new one.
+        if connection == nil {
+            log("SYNC: No active connection to reset.")
+            return
+        }
+        
+        log("SYNC: Handling connection loss... initiating hard reset.")
+        disconnect()
+    }
+
+
+    private func startHandshake() {
+        if vaultId.isEmpty {
+            log("SYNC: Blocked handshake - vault identity not yet derived (empty vaultId).")
+            return
+        }
+        
+        isHandshaking = true
+        awaitingHandshakeAck = true
+        log("SYNC: Starting secure handshake...")
+        let nonce = WireCrypto.randomNonce()
+        pendingClientNonce = nonce
+        sendPlainJSON(["type": "hello", "device_id": deviceId, "version": Int(currentProtocolVersion), "client_nonce": WireCrypto.hex(nonce)])
+    }
+
+    /// The computer answered with its nonce: prove we know the vault id and switch to encrypted frames.
+    private func handleChallenge(_ json: [String: Any]) {
+        guard let clientNonce = pendingClientNonce,
+              let serverHex = json["server_nonce"] as? String,
+              let serverNonce = WireCrypto.fromHex(serverHex), serverNonce.count == 16 else {
+            log("SYNC: Malformed challenge from the computer.")
+            return
+        }
+        pendingClientNonce = nil
+        let id = vaultId
+        let device = deviceId
+        // The proof is deliberately slow; keep it off the network queue.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            guard let proof = WireCrypto.proof(localId: id, clientNonce: clientNonce, serverNonce: serverNonce) else {
+                self.log("SYNC: Could not compute the handshake proof.")
+                return
+            }
+            self.wireLock.lock()
+            self.wireSession = WireSession(localId: id, clientNonce: clientNonce, serverNonce: serverNonce)
+            self.wireLock.unlock()
+            var auth: [String: Any] = ["type": "auth", "device_id": device, "proof": proof]
+            // A vault created on this phone that the computer has not seen yet: ask it to accept the new id.
+            if UserDefaults.standard.string(forKey: "pendingRegister_\(id)") != nil { auth["register_id"] = id }
+            self.sendPlainJSON(auth)
+        }
+    }
+
+
+    private func receiveLoop() {
+        guard let conn = connection else { return }
+        conn.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self, weak conn] (data, _, isComplete, error) in
+            guard let self = self, let conn = conn, conn === self.connection else { return }
+
+            if let data = data, data.count == 4 {
+                // Big-endian length prefix, built explicitly to avoid endianness bugs.
+                let length = UInt32(data[0]) << 24 |
+                             UInt32(data[1]) << 16 |
+                             UInt32(data[2]) << 8  |
+                             UInt32(data[3])
+
+                // Safety valve: the desktop never sends frames anywhere near this size.
+                if length > 8 * 1024 * 1024 {
+                    self.log("SYNC: Received absurd packet length (\(length)). Forcing disconnect.")
+                    self.handleDisconnect()
+                    return
+                }
+
+                self.readPacket(length: Int(length), on: conn)
+            } else if let error = error {
+                self.log("Connection receive error: \(error)")
+                self.handleDisconnect()
+            } else if isComplete {
+                self.handleDisconnect()
+            }
+        }
+    }
+
+    private func readPacket(length: Int, on conn: NWConnection) {
+        guard length > 0 else { receiveLoop(); return }
+        conn.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self, weak conn] (data, _, isComplete, error) in
+            guard let self = self, let conn = conn, conn === self.connection else { return }
+
+            if let data = data, data.count == length {
+                self.handleFrame(data)
+                self.receiveLoop()
+            } else if let error = error {
+                self.log("Payload receive error: \(error)")
+                self.handleDisconnect()
+            } else if isComplete {
+                self.handleDisconnect()
+            }
+        }
+    }
+
+    private func handleFrame(_ data: Data) {
+        wireLock.lock()
+        let session = wireSession
+        wireLock.unlock()
+
+        // Before the proof is sent only plaintext hello replies are expected.
+        guard let session = session else {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if (json["type"] as? String) == "challenge" { handleChallenge(json); return }
+                if let packet = try? JSONDecoder().decode(SyncPacket.self, from: data) { handlePlainError(packet); return }
+            }
+            log("SYNC: Unexpected unencrypted packet ignored.")
+            return
+        }
+
+        do {
+            let plain = try session.open(data)
+            let packet = try JSONDecoder().decode(SyncPacket.self, from: plain)
+            handleIncomingPacket(packet)
+        } catch {
+            // A rejected proof comes back as a plaintext error before any key is trusted.
+            if awaitingHandshakeAck, let packet = try? JSONDecoder().decode(SyncPacket.self, from: data) {
+                handlePlainError(packet)
+                return
+            }
+            log("SYNC: Dropping a packet that failed authentication.")
+            handleDisconnect()
+        }
+    }
+
+    private func handlePlainError(_ packet: SyncPacket) {
+        guard case .error(let message) = packet.message, awaitingHandshakeAck || isHandshaking else {
+            log("SYNC: Unexpected unencrypted packet ignored.")
+            return
+        }
+        log("SYNC: Handshake failed with server error: \(message)")
+        isHandshaking = false
+        awaitingHandshakeAck = false
+        DispatchQueue.main.async {
+            self.delegate?.syncService(self, didEncounterHandshakeError: message)
+        }
+    }
+
+    private func handleIncomingPacket(_ packet: SyncPacket) {
+        switch packet.message {
+        case .handshake(let deviceId, let version, let vaultId):
+            self.log("SYNC: Handshake received from \(deviceId).")
+            
+        case .ack:
+            if awaitingHandshakeAck {
+                self.log("SYNC: Handshake ACK received.")
+                self.isHandshaking = false
+                self.awaitingHandshakeAck = false
+                self.handshakeCompleted = true
+                self.log("SYNC: Connection established and verified.")
+
+                if let verifyHex = UserDefaults.standard.string(forKey: "pendingRegister_\(vaultId)"),
+                   let verify = WireCrypto.fromHex(verifyHex),
+                   let salt = try? VaultManager.shared.localSalt(for: vaultId) {
+                    // New vault made on this phone: hand the computer its salt and key verifier first.
+                    log("SYNC: Registering the new vault on the computer...")
+                    awaitingRegisterAck = true
+                    sendPacket(SyncPacket(deviceId: deviceId, message: .registerVault(salt: [UInt8](salt), verify: [UInt8](verify))))
+                    return
+                }
+
+                // Crucial: Request salt immediately after handshake to proceed with setup or unlock
+                self.requestSalt()
+                log("SYNC: Automatically requesting vault salt...")
+                
+                // REMOVED: automatic startFullSyncPipeline() call. 
+                // The VaultManager must trigger this once the DB is actually open.
+            } else if awaitingRegisterAck {
+                awaitingRegisterAck = false
+                UserDefaults.standard.removeObject(forKey: "pendingRegister_\(vaultId)")
+                log("SYNC: New vault registered on the computer.")
+                DispatchQueue.main.async { self.objectWillChange.send() }
+                requestSalt()
+            } else {
+                // Generic ACKs are noisy and usually just confirm receipt of 
+                // an entry update or similar. Silencing to keep logs clean.
+                // self.log("SYNC: Received generic ACK.")
+            }
+
+        case .error(let message):
+            self.log("SYNC SERVER ERROR: \(message)")
+            if awaitingRegisterAck {
+                awaitingRegisterAck = false
+                if message.contains("declined") {
+                    // Stays flagged "Not yet synced to PC"; asked again on the next connection.
+                    DispatchQueue.main.async { self.objectWillChange.send() }
+                    return
+                }
+                // The computer already has this vault (or refused): fall back to the normal salt exchange.
+                UserDefaults.standard.removeObject(forKey: "pendingRegister_\(vaultId)")
+                requestSalt()
+                return
+            }
+            if isHandshaking || awaitingHandshakeAck {
+                self.log("SYNC: Handshake failed with server error: \(message)")
+                self.isHandshaking = false
+                self.awaitingHandshakeAck = false
+                DispatchQueue.main.async {
+                    self.delegate?.syncService(self, didEncounterHandshakeError: message)
+                }
+            }
+            
+        case .saltResponse(let salt):
+            self.log("SYNC: Salt response received.")
+            self.delegate?.syncServiceDidReceiveSalt(self, salt: salt)
+            
+        case .syncResponse(let entries, let timestamp):
+            self.log("SYNC: Sync response received (\(entries.count) entries).")
+            DispatchQueue.main.async {
+                self.firstSyncComplete = true
+                // Persist the server's "since" marker so the next
+                // requestSync() is incremental instead of returning the
+                // full vault every time. The server's filter is
+                // `e.modified_at > last_timestamp`, so without this update
+                // we'd ask for everything on every reconnect, and the
+                // server's response would overwrite any newer local state
+                // via `INSERT OR REPLACE` in saveEntry(). Wire unit is
+                // millis since epoch (matches Desktop `timestamp_millis()`
+                // in sync_tcp.rs::handle_client).
+                self.lastSyncTimestamp = timestamp
+                // Persist per-vault so the next app launch (or next
+                // time this vault is unlocked) asks the server for
+                // only what changed since now. Without this, every
+                // iOS launch reverts to timestamp=0 and pulls every
+                // entry on the server.
+                UserDefaults.standard.set(timestamp, forKey: "lastSyncTimestamp_\(self.vaultId)")
+                // CRITICAL: dispatch the delegate call to main too. We're
+                // being invoked from a Network-framework callback queue
+                // (background). VaultManager.didReceiveSyncEntries does
+                // SQLite work (saveEntry, loadData) and then publishes
+                // `entries = loadedEntries` via its OWN DispatchQueue.main.async
+                // — but it also reads `self.db` and `self.encryptionKey`
+                // synchronously at the top. Those are set on main by the
+                // salt handler (`syncServiceDidReceiveSalt` -> `unlock`).
+                // If this delegate fires on background BEFORE the main-thread
+                // unlock has finished, the guard `db != nil && key != nil`
+                // returns early and the entries never get saved. Then
+                // `firstSyncComplete` flips to true but `entries` stays
+                // empty, leaving the "Syncing your vault..." overlay
+                // stuck until the user closes/reopens the app.
+                //
+                // Dispatching to main here serializes the delegate call
+                // AFTER any pending salt-handler unlock work.
+                self.delegate?.syncService(self, didReceiveSyncEntries: entries, timestamp: timestamp)
+                self.delegate?.syncServiceDidCompleteSync(self)
+            }
+            
+        case .categoriesResponse(let categories):
+            self.log("SYNC: Categories response received (\(categories.count) categories).")
+            // Dispatch to main for the same race-avoidance reason as
+            // .syncResponse above: VaultManager.didReceiveCategories does
+            // SQLite work and reads `self.db` (set on main by the salt
+            // handler). Dispatching serializes AFTER pending unlock work.
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveCategories: categories)
+            }
+
+        case .tombstonesResponse(let deletedIds, let deletedAt):
+            self.log("SYNC: Tombstones response received (\(deletedIds.count) IDs).")
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveTombstones: deletedIds, deletedAt: deletedAt)
+            }
+            
+        case .entryUpdate(let entry):
+            self.log("SYNC: Individual entry update received: \(entry.title)")
+            // Wall-clock as **millis** since epoch. The receiving path
+            // (didReceiveSyncEntries) updates `lastSyncTimestamp` from
+            // this value, and the server filter compares it against
+            // entries' `modified_at` which is also millis. Previously
+            // we passed `Int64(Date().timeIntervalSince1970)` (seconds),
+            // which collapsed to seconds-vs-millis and made the next
+            // requestSync() either ask for everything or miss entries.
+            let entryUpdateTimestamp = Int64(Date().timeIntervalSince1970 * 1000)
+            // Same race-avoidance as .syncResponse above.
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveSyncEntries: [entry], timestamp: entryUpdateTimestamp)
+            }
+
+        case .entryDelete(let entryId, let deletedAt):
+            self.log("SYNC: Individual entry deletion received: \(entryId)")
+            DispatchQueue.main.async {
+                self.delegate?.syncService(self, didReceiveTombstones: [entryId],
+                                           deletedAt: deletedAt.map { [entryId.lowercased(): $0] } ?? [:])
+            }
+            
+        case .error(let message):
+            self.log("SYNC SERVER ERROR: \(message)")
+            
+        case .ping:
+            self.log("SYNC: Ping received.")
+            self.sendPacket(SyncPacket(deviceId: deviceId, message: .pong))
+            
+        case .pong:
+            self.log("SYNC: Pong received.")
+            
+        case .deleteVault:
+            self.log("SYNC: Server-initiated vault deletion? (Unexpected)")
+        case .logUpload:
+            self.log("SYNC: Server requested log upload? (Unexpected)")
+        case .registerVault:
+            self.log("SYNC: Server sent a vault registration? (Unexpected)")
+        case .syncRequest, .requestSalt, .requestCategories, .requestTombstones:
+            self.log("SYNC: Received request message from server (usually client-initiated).")
+        }
+    }
+}
