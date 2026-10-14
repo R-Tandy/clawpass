@@ -1198,6 +1198,8 @@ class SyncService: ObservableObject {
             self.log("SYNC: Server-initiated vault deletion? (Unexpected)")
         case .logUpload:
             self.log("SYNC: Server requested log upload? (Unexpected)")
+        case .registerVault:
+            self.log("SYNC: Server sent a vault registration? (Unexpected)")
         case .syncRequest, .requestSalt, .requestCategories, .requestTombstones:
             self.log("SYNC: Received request message from server (usually client-initiated).")
         }

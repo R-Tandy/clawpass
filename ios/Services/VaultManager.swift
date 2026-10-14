@@ -818,8 +818,9 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
                 try? FileManager.default.removeItem(atPath: vaultDir.appendingPathComponent(name).path)
             }
         }
-        SecItemDelete([kSecClass as String: kSecClassGenericPassword,
-                       kSecAttrAccount as String: "vault_salt_\(id)"] as CFDictionary)
+        let saltQuery: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                        kSecAttrAccount as String: "vault_salt_\(id)"]
+        SecItemDelete(saltQuery as CFDictionary)
         UserDefaults.standard.removeObject(forKey: "vault_salt_fallback_\(id)")
         UserDefaults.standard.removeObject(forKey: "lastSyncTimestamp_\(id)")
         UserDefaults.standard.removeObject(forKey: "categoriesDirty_\(id)")
