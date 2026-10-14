@@ -8,9 +8,10 @@ struct ContentView: View {
     @AppStorage("autoLockSeconds") private var autoLockSeconds = 60
     @State private var leftAppAt: Date?
     @State private var coverScreen = false
+    @ObservedObject private var syncService = SyncService.shared
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Group {
                 if vaultManager.isUnlocked {
                     VaultView()
@@ -23,6 +24,12 @@ struct ContentView: View {
                 }
             }
             .transition(.opacity)
+
+            // Before a vault is open, say whether the computer's beacon has been heard.
+            if !vaultManager.isUnlocked && !vaultManager.isFirstPopulationPending {
+                ComputerStatusPill(found: !syncService.discoveredDevices.isEmpty)
+                    .padding(.top, 8)
+            }
 
             // Hides vault contents in the app switcher snapshot.
             if coverScreen {
@@ -51,6 +58,23 @@ struct ContentView: View {
                 break
             }
         }
+    }
+}
+
+struct ComputerStatusPill: View {
+    let found: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(found ? Palette.success : Palette.textTertiary).frame(width: 8, height: 8)
+            Text(found ? "Computer found" : "Looking for your computer…")
+                .font(.caption)
+                .foregroundColor(Palette.textSecondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Palette.surface))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -304,7 +328,6 @@ struct UnlockView: View {
     @State private var password = ""
     @State private var errorMessage: String?
     @State private var working = false
-    @State private var showingEraseConfirm = false
     @State private var canUseBiometrics = false
     @State private var showingRestore = false
 
@@ -344,10 +367,6 @@ struct UnlockView: View {
                     Button("Retrieve Vault from PC") { showingRestore = true }
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(Palette.accent)
-                    Button("Delete this Vault…", role: .destructive) { showingEraseConfirm = true }
-                        .font(.footnote)
-                        .foregroundColor(Palette.danger)
-                        .disabled(password.isEmpty)
                 }
                 .padding(.top, 24)
             }
@@ -359,15 +378,6 @@ struct UnlockView: View {
             canUseBiometrics = CryptoService.shared.biometricsAvailable && CryptoService.shared.hasSavedMasterPassword()
         }
         .sheet(isPresented: $showingRestore) { RestoreVaultView() }
-        .confirmationDialog("Are you sure you want to delete this vault?", isPresented: $showingEraseConfirm, titleVisibility: .visible) {
-            Button("Delete this Vault", role: .destructive) {
-                if vaultManager.deleteLocalVault(password: password) { password = ""; errorMessage = nil }
-                else { errorMessage = "No vault on this device matches that password." }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Note: this will not delete the vault from your Computer.")
-        }
     }
 
     private func unlock() {
@@ -603,37 +613,53 @@ struct CategoryGlyph: View {
     }
 }
 
-/// Icon-only category bar: tap an icon to filter, tap it again (or the all-items key) to clear.
+/// Category filter: one line of text (icon + name) that opens a vertical list to pick from.
 struct CategoryChips: View {
     let categories: [Category]
     @Binding var selected: Category?
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                chip(icon: AnyView(Image(systemName: "square.grid.2x2.fill")), label: "All", isOn: selected == nil, tint: Palette.accent) { selected = nil }
+        HStack {
+            Menu {
+                Button { selected = nil } label: {
+                    Label("All Items", systemImage: selected == nil ? "checkmark" : "square.grid.2x2")
+                }
                 ForEach(categories) { category in
-                    chip(icon: AnyView(CategoryGlyph(icon: category.icon)), label: category.name,
-                         isOn: selected?.id == category.id, tint: Color(hex: category.color)) {
-                        selected = selected?.id == category.id ? nil : category
+                    Button { selected = category } label: {
+                        if selected?.id == category.id {
+                            Label(category.name, systemImage: "checkmark")
+                        } else {
+                            Text("\(glyph(category.icon)) \(category.name)")
+                        }
                     }
                 }
+            } label: {
+                HStack(spacing: 8) {
+                    if let category = selected {
+                        CategoryGlyph(icon: category.icon).foregroundColor(Color(hex: category.color))
+                        Text(category.name)
+                    } else {
+                        Image(systemName: "square.grid.2x2.fill")
+                        Text("All Items")
+                    }
+                    Image(systemName: "chevron.down").font(.caption)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(Palette.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Palette.surfaceRaised))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .accessibilityLabel("Category")
+            Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
-    private func chip(icon: AnyView, label: String, isOn: Bool, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            icon
-                .font(.title3)
-                .frame(width: 44, height: 44)
-                .foregroundColor(isOn ? Palette.onAccent : tint)
-                .background(Circle().fill(isOn ? tint : Palette.surfaceRaised))
-        }
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
+    /// Menu rows are plain text, so only emoji icons can sit beside the name.
+    private func glyph(_ icon: String) -> String {
+        icon.unicodeScalars.allSatisfy({ $0.isASCII }) ? "•" : icon
     }
 }
 

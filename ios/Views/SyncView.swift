@@ -111,9 +111,9 @@ struct SettingsView: View {
             Section {
                 HStack {
                     Circle()
-                        .fill(syncService.isConnected ? Palette.success : Palette.textTertiary)
+                        .fill(syncService.isConnected ? Palette.success : (syncService.discoveredDevices.isEmpty ? Palette.textTertiary : Palette.warning))
                         .frame(width: 10, height: 10)
-                    Text(syncService.isConnected ? "Connected to your computer" : "Not connected")
+                    Text(syncService.isConnected ? "Connected to your computer" : (syncService.discoveredDevices.isEmpty ? "Not connected" : "Computer found"))
                     Spacer()
                 }
                 .accessibilityElement(children: .combine)
