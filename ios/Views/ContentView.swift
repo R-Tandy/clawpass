@@ -334,13 +334,10 @@ struct UnlockView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                VStack(spacing: 14) {
-                    BrandMark(size: 84)
-                    Text(AppBrand.name)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundColor(Palette.textPrimary)
-                }
-                .padding(.top, 72)
+                // The launch animation plays here, above the password box, and its last frame stays.
+                SplashView(embedded: true)
+                    .frame(height: 340)
+                    .padding(.top, 24)
 
                 VStack(spacing: 14) {
                     FieldRow(title: "Master password", text: $password, secure: true, contentType: .password)
@@ -391,6 +388,7 @@ struct UnlockView: View {
                 password = ""
             } catch VaultError.vaultNotFound {
                 errorMessage = "That password does not match any vault on this device. Check it and try again, or restore your vault from your computer."
+                UnlockPhotoService.shared.captureWrongPassword()
             } catch VaultError.saltMissing {
                 errorMessage = "This vault's key material is missing from this device. Restore it from your computer below."
             } catch {
@@ -493,8 +491,11 @@ struct VaultView: View {
                     HStack {
                         Text("\(selectedIds.count) selected").font(.subheadline).foregroundColor(Palette.textSecondary)
                         Spacer()
-                        Button("Clear") { selectedIds.removeAll() }
-                        Button("Delete Selected", role: .destructive) { confirmingDelete = true }
+                        HStack(spacing: 20) {
+                            Button("Clear") { selectedIds.removeAll() }
+                            Button("Delete Selected", role: .destructive) { confirmingDelete = true }
+                        }
+                        .buttonStyle(.borderless)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -525,6 +526,7 @@ struct VaultView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .screenBackground()

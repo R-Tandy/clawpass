@@ -3,32 +3,24 @@ import UIKit
 
 @main
 struct ClawPassApp: App {
-    @State private var showSplash = true
+    @ObservedObject private var theme = ThemeStore.shared
 
     var body: some Scene {
         WindowGroup {
-            ZStack {
-                ContentView()
-                if showSplash {
-                    SplashView()
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
-            }
-            .task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                withAnimation(.easeInOut(duration: 0.45)) { showSplash = false }
-            }
+            // Rebuilding on a theme change makes every screen re-read the palette.
+            ContentView()
+                .id(theme.current.id)
         }
     }
 }
 
-/// Launch moment: the shackle drops, the lock clunks shut with a tap, a glint crosses the steel,
-/// then the name builds beneath it.
+/// The brand moment on the unlock screen: the shackle drops, the lock clunks shut with a tap, a glint crosses
+/// the steel, then the name builds beneath it. `embedded` sits it above the password box on the theme colours.
 struct SplashView: View {
+    var embedded = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    private var night: Bool { colorScheme == .dark }
+    private var night: Bool { embedded || colorScheme == .dark }
     @State private var markIn = false
     @State private var shackleDown = false
     @State private var clunk = false
@@ -40,12 +32,12 @@ struct SplashView: View {
     private let letters = Array("LAYER")
     private let markHeight: CGFloat = 245
     private let markWidth: CGFloat = 124
-    private var ink: Color { night ? Color(red: 0.93, green: 0.95, blue: 0.97) : Color(red: 0.07, green: 0.16, blue: 0.36) }
-    private var slate: Color { night ? Color(red: 0.60, green: 0.63, blue: 0.68) : Color(red: 0.26, green: 0.27, blue: 0.29) }
+    private var ink: Color { embedded ? Palette.textPrimary : night ? Color(red: 0.93, green: 0.95, blue: 0.97) : Color(red: 0.07, green: 0.16, blue: 0.36) }
+    private var slate: Color { embedded ? Palette.textSecondary : night ? Color(red: 0.60, green: 0.63, blue: 0.68) : Color(red: 0.26, green: 0.27, blue: 0.29) }
 
     var body: some View {
         ZStack {
-            (night ? Color.black : Color.white).ignoresSafeArea()
+            if !embedded { (night ? Color.black : Color.white).ignoresSafeArea() }
             if night {
                 RadialGradient(colors: [Color(red: 0.38, green: 0.49, blue: 0.75).opacity(0.2), .clear],
                                center: .center, startRadius: 0, endRadius: 260)
@@ -72,6 +64,7 @@ struct SplashView: View {
                     .offset(y: byIn ? 0 : 6)
             }
         }
+        .scaleEffect(embedded ? 0.78 : 1)
         .accessibilityHidden(true)
         .onAppear(perform: run)
     }

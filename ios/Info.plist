@@ -46,7 +46,9 @@
     <key>NSLocalNetworkUsageDescription</key>
     <string>Layer needs local network access to discover and sync with your desktop vault.</string>
     <key>NSCameraUsageDescription</key>
-    <string>Layer needs camera access to scan connection QR codes.</string>
+    <string>Layer uses the camera to scan connection QR codes and to take a photo after a wrong password.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Layer stamps the wrong-password photo with the location where it was taken.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_layer._tcp</string>

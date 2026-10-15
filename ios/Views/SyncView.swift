@@ -26,6 +26,8 @@ struct SettingsView: View {
                 securitySection
             }
             syncSection
+            themeSection
+            unlockPhotoSection
             diagnosticsSection
             aboutSection
         }
@@ -189,6 +191,35 @@ struct SettingsView: View {
             }
             .listRowBackground(Palette.surface)
         }
+    }
+
+    private var themeSection: some View {
+        Section {
+            Picker("Theme", selection: Binding(
+                get: { ThemeStore.shared.current.id },
+                set: { ThemeStore.shared.select($0) }
+            )) {
+                ForEach(ThemeColors.all, id: \.id) { Text($0.name).tag($0.id) }
+            }
+        } header: {
+            Text("Appearance")
+        }
+        .listRowBackground(Palette.surface)
+    }
+
+    private var unlockPhotoSection: some View {
+        Section {
+            Toggle("Photo on wrong password", isOn: Binding(
+                get: { UnlockPhotoService.shared.enabled },
+                set: { UnlockPhotoService.shared.enabled = $0 }
+            ))
+            NavigationLink("View unlock photos") { UnlockPhotosView() }
+        } header: {
+            Text("Unlock photo")
+        } footer: {
+            Text("After a wrong password on the unlock screen, the front camera takes a photo stamped with the date, time and location and keeps it on this phone.")
+        }
+        .listRowBackground(Palette.surface)
     }
 
     private var diagnosticsSection: some View {

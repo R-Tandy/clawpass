@@ -8,17 +8,58 @@ enum AppBrand {
     static let desktopName = "\(name) for Desktop"
 }
 
+/// A colour theme. "Brass" is the original look; the others are alternatives chosen in Settings.
+struct ThemeColors {
+    let id: String
+    let name: String
+    let background, surface, surfaceRaised, stroke, accent, accentPressed, onAccent, textPrimary, textSecondary, textTertiary: Color
+
+    init(_ id: String, _ name: String, _ bg: String, _ surface: String, _ raised: String, _ stroke: String, _ accent: String, _ pressed: String, _ onAccent: String, _ t1: String, _ t2: String, _ t3: String) {
+        self.id = id; self.name = name
+        background = Color(hex: bg); self.surface = Color(hex: surface); surfaceRaised = Color(hex: raised); self.stroke = Color(hex: stroke)
+        self.accent = Color(hex: accent); accentPressed = Color(hex: pressed); self.onAccent = Color(hex: onAccent)
+        textPrimary = Color(hex: t1); textSecondary = Color(hex: t2); textTertiary = Color(hex: t3)
+    }
+
+    static let all: [ThemeColors] = [
+        ThemeColors("brass", "Brass", "0B0C10", "15171C", "1D2027", "2A2D36", "C5A059", "A98A47", "0B0C10", "ECEDEF", "9AA3B2", "6B7280"),
+        ThemeColors("layer", "Layer", "0F1114", "161A1F", "1D2229", "2A2F37", "4FD8EE", "35B8CC", "0F1114", "F2F4F7", "8A919C", "6B727D"),
+        ThemeColors("terminal", "Terminal", "050805", "0C130C", "132013", "1D2E1D", "33FF66", "1FA84A", "050805", "D6FFE0", "6F9A6F", "4B6B4B"),
+        ThemeColors("midnight", "Midnight", "0A0F1F", "111A33", "18244A", "1F2C52", "6EA8FF", "3F78D6", "0A0F1F", "E8EEFF", "8A9BC4", "5C6B94")
+    ]
+}
+
+final class ThemeStore: ObservableObject {
+    static let shared = ThemeStore()
+    private static let key = "layer.theme"
+
+    @Published private(set) var current: ThemeColors
+
+    private init() {
+        let saved = UserDefaults.standard.string(forKey: Self.key)
+        current = ThemeColors.all.first { $0.id == saved } ?? ThemeColors.all[0]
+    }
+
+    func select(_ id: String) {
+        guard let theme = ThemeColors.all.first(where: { $0.id == id }) else { return }
+        UserDefaults.standard.set(id, forKey: Self.key)
+        current = theme
+    }
+}
+
+/// Every view reads colours from here; the root view is rebuilt when the theme changes.
 enum Palette {
-    static let background = Color(hex: "0B0C10")
-    static let surface = Color(hex: "15171C")
-    static let surfaceRaised = Color(hex: "1D2027")
-    static let stroke = Color(hex: "2A2D36")
-    static let accent = Color(hex: "C5A059")
-    static let accentPressed = Color(hex: "A98A47")
-    static let onAccent = Color(hex: "0B0C10")
-    static let textPrimary = Color(hex: "ECEDEF")
-    static let textSecondary = Color(hex: "9AA3B2")
-    static let textTertiary = Color(hex: "6B7280")
+    private static var theme: ThemeColors { ThemeStore.shared.current }
+    static var background: Color { theme.background }
+    static var surface: Color { theme.surface }
+    static var surfaceRaised: Color { theme.surfaceRaised }
+    static var stroke: Color { theme.stroke }
+    static var accent: Color { theme.accent }
+    static var accentPressed: Color { theme.accentPressed }
+    static var onAccent: Color { theme.onAccent }
+    static var textPrimary: Color { theme.textPrimary }
+    static var textSecondary: Color { theme.textSecondary }
+    static var textTertiary: Color { theme.textTertiary }
     static let success = Color(hex: "34C759")
     static let danger = Color(hex: "FF5A52")
     static let warning = Color(hex: "FFB340")
@@ -287,5 +328,176 @@ struct StrengthMeter: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Password strength \(strength.label)")
         }
+    }
+}
+
+// MARK: - Unlock photo
+
+import AVFoundation
+import CoreLocation
+
+/// Takes a front-camera photo after a wrong password on the unlock screen, stamps it with the date,
+/// time and location, and saves it on the phone (see UnlockPhotosView for the list). Successful unlocks save nothing.
+final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocationManagerDelegate {
+    static let shared = UnlockPhotoService()
+    static let enabledKey = "layer.unlockPhoto"
+
+    private let output = AVCapturePhotoOutput()
+    private let locationManager = CLLocationManager()
+    private var session: AVCaptureSession?
+    private var photoContinuation: CheckedContinuation<Data?, Never>?
+
+    var enabled: Bool {
+        get { UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.enabledKey) }
+    }
+
+    static var directory: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let dir = docs.appendingPathComponent("Layer/captures", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Call after a wrong password; the photo is taken and saved in the background.
+    func captureWrongPassword() {
+        guard enabled else { return }
+        let when = Date()
+        locationManager.delegate = self
+        if locationManager.authorizationStatus == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+        }
+        locationManager.requestLocation()
+        Task.detached { [self] in
+            guard let data = await self.captureFrame() else { return }
+            let location = self.locationManager.location
+            guard let stamped = Self.stamp(data, when: when, location: location) else { return }
+            Self.save(stamped, when: when, location: location)
+        }
+    }
+
+    private func captureFrame() async -> Data? {
+        guard await cameraAllowed(),
+              let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+              let input = try? AVCaptureDeviceInput(device: device) else { return nil }
+        let session = AVCaptureSession()
+        guard session.canAddInput(input), session.canAddOutput(output) else { return nil }
+        session.addInput(input)
+        session.addOutput(output)
+        self.session = session
+        DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+        // Give the sensor a moment to settle exposure before the frame is taken.
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        return await withCheckedContinuation { continuation in
+            self.photoContinuation = continuation
+            self.output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        }
+    }
+
+    private func cameraAllowed() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+        default: return false
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        session?.stopRunning()
+        session = nil
+        photoContinuation?.resume(returning: error == nil ? photo.fileDataRepresentation() : nil)
+        photoContinuation = nil
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {}
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+
+    private static func stamp(_ data: Data, when: Date, location: CLLocation?) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let size = image.size
+        let bar = max(46, size.height * 0.11)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let stamped = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+            UIColor(white: 0.03, alpha: 0.78).setFill()
+            UIRectFill(CGRect(x: 0, y: size.height - bar, width: size.width, height: bar))
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.monospacedSystemFont(ofSize: bar * 0.3, weight: .regular),
+                .foregroundColor: UIColor(white: 0.92, alpha: 1)
+            ]
+            let place = location.map { String(format: "%.5f, %.5f", $0.coordinate.latitude, $0.coordinate.longitude) } ?? "Location unavailable"
+            DateFormatter.localizedString(from: when, dateStyle: .medium, timeStyle: .medium)
+                .draw(at: CGPoint(x: 12, y: size.height - bar * 0.9), withAttributes: attrs)
+            "\(place)  ·  WRONG PASSWORD".draw(at: CGPoint(x: 12, y: size.height - bar * 0.5), withAttributes: attrs)
+        }
+        return stamped.jpegData(compressionQuality: 0.82)
+    }
+
+    private static func save(_ jpeg: Data, when: Date, location: CLLocation?) {
+        let name = "\(Int(when.timeIntervalSince1970 * 1000)).jpg"
+        let dir = directory
+        try? jpeg.write(to: dir.appendingPathComponent(name))
+        var entry: [String: Any] = ["file": name, "taken_at": ISO8601DateFormatter().string(from: when)]
+        if let c = location { entry["lat"] = c.coordinate.latitude; entry["lon"] = c.coordinate.longitude }
+        guard let line = try? JSONSerialization.data(withJSONObject: entry), let text = String(data: line, encoding: .utf8) else { return }
+        let log = dir.appendingPathComponent("log.jsonl")
+        let existing = (try? String(contentsOf: log, encoding: .utf8)) ?? ""
+        try? (existing + text + "\n").write(to: log, atomically: true, encoding: .utf8)
+    }
+
+    /// Newest first.
+    static func entries() -> [(file: String, takenAt: String, place: String)] {
+        let text = (try? String(contentsOf: directory.appendingPathComponent("log.jsonl"), encoding: .utf8)) ?? ""
+        return text.split(separator: "\n").compactMap { line in
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  let file = obj["file"] as? String else { return nil }
+            let place: String
+            if let lat = obj["lat"] as? Double, let lon = obj["lon"] as? Double {
+                place = String(format: "%.5f, %.5f", lat, lon)
+            } else {
+                place = "Location unavailable"
+            }
+            return (file, obj["taken_at"] as? String ?? "", place)
+        }.reversed()
+    }
+
+    static func delete(_ file: String) {
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent(file))
+        let log = directory.appendingPathComponent("log.jsonl")
+        let text = (try? String(contentsOf: log, encoding: .utf8)) ?? ""
+        let kept = text.split(separator: "\n").filter { !$0.contains("\"\(file)\"") }
+        try? (kept.map(String.init).joined(separator: "\n") + (kept.isEmpty ? "" : "\n")).write(to: log, atomically: true, encoding: .utf8)
+    }
+}
+
+struct UnlockPhotosView: View {
+    @State private var items = UnlockPhotoService.entries()
+
+    var body: some View {
+        List {
+            if items.isEmpty {
+                Text("No photos yet. One is taken after each wrong password on the unlock screen.")
+                    .foregroundColor(Palette.textSecondary)
+            }
+            ForEach(items, id: \.file) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    if let image = UIImage(contentsOfFile: UnlockPhotoService.directory.appendingPathComponent(item.file).path) {
+                        Image(uiImage: image).resizable().scaledToFit().cornerRadius(8)
+                    }
+                    Text("Wrong password")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(Palette.danger)
+                    Text(item.takenAt).font(.caption).foregroundColor(Palette.textSecondary)
+                    Text(item.place).font(.caption).foregroundColor(Palette.textSecondary)
+                }
+                .swipeActions {
+                    Button(role: .destructive) {
+                        UnlockPhotoService.delete(item.file)
+                        items = UnlockPhotoService.entries()
+                    } label: { Label("Delete", systemImage: "trash") }
+                }
+            }
+        }
+        .navigationTitle("Unlock photos")
     }
 }
