@@ -343,6 +343,8 @@ struct UnlockView: View {
 
                 VStack(spacing: 14) {
                     FieldRow(title: "Master password", text: $password, secure: true, contentType: .password)
+                        .submitLabel(.go)
+                        .onSubmit { if !password.isEmpty && !working { unlock() } }
 
                     if let errorMessage = errorMessage {
                         InlineBanner(kind: .error, message: errorMessage)
@@ -373,6 +375,7 @@ struct UnlockView: View {
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
+        .keyboardDismissOnScroll()
         .onAppear {
             canUseBiometrics = CryptoService.shared.biometricsAvailable && CryptoService.shared.hasSavedMasterPassword()
         }
@@ -712,11 +715,11 @@ struct EntryRowView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title)
-                    .font(.body.weight(.semibold))
+                    .font(Palette.font(.body, .semibold))
                     .foregroundColor(Palette.textPrimary)
                 if !entry.username.isEmpty {
                     Text(entry.username)
-                        .font(.subheadline)
+                        .font(Palette.font(.subheadline))
                         .foregroundColor(Palette.textSecondary)
                         .lineLimit(1)
                 }

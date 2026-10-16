@@ -355,6 +355,17 @@ final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocat
     private let locationManager = CLLocationManager()
     private var session: AVCaptureSession?
     private var photoContinuation: CheckedContinuation<Data?, Never>?
+    private var capturing = false
+    private let stateLock = NSLock()
+
+    /// Resumes the pending photo request exactly once; later calls (timeout vs delegate) are no-ops.
+    private func finishPhoto(_ data: Data?) {
+        stateLock.lock()
+        let c = photoContinuation
+        photoContinuation = nil
+        stateLock.unlock()
+        c?.resume(returning: data)
+    }
 
     var enabled: Bool {
         get { UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true }
@@ -370,7 +381,8 @@ final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocat
 
     /// Call after a wrong password; the photo is taken and saved in the background.
     func captureWrongPassword() {
-        guard enabled else { return }
+        guard enabled, !capturing else { return }   // one capture at a time; rapid wrong tries must not stack sessions
+        capturing = true
         let when = Date()
         locationManager.delegate = self
         if locationManager.authorizationStatus == .notDetermined {
@@ -378,6 +390,7 @@ final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocat
         }
         locationManager.requestLocation()
         Task.detached { [self] in
+            defer { DispatchQueue.main.async { self.capturing = false } }
             guard let data = await self.captureFrame() else { return }
             let location = self.locationManager.location
             guard let stamped = Self.stamp(data, when: when, location: location) else { return }
@@ -397,10 +410,22 @@ final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocat
         DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
         // Give the sensor a moment to settle exposure before the frame is taken.
         try? await Task.sleep(nanoseconds: 600_000_000)
-        return await withCheckedContinuation { continuation in
-            self.photoContinuation = continuation
-            self.output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        // capturePhoto raises an Objective-C exception (a crash) if the session is not running yet.
+        var waited = 0
+        while !session.isRunning && waited < 20 { try? await Task.sleep(nanoseconds: 100_000_000); waited += 1 }
+        guard session.isRunning, output.connection(with: .video) != nil else {
+            session.stopRunning(); self.session = nil
+            return nil
         }
+        let data: Data? = await withCheckedContinuation { continuation in
+            stateLock.lock(); self.photoContinuation = continuation; stateLock.unlock()
+            self.output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+            // If the camera never answers, give up so the task (and the session) cannot hang forever.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) { [weak self] in self?.finishPhoto(nil) }
+        }
+        session.stopRunning()
+        self.session = nil
+        return data
     }
 
     private func cameraAllowed() async -> Bool {
@@ -412,10 +437,7 @@ final class UnlockPhotoService: NSObject, AVCapturePhotoCaptureDelegate, CLLocat
     }
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        session?.stopRunning()
-        session = nil
-        photoContinuation?.resume(returning: error == nil ? photo.fileDataRepresentation() : nil)
-        photoContinuation = nil
+        finishPhoto(error == nil ? photo.fileDataRepresentation() : nil)
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {}
@@ -512,133 +534,21 @@ struct UnlockPhotosView: View {
 }
 
 
+extension Palette {
+    /// Explicit themed font for list rows, which do not reliably inherit the app-wide font design.
+    static func font(_ style: Font.TextStyle, _ weight: Font.Weight = .regular) -> Font {
+        Font.system(style, design: ThemeStore.shared.current.fontDesign).weight(weight)
+    }
+}
+
 extension View {
+    /// Lets the keyboard be dragged away so the Unlock button is never stuck behind it.
+    @ViewBuilder func keyboardDismissOnScroll() -> some View {
+        if #available(iOS 16.0, *) { self.scrollDismissesKeyboard(.interactively) } else { self }
+    }
+
     /// Applies the current theme's typeface to everything below.
     @ViewBuilder func themeFont() -> some View {
         if #available(iOS 16.1, *) { self.fontDesign(ThemeStore.shared.current.fontDesign) } else { self }
-    }
-}
-
-// MARK: - Layer Pro + security audit
-// Beta: Pro is a local switch (no purchase yet). Gate every Pro feature on
-// ProStore.shared.enabled so real licensing only has to change this class.
-final class ProStore: ObservableObject {
-    static let shared = ProStore()
-    @Published var enabled: Bool {
-        didSet { UserDefaults.standard.set(enabled, forKey: "layer.pro") }
-    }
-    private init() { enabled = UserDefaults.standard.bool(forKey: "layer.pro") }
-}
-
-struct AuditFinding: Identifiable {
-    let id = UUID()
-    let title: String
-    let kind: String
-    let detail: String
-}
-
-struct AuditReport {
-    var score: Int
-    var total: Int
-    var findings: [AuditFinding]
-}
-
-// Runs on the unlocked vault only; passwords are decrypted in memory, scored
-// and grouped here, and never leave the device.
-enum SecurityAudit {
-    private static let common = ["password", "123456", "12345678", "123456789", "qwerty", "abc123",
-        "letmein", "monkey", "dragon", "iloveyou", "admin", "welcome", "login", "passw0rd",
-        "football", "baseball", "master", "sunshine", "princess", "trustno1"]
-
-    static func weakness(_ pw: String) -> String? {
-        let lower = pw.lowercased()
-        if common.contains(where: { lower.contains($0) }) { return "Contains a very common password" }
-        let chars = Array(pw)
-        if chars.count < 8 { return "Only \(chars.count) characters" }
-        if Set(chars).count * 3 < chars.count { return "Mostly repeated characters" }
-        let codes = chars.compactMap { $0.unicodeScalars.first?.value }.map { Int($0) }
-        if codes.count >= 4 {
-            for i in 0...(codes.count - 4) {
-                let d = codes[i + 1] - codes[i]
-                if (d == 1 || d == -1) && codes[i + 2] - codes[i + 1] == d && codes[i + 3] - codes[i + 2] == d {
-                    return "Contains a simple sequence (abcd, 1234)"
-                }
-            }
-        }
-        let classes = [chars.contains { $0.isLowercase }, chars.contains { $0.isUppercase },
-                       chars.contains { $0.isNumber }, chars.contains { !$0.isLetter && !$0.isNumber }]
-            .filter { $0 }.count
-        if chars.count < 12 && classes < 3 { return "Short and uses few character types" }
-        return nil
-    }
-
-    static func run(_ vault: VaultManager) -> AuditReport {
-        var findings: [AuditFinding] = []
-        var groups: [String: [VaultEntry]] = [:]
-        for e in vault.entries {
-            guard let pw = try? vault.decryptPassword(for: e), !pw.isEmpty else { continue }
-            if let why = weakness(pw) { findings.append(AuditFinding(title: e.title, kind: "weak", detail: why)) }
-            groups[pw, default: []].append(e)
-            let days = Int(Date().timeIntervalSince(e.modifiedAt) / 86_400)
-            if days > 365 { findings.append(AuditFinding(title: e.title, kind: "old", detail: "Not changed in \(days) days")) }
-            let hasSite = !(e.url ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-            let hasTotp = !(e.totpSecret ?? "").trimmingCharacters(in: .whitespaces).isEmpty
-            if hasSite && !hasTotp {
-                findings.append(AuditFinding(title: e.title, kind: "no2fa", detail: "No two-factor code stored for this site"))
-            }
-        }
-        for (_, g) in groups where g.count > 1 {
-            for e in g { findings.append(AuditFinding(title: e.title, kind: "reused", detail: "Same password used by \(g.count) entries")) }
-        }
-        let total = vault.entries.count
-        var penalty = 0.0
-        for f in findings { penalty += (f.kind == "weak" || f.kind == "reused") ? 3 : (f.kind == "old" ? 1 : 0.5) }
-        let score = total == 0 ? 100 : Int(max(0, min(100, 100 - penalty / (Double(total) * 3) * 100)).rounded())
-        findings.sort { ($0.kind, $0.title) < ($1.kind, $1.title) }
-        return AuditReport(score: score, total: total, findings: findings)
-    }
-}
-
-struct SecurityAuditView: View {
-    @ObservedObject private var vault = VaultManager.shared
-    @State private var report: AuditReport?
-
-    private let labels: [(String, String)] = [
-        ("weak", "Weak passwords"), ("reused", "Reused passwords"),
-        ("old", "Not changed in over a year"), ("no2fa", "No two-factor code stored")
-    ]
-
-    var body: some View {
-        List {
-            if let r = report {
-                Section {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("\(r.score)").font(.system(size: 44, weight: .bold))
-                            .foregroundColor(r.score >= 80 ? .green : (r.score >= 50 ? .orange : .red))
-                        Text("/ 100 · \(r.total) entries").foregroundColor(.secondary)
-                    }
-                    if r.findings.isEmpty { Text("No problems found.").foregroundColor(.secondary) }
-                }
-                .listRowBackground(Palette.surface)
-                ForEach(labels, id: \.0) { kind, label in
-                    let items = r.findings.filter { $0.kind == kind }
-                    if !items.isEmpty {
-                        Section(header: Text("\(label) (\(items.count))")) {
-                            ForEach(items) { f in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(f.title)
-                                    Text(f.detail).font(.footnote).foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        .listRowBackground(Palette.surface)
-                    }
-                }
-                Section { Text("Checked on this device only. Passwords are never sent anywhere.").font(.footnote).foregroundColor(.secondary) }
-                    .listRowBackground(Palette.surface)
-            }
-        }
-        .navigationTitle("Security audit")
-        .onAppear { report = SecurityAudit.run(vault) }
     }
 }

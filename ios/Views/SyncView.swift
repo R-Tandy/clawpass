@@ -9,7 +9,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var vaultManager = VaultManager.shared
     @ObservedObject private var syncService = SyncService.shared
-    @ObservedObject private var pro = ProStore.shared
     @AppStorage("autoLockSeconds") private var autoLockSeconds = 60
     @AppStorage("faceIDUnlock") private var faceIDUnlock = true
 
@@ -29,7 +28,6 @@ struct SettingsView: View {
             syncSection
             themeSection
             unlockPhotoSection
-            proSection
             diagnosticsSection
             aboutSection
         }
@@ -220,25 +218,6 @@ struct SettingsView: View {
             Text("Unlock photo")
         } footer: {
             Text("After a wrong password on the unlock screen, the front camera takes a photo stamped with the date, time and location and keeps it on this phone.")
-        }
-        .listRowBackground(Palette.surface)
-    }
-
-    private var proSection: some View {
-        Section {
-            Toggle("Pro features (beta: free while testing)", isOn: Binding(
-                get: { ProStore.shared.enabled },
-                set: { ProStore.shared.enabled = $0 }
-            ))
-            if pro.enabled {
-                NavigationLink("Security audit") { SecurityAuditView() }
-            } else {
-                Text("Security audit (Pro)").foregroundColor(.secondary)
-            }
-        } header: {
-            Text("Layer Pro")
-        } footer: {
-            Text("Security audit checks for weak, reused and old passwords and missing two-factor codes. Turn on Pro to use it.")
         }
         .listRowBackground(Palette.surface)
     }
