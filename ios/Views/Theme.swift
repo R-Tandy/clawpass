@@ -13,8 +13,12 @@ struct ThemeColors {
     let id: String
     let name: String
     let background, surface, surfaceRaised, stroke, accent, accentPressed, onAccent, textPrimary, textSecondary, textTertiary: Color
+    /// Corner rounding relative to the standard design (0 = square corners) and the typeface family for the whole app.
+    let radiusScale: CGFloat
+    let fontDesign: Font.Design
 
-    init(_ id: String, _ name: String, _ bg: String, _ surface: String, _ raised: String, _ stroke: String, _ accent: String, _ pressed: String, _ onAccent: String, _ t1: String, _ t2: String, _ t3: String) {
+    init(_ id: String, _ name: String, _ bg: String, _ surface: String, _ raised: String, _ stroke: String, _ accent: String, _ pressed: String, _ onAccent: String, _ t1: String, _ t2: String, _ t3: String, radius: CGFloat = 1, font: Font.Design = .default) {
+        radiusScale = radius; fontDesign = font
         self.id = id; self.name = name
         background = Color(hex: bg); self.surface = Color(hex: surface); surfaceRaised = Color(hex: raised); self.stroke = Color(hex: stroke)
         self.accent = Color(hex: accent); accentPressed = Color(hex: pressed); self.onAccent = Color(hex: onAccent)
@@ -22,10 +26,14 @@ struct ThemeColors {
     }
 
     static let all: [ThemeColors] = [
-        ThemeColors("brass", "Brass", "0B0C10", "15171C", "1D2027", "2A2D36", "C5A059", "A98A47", "0B0C10", "ECEDEF", "9AA3B2", "6B7280"),
-        ThemeColors("layer", "Layer", "0F1114", "161A1F", "1D2229", "2A2F37", "4FD8EE", "35B8CC", "0F1114", "F2F4F7", "8A919C", "6B727D"),
-        ThemeColors("terminal", "Terminal", "050805", "0C130C", "132013", "1D2E1D", "33FF66", "1FA84A", "050805", "D6FFE0", "6F9A6F", "4B6B4B"),
-        ThemeColors("midnight", "Midnight", "0A0F1F", "111A33", "18244A", "1F2C52", "6EA8FF", "3F78D6", "0A0F1F", "E8EEFF", "8A9BC4", "5C6B94")
+        // Brass: the original gold on near-black, with serif type and squarer corners for the steampunk feel.
+        ThemeColors("brass", "Brass", "0B0C10", "15171C", "1D2027", "2A2D36", "C5A059", "A98A47", "0B0C10", "ECEDEF", "9AA3B2", "6B7280", radius: 0.6, font: .serif),
+        // Layer: graphite with a restrained steel-cyan instead of bright cyan everywhere.
+        ThemeColors("layer", "Layer", "0F1114", "161A1F", "1D2229", "2A2F37", "6FB3C4", "4F93A4", "0F1114", "F2F4F7", "8A919C", "6B727D"),
+        // Terminal: pure black, phosphor green, monospace, no rounded corners.
+        ThemeColors("terminal", "Terminal", "000000", "000000", "050A05", "0F3D1C", "2BD45F", "1E9D45", "000000", "46D977", "2FA155", "1F6B39", radius: 0, font: .monospaced),
+        // Midnight: deep blue over true black.
+        ThemeColors("midnight", "Midnight", "03050B", "0B1226", "121C38", "1F2C52", "6EA8FF", "3F78D6", "03050B", "E8EEFF", "8A9BC4", "5C6B94")
     ]
 }
 
@@ -60,6 +68,7 @@ enum Palette {
     static var textPrimary: Color { theme.textPrimary }
     static var textSecondary: Color { theme.textSecondary }
     static var textTertiary: Color { theme.textTertiary }
+    static func r(_ base: CGFloat) -> CGFloat { base * theme.radiusScale }
     static let success = Color(hex: "34C759")
     static let danger = Color(hex: "FF5A52")
     static let warning = Color(hex: "FFB340")
@@ -96,7 +105,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .foregroundColor(Palette.onAccent)
             .frame(maxWidth: .infinity, minHeight: 50)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: Palette.r(14), style: .continuous)
                     .fill(configuration.isPressed ? Palette.accentPressed : Palette.accent)
             )
             .opacity(isEnabled ? 1 : 0.4)
@@ -114,10 +123,10 @@ struct SecondaryButtonStyle: ButtonStyle {
             .foregroundColor(Palette.accent)
             .frame(maxWidth: .infinity, minHeight: 50)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: Palette.r(14), style: .continuous)
                     .fill(Palette.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: Palette.r(14), style: .continuous)
                             .stroke(Palette.accent.opacity(0.6), lineWidth: 1)
                     )
             )
@@ -137,10 +146,10 @@ struct Card<Content: View>: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Palette.r(16), style: .continuous)
                     .fill(Palette.surface)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: Palette.r(16), style: .continuous)
                             .stroke(Palette.stroke, lineWidth: 1)
                     )
             )
@@ -189,10 +198,10 @@ struct FieldRow: View {
             .padding(.horizontal, 14)
             .frame(minHeight: 48)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Palette.r(12), style: .continuous)
                     .fill(Palette.surfaceRaised)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Palette.r(12), style: .continuous)
                             .stroke(Palette.stroke, lineWidth: 1)
                     )
             )
@@ -232,7 +241,7 @@ struct InlineBanner: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Palette.r(12), style: .continuous)
                 .fill(color.opacity(0.14))
         )
         .accessibilityElement(children: .combine)
@@ -245,7 +254,7 @@ struct BrandMark: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            RoundedRectangle(cornerRadius: Palette.r(size * 0.28), style: .continuous)
                 .fill(LinearGradient(colors: [Palette.accent, Palette.accentPressed],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: size, height: size)
@@ -499,5 +508,137 @@ struct UnlockPhotosView: View {
             }
         }
         .navigationTitle("Unlock photos")
+    }
+}
+
+
+extension View {
+    /// Applies the current theme's typeface to everything below.
+    @ViewBuilder func themeFont() -> some View {
+        if #available(iOS 16.1, *) { self.fontDesign(ThemeStore.shared.current.fontDesign) } else { self }
+    }
+}
+
+// MARK: - Layer Pro + security audit
+// Beta: Pro is a local switch (no purchase yet). Gate every Pro feature on
+// ProStore.shared.enabled so real licensing only has to change this class.
+final class ProStore: ObservableObject {
+    static let shared = ProStore()
+    @Published var enabled: Bool {
+        didSet { UserDefaults.standard.set(enabled, forKey: "layer.pro") }
+    }
+    private init() { enabled = UserDefaults.standard.bool(forKey: "layer.pro") }
+}
+
+struct AuditFinding: Identifiable {
+    let id = UUID()
+    let title: String
+    let kind: String
+    let detail: String
+}
+
+struct AuditReport {
+    var score: Int
+    var total: Int
+    var findings: [AuditFinding]
+}
+
+// Runs on the unlocked vault only; passwords are decrypted in memory, scored
+// and grouped here, and never leave the device.
+enum SecurityAudit {
+    private static let common = ["password", "123456", "12345678", "123456789", "qwerty", "abc123",
+        "letmein", "monkey", "dragon", "iloveyou", "admin", "welcome", "login", "passw0rd",
+        "football", "baseball", "master", "sunshine", "princess", "trustno1"]
+
+    static func weakness(_ pw: String) -> String? {
+        let lower = pw.lowercased()
+        if common.contains(where: { lower.contains($0) }) { return "Contains a very common password" }
+        let chars = Array(pw)
+        if chars.count < 8 { return "Only \(chars.count) characters" }
+        if Set(chars).count * 3 < chars.count { return "Mostly repeated characters" }
+        let codes = chars.compactMap { $0.unicodeScalars.first?.value }.map { Int($0) }
+        if codes.count >= 4 {
+            for i in 0...(codes.count - 4) {
+                let d = codes[i + 1] - codes[i]
+                if (d == 1 || d == -1) && codes[i + 2] - codes[i + 1] == d && codes[i + 3] - codes[i + 2] == d {
+                    return "Contains a simple sequence (abcd, 1234)"
+                }
+            }
+        }
+        let classes = [chars.contains { $0.isLowercase }, chars.contains { $0.isUppercase },
+                       chars.contains { $0.isNumber }, chars.contains { !$0.isLetter && !$0.isNumber }]
+            .filter { $0 }.count
+        if chars.count < 12 && classes < 3 { return "Short and uses few character types" }
+        return nil
+    }
+
+    static func run(_ vault: VaultManager) -> AuditReport {
+        var findings: [AuditFinding] = []
+        var groups: [String: [VaultEntry]] = [:]
+        for e in vault.entries {
+            guard let pw = try? vault.decryptPassword(for: e), !pw.isEmpty else { continue }
+            if let why = weakness(pw) { findings.append(AuditFinding(title: e.title, kind: "weak", detail: why)) }
+            groups[pw, default: []].append(e)
+            let days = Int(Date().timeIntervalSince(e.modifiedAt) / 86_400)
+            if days > 365 { findings.append(AuditFinding(title: e.title, kind: "old", detail: "Not changed in \(days) days")) }
+            let hasSite = !(e.url ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+            let hasTotp = !(e.totpSecret ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+            if hasSite && !hasTotp {
+                findings.append(AuditFinding(title: e.title, kind: "no2fa", detail: "No two-factor code stored for this site"))
+            }
+        }
+        for (_, g) in groups where g.count > 1 {
+            for e in g { findings.append(AuditFinding(title: e.title, kind: "reused", detail: "Same password used by \(g.count) entries")) }
+        }
+        let total = vault.entries.count
+        var penalty = 0.0
+        for f in findings { penalty += (f.kind == "weak" || f.kind == "reused") ? 3 : (f.kind == "old" ? 1 : 0.5) }
+        let score = total == 0 ? 100 : Int(max(0, min(100, 100 - penalty / (Double(total) * 3) * 100)).rounded())
+        findings.sort { ($0.kind, $0.title) < ($1.kind, $1.title) }
+        return AuditReport(score: score, total: total, findings: findings)
+    }
+}
+
+struct SecurityAuditView: View {
+    @ObservedObject private var vault = VaultManager.shared
+    @State private var report: AuditReport?
+
+    private let labels: [(String, String)] = [
+        ("weak", "Weak passwords"), ("reused", "Reused passwords"),
+        ("old", "Not changed in over a year"), ("no2fa", "No two-factor code stored")
+    ]
+
+    var body: some View {
+        List {
+            if let r = report {
+                Section {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(r.score)").font(.system(size: 44, weight: .bold))
+                            .foregroundColor(r.score >= 80 ? .green : (r.score >= 50 ? .orange : .red))
+                        Text("/ 100 · \(r.total) entries").foregroundColor(.secondary)
+                    }
+                    if r.findings.isEmpty { Text("No problems found.").foregroundColor(.secondary) }
+                }
+                .listRowBackground(Palette.surface)
+                ForEach(labels, id: \.0) { kind, label in
+                    let items = r.findings.filter { $0.kind == kind }
+                    if !items.isEmpty {
+                        Section(header: Text("\(label) (\(items.count))")) {
+                            ForEach(items) { f in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(f.title)
+                                    Text(f.detail).font(.footnote).foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .listRowBackground(Palette.surface)
+                    }
+                }
+                Section { Text("Checked on this device only. Passwords are never sent anywhere.").font(.footnote).foregroundColor(.secondary) }
+                    .listRowBackground(Palette.surface)
+            }
+        }
+        .navigationTitle("Security audit")
+        .onAppear { report = SecurityAudit.run(vault) }
     }
 }

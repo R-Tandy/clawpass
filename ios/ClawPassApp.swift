@@ -9,6 +9,7 @@ struct ClawPassApp: App {
         WindowGroup {
             // Rebuilding on a theme change makes every screen re-read the palette.
             ContentView()
+                .themeFont()
                 .id(theme.current.id)
         }
     }
@@ -41,7 +42,7 @@ struct SplashView: View {
             if night {
                 RadialGradient(colors: [Color(red: 0.38, green: 0.49, blue: 0.75).opacity(0.2), .clear],
                                center: .center, startRadius: 0, endRadius: 260)
-                    .frame(width: 520, height: 520)
+                    .frame(width: embedded ? 320 : 520, height: embedded ? 320 : 520)
                     .offset(y: -70)
                     .opacity(markIn ? 1 : 0)
             }

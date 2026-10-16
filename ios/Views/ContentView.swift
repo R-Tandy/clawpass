@@ -336,7 +336,9 @@ struct UnlockView: View {
             VStack(spacing: 24) {
                 // The launch animation plays here, above the password box, and its last frame stays.
                 SplashView(embedded: true)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 340)
+                    .clipped()
                     .padding(.top, 24)
 
                 VStack(spacing: 14) {
@@ -430,6 +432,7 @@ struct VaultView: View {
     @State private var confirmingDelete = false
     @State private var showSyncedBanner = false
     @FocusState private var searchFocused: Bool
+    @ObservedObject private var theme = ThemeStore.shared
 
     private let favoritesId = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
 
@@ -478,7 +481,7 @@ struct VaultView: View {
                         }
                     }
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.surfaceRaised))
+                    .background(RoundedRectangle(cornerRadius: Palette.r(10), style: .continuous).fill(Palette.surfaceRaised))
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 }
@@ -491,9 +494,12 @@ struct VaultView: View {
                     HStack {
                         Text("\(selectedIds.count) selected").font(.subheadline).foregroundColor(Palette.textSecondary)
                         Spacer()
-                        HStack(spacing: 20) {
+                        HStack(spacing: 0) {
                             Button("Clear") { selectedIds.removeAll() }
+                                .padding(.horizontal, 14)
+                            Rectangle().fill(Palette.stroke).frame(width: 1, height: 18)
                             Button("Delete Selected", role: .destructive) { confirmingDelete = true }
+                                .padding(.horizontal, 14)
                         }
                         .buttonStyle(.borderless)
                     }
@@ -523,6 +529,7 @@ struct VaultView: View {
                             }
                             .listRowBackground(Palette.background)
                             .listRowSeparatorTint(Palette.stroke)
+                            .tint(Palette.accent)
                         }
                     }
                     .listStyle(.plain)
@@ -653,8 +660,8 @@ struct CategoryChips: View {
                 .background(Capsule().fill(Palette.surfaceRaised))
             }
             .accessibilityLabel("Category")
-            Spacer()
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
@@ -699,6 +706,7 @@ struct EmptyVaultState: View {
 
 struct EntryRowView: View {
     let entry: VaultEntry
+    @ObservedObject private var theme = ThemeStore.shared
 
     var body: some View {
         HStack(spacing: 14) {
@@ -721,5 +729,6 @@ struct EntryRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .id(theme.current.id)
     }
 }
