@@ -716,11 +716,11 @@ struct EntryRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title)
                     .font(Palette.font(.body, .semibold))
-                    .foregroundColor(Palette.textPrimary)
+                    .foregroundColor(Palette.entryTitle)
                 if !entry.username.isEmpty {
                     Text(entry.username)
                         .font(Palette.font(.subheadline))
-                        .foregroundColor(Palette.textSecondary)
+                        .foregroundColor(Palette.entrySubtitle)
                         .lineLimit(1)
                 }
             }

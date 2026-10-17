@@ -535,6 +535,24 @@ struct UnlockPhotosView: View {
 
 
 extension Palette {
+    /// Entry-list text is tinted per theme; the general text colours are near-white in most themes and read as unthemed.
+    static var entryTitle: Color {
+        switch ThemeStore.shared.current.id {
+        case "brass": return Color(hex: "E6C77A")
+        case "layer": return Color(hex: "9FD3E0")
+        case "midnight": return Color(hex: "9CC2FF")
+        default: return textPrimary
+        }
+    }
+    static var entrySubtitle: Color {
+        switch ThemeStore.shared.current.id {
+        case "brass": return Color(hex: "A68A52")
+        case "layer": return Color(hex: "6FA0AD")
+        case "midnight": return Color(hex: "7792C9")
+        default: return textSecondary
+        }
+    }
+
     /// Explicit themed font for list rows, which do not reliably inherit the app-wide font design.
     static func font(_ style: Font.TextStyle, _ weight: Font.Weight = .regular) -> Font {
         Font.system(style, design: ThemeStore.shared.current.fontDesign).weight(weight)
