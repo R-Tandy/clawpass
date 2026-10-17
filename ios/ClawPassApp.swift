@@ -5,6 +5,8 @@ import UIKit
 struct ClawPassApp: App {
     @ObservedObject private var theme = ThemeStore.shared
 
+    init() { BrandAssets.warm() }
+
     var body: some Scene {
         WindowGroup {
             // Rebuilding on a theme change makes every screen re-read the palette.

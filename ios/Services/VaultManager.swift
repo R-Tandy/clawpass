@@ -93,8 +93,20 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     /// Absolute path to the DB file that *should* currently be open, given the
     /// SyncService vaultId. Callers use this to open/initialize against the
     /// correct per-vault file.
+    /// Documents/Vaultinator. A pre-rename Documents/Layer folder is moved over once so existing vaults keep working.
+    static var vaultDirectory: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let new = docs.appendingPathComponent("Vaultinator")
+        let old = docs.appendingPathComponent("Layer")
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: new.path), fm.fileExists(atPath: old.path) {
+            do { try fm.moveItem(at: old, to: new) } catch { return old }
+        }
+        return new
+    }
+
     private func currentVaultDbPath() -> String {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
+        let vaultDir = VaultManager.vaultDirectory
         try? FileManager.default.createDirectory(at: vaultDir, withIntermediateDirectories: true)
         return vaultDir.appendingPathComponent(currentVaultDbFilename()).path
     }
@@ -725,7 +737,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     /// vaults when `vaultId` is unset. The bare `vault.db` is LEGACY-V2 and
     /// deliberately excluded from v3 enumeration.
     func availableVaultFilenames() -> [String] {
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
+        let vaultDir = VaultManager.vaultDirectory
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return [] }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
         return items.filter { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }.sorted()
@@ -739,8 +751,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     func vaultFileExists(forVaultId vaultId: String) -> Bool {
         guard !vaultId.isEmpty else { return false }
         let filename = "vault_\(vaultId).db"
-        let dbPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("Layer")
+        let dbPath = VaultManager.vaultDirectory
             .appendingPathComponent(filename)
             .path
         return FileManager.default.fileExists(atPath: dbPath)
@@ -778,7 +789,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         // True if any per-vault `vault_<id>.db` exists. Matches Desktop's
         // expectation that 'any present vault' gates Unlock vs Setup.
         // v3+ explicitly excludes the un-suffixed legacy `vault.db`.
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
+        let vaultDir = VaultManager.vaultDirectory
         guard FileManager.default.fileExists(atPath: vaultDir.path) else { return false }
         let items = (try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path)) ?? []
         return items.contains { $0.hasSuffix(".db") && $0.hasPrefix("vault_") && $0 != "vault.db" }
@@ -812,7 +823,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
     @discardableResult
     private func deleteLocalVault(id: String) -> Bool {
         guard vaultFileExists(forVaultId: id) else { return false }
-        let vaultDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("Layer")
+        let vaultDir = VaultManager.vaultDirectory
         if let items = try? FileManager.default.contentsOfDirectory(atPath: vaultDir.path) {
             for name in items where name.contains(id) {
                 try? FileManager.default.removeItem(atPath: vaultDir.appendingPathComponent(name).path)

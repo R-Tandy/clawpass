@@ -214,6 +214,10 @@ struct SettingsView: View {
                 set: { UnlockPhotoService.shared.enabled = $0 }
             ))
             NavigationLink("View unlock photos") { UnlockPhotosView() }
+            Toggle("Lock sound on splash", isOn: Binding(
+                get: { BrandAssets.soundEnabled },
+                set: { UserDefaults.standard.set($0, forKey: BrandAssets.soundKey) }
+            ))
         } header: {
             Text("Unlock photo")
         } footer: {
