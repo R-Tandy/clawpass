@@ -1,4 +1,4 @@
-# Layer iOS
+# Vaultinator iOS
 
 Secure password manager for iOS with local WiFi sync.
 

@@ -30,7 +30,7 @@ struct SplashView: View {
     @State private var ruleIn = false
     @State private var byIn = false
 
-    private let letters = Array("LAYER")
+    private let letters = Array("VAULTINATOR")
     private let markHeight: CGFloat = 245
     private let markWidth: CGFloat = 124
     private var ink: Color { embedded ? Palette.textPrimary : night ? Color(red: 0.93, green: 0.95, blue: 0.97) : Color(red: 0.07, green: 0.16, blue: 0.36) }
@@ -58,8 +58,9 @@ struct SplashView: View {
                     .opacity(ruleIn ? 1 : 0)
                     .padding(.top, 14)
                     .padding(.bottom, 12)
-                Text("by Tandy Pro Services")
-                    .font(.system(size: 16, weight: .medium))
+                Text("SECURED BY VAULTINATOR")
+                    .font(BrandAssets.font(13))
+                    .tracking(3)
                     .foregroundColor(slate)
                     .opacity(byIn ? 1 : 0)
                     .offset(y: byIn ? 0 : 6)
@@ -67,7 +68,7 @@ struct SplashView: View {
         }
         .scaleEffect(embedded ? 0.78 : 1)
         .accessibilityHidden(true)
-        .onAppear(perform: run)
+        .onAppear { BrandAssets.playLock(); run() }
     }
 
     private var lockMark: some View {
@@ -100,10 +101,10 @@ struct SplashView: View {
     }
 
     private var wordmark: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 4) {
             ForEach(letters.indices, id: \.self) { i in
                 Text(String(letters[i]))
-                    .font(.system(size: 46, weight: .heavy))
+                    .font(BrandAssets.font(36))
                     .foregroundColor(ink)
                     .offset(y: lettersIn ? 0 : 52)
                     .opacity(lettersIn ? 1 : 0)
