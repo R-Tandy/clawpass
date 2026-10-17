@@ -43,10 +43,10 @@ jobs:
     - name: Locate .app
       id: locate
       run: |
-        APP_PATH=$(find /Users/runner -name "Layer.app" -type d 2>/dev/null | head -n 1)
+        APP_PATH=$(find /Users/runner -name "Vaultinator.app" -type d 2>/dev/null | head -n 1)
 
         if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-          echo "::error::Layer.app not found"
+          echo "::error::Vaultinator.app not found"
           find /Users/runner -name "*.app" -type d 2>/dev/null | head -10 || true
           exit 1
         fi
@@ -71,21 +71,21 @@ jobs:
         APP_PATH="${{ steps.locate.outputs.app_path }}"
         rm -rf ios/Payload
         mkdir -p ios/Payload
-        cp -R "$APP_PATH" ios/Payload/Layer.app
+        cp -R "$APP_PATH" ios/Payload/Vaultinator.app
 
-        if [ ! -f "ios/Payload/Layer.app/Layer" ]; then
+        if [ ! -f "ios/Payload/Vaultinator.app/Vaultinator" ]; then
           echo "::error::Executable missing"
           exit 1
         fi
 
         cd ios
-        zip -r ../Layer-iOS.ipa Payload/
-        mv ../Layer-iOS.ipa ../Layer.ipa
-        ls -la ../Layer.ipa
+        zip -r ../Vaultinator-iOS.ipa Payload/
+        mv ../Vaultinator-iOS.ipa ../Vaultinator.ipa
+        ls -la ../Vaultinator.ipa
 
     - name: Upload Artifact
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
-        name: Layer-iOS-IPA
-        path: Layer.ipa
+        name: Vaultinator-iOS-IPA
+        path: Vaultinator.ipa
