@@ -27,7 +27,9 @@ struct SplashView: View {
     @State private var markIn = false
     @State private var shackleDown = false
     @State private var clunk = false
-    @State private var glint = false
+    @State private var flash = false
+    @State private var ringPhase = 0
+    @State private var shake = 0
     @State private var lettersIn = false
     @State private var ruleIn = false
     @State private var byIn = false
@@ -68,6 +70,7 @@ struct SplashView: View {
                     .offset(y: byIn ? 0 : 6)
             }
         }
+        .offset(x: shake == 0 ? 0 : (shake % 2 == 1 ? 5 : -5), y: shake == 0 ? 0 : (shake % 2 == 1 ? 2 : -2))
         .scaleEffect(embedded ? 0.78 : 1)
         .accessibilityHidden(true)
         .onAppear { BrandAssets.playLock(); run() }
@@ -81,24 +84,27 @@ struct SplashView: View {
                 .frame(width: markWidth, height: markHeight)
                 .mask(alignment: .bottom) { Rectangle().frame(height: markHeight * 0.59) }
             // Shackle: upper 36%, clipped in place while the artwork inside it drops.
-            ZStack { image.offset(y: shackleDown ? 0 : -markHeight * 0.05) }
+            ZStack { image }
                 .frame(width: markWidth, height: markHeight)
-                .mask(alignment: .top) { Rectangle().frame(height: markHeight * 0.41) }
-            // Glint across the steel.
+                .mask(alignment: .top) { Rectangle().frame(height: markHeight * 0.61).offset(y: -markHeight * 0.2).frame(height: markHeight * 0.41, alignment: .top) }
+                .offset(y: shackleDown ? 0 : -markHeight * 0.16)
+            // Impact flash: white-hot for an instant, only where the steel is.
             Rectangle()
-                .fill(LinearGradient(colors: [.white.opacity(0), .white.opacity(0.95), .white.opacity(0)],
-                                     startPoint: .leading, endPoint: .trailing))
-                .frame(width: markWidth * 0.46, height: markHeight * 1.2)
-                .rotationEffect(.degrees(12))
-                .offset(x: glint ? markWidth * 0.9 : -markWidth * 0.9)
-                .blendMode(.softLight)
+                .fill(RadialGradient(colors: [.white, Color(red: 1, green: 0.82, blue: 0.55), .clear],
+                                     center: .init(x: 0.5, y: 0.42), startRadius: 0, endRadius: markHeight * 0.55))
+                .opacity(flash ? 0.85 : 0)
                 .frame(width: markWidth, height: markHeight)
-                // The glint only shows where the lock is, never on the background.
                 .mask { Image("LayerMarkDark").resizable().scaledToFit().frame(width: markWidth, height: markHeight) }
         }
         .frame(width: markWidth, height: markHeight)
-        .clipped()
-        .scaleEffect(clunk ? 0.982 : (markIn ? 1 : 0.94))
+        .background(
+            Circle().stroke(Color.white.opacity(0.7), lineWidth: 3)
+                .frame(width: 90, height: 90)
+                .scaleEffect(ringPhase == 2 ? 5.5 : 0.3)
+                .opacity(ringPhase == 1 ? 0.8 : 0)
+                .offset(y: -markHeight * 0.08)
+        )
+        .scaleEffect(clunk ? 0.965 : (markIn ? 1 : 0.94))
         .opacity(markIn ? 1 : 0)
     }
 
@@ -123,16 +129,22 @@ struct SplashView: View {
             return
         }
         withAnimation(.easeOut(duration: 0.5)) { markIn = true }
-        after(0.45) { withAnimation(.timingCurve(0.3, 0, 0.2, 1, duration: 0.55)) { shackleDown = true } }
-        after(0.95) {
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-            withAnimation(.easeOut(duration: 0.09)) { clunk = true }
-            after(0.09) { withAnimation(.easeOut(duration: 0.13)) { clunk = false } }
-            withAnimation(.easeInOut(duration: 0.8)) { glint = true }
+        // The shackle hovers open, then slams shut at 1.05s, in step with the vault sound.
+        after(0.72) { withAnimation(.timingCurve(0.6, 0, 1, 0.5, duration: 0.33)) { shackleDown = true } }
+        after(1.05) {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            withAnimation(.easeOut(duration: 0.05)) { clunk = true; flash = true }
+            after(0.05) { withAnimation(.easeOut(duration: 0.3)) { clunk = false; flash = false } }
+            ringPhase = 1
+            DispatchQueue.main.async { withAnimation(.easeOut(duration: 0.9)) { ringPhase = 2 } }
+            for k in 1...6 { after(Double(k) * 0.045) { shake = k < 6 ? k : 0 } }
         }
-        after(1.05) { lettersIn = true }
-        after(1.5) { withAnimation(.easeOut(duration: 0.6)) { ruleIn = true } }
-        after(1.75) { withAnimation(.easeOut(duration: 0.6)) { byIn = true } }
+        after(1.42) { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.6) }
+        after(1.62) { UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.7) }
+        after(1.35) { lettersIn = true }
+        after(1.85) { withAnimation(.easeOut(duration: 0.6)) { ruleIn = true } }
+        after(2.0) { withAnimation(.easeOut(duration: 0.6)) { byIn = true } }
+        after(1.95) { UIImpactFeedbackGenerator(style: .heavy).impactOccurred(intensity: 0.8) }
     }
 
     private func after(_ seconds: Double, _ work: @escaping () -> Void) {
