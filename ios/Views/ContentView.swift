@@ -434,6 +434,8 @@ struct VaultView: View {
     @State private var selectedIds = Set<UUID>()
     @State private var confirmingDelete = false
     @State private var showSyncedBanner = false
+    @State private var moveMenuToken = UUID()
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var searchFocused: Bool
     @ObservedObject private var theme = ThemeStore.shared
 
@@ -467,11 +469,6 @@ struct VaultView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // The "synced" confirmation is shown for a few seconds; problems and offline stay visible.
-                if !syncService.isConnected || vaultManager.lastHandshakeError != nil || showSyncedBanner || notYetSynced {
-                    SyncStatusBar(isConnected: syncService.isConnected, error: vaultManager.lastHandshakeError, notSynced: notYetSynced)
-                }
-
                 if isSearching {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass").foregroundColor(Palette.textTertiary)
@@ -489,26 +486,16 @@ struct VaultView: View {
                     .padding(.top, 8)
                 }
 
-                if !vaultManager.categories.isEmpty {
-                    CategoryChips(categories: vaultManager.categories, selected: $selectedCategory)
-                }
-
-                if !selectedIds.isEmpty {
-                    HStack {
-                        Text("\(selectedIds.count) selected").font(.subheadline).foregroundColor(Palette.textSecondary)
-                        Spacer()
-                        HStack(spacing: 0) {
-                            Button("Clear") { selectedIds.removeAll() }
-                                .padding(.horizontal, 14)
-                            Rectangle().fill(Palette.stroke).frame(width: 1, height: 18)
-                            Button("Delete Selected", role: .destructive) { confirmingDelete = true }
-                                .padding(.horizontal, 14)
-                        }
-                        .buttonStyle(.borderless)
+                // The selection menu is drawn over the category button, so nothing below it moves.
+                ZStack {
+                    if !vaultManager.categories.isEmpty {
+                        CategoryChips(categories: vaultManager.categories, selected: $selectedCategory)
+                    } else {
+                        Color.clear.frame(height: 1)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Palette.surface)
+                }
+                .overlay(alignment: .top) {
+                    if !selectedIds.isEmpty { selectionBar }
                 }
 
                 if filteredEntries.isEmpty {
@@ -539,6 +526,19 @@ struct VaultView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
+            .overlay(alignment: .bottom) {
+                // Floats over the list; showing or hiding it never shifts the screen's elements.
+                if !syncService.isConnected || vaultManager.lastHandshakeError != nil || showSyncedBanner || notYetSynced {
+                    SyncStatusBar(isConnected: syncService.isConnected, error: vaultManager.lastHandshakeError, notSynced: notYetSynced)
+                        .clipShape(RoundedRectangle(cornerRadius: Palette.r(12), style: .continuous))
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: showSyncedBanner)
             .screenBackground()
             .navigationTitle(vaultManager.vaultName)
             .navigationBarTitleDisplayMode(.inline)
@@ -571,6 +571,10 @@ struct VaultView: View {
                 }
                 Button("Cancel", role: .cancel) { }
             }
+            .onChange(of: scenePhase) { phase in
+                // A menu left open when the app is backgrounded must not still be open on return.
+                if phase != .active { moveMenuToken = UUID() }
+            }
             .onChange(of: syncService.isConnected) { connected in
                 guard connected else { showSyncedBanner = false; return }
                 showSyncedBanner = true
@@ -583,6 +587,48 @@ struct VaultView: View {
 
     private func toggle(_ id: UUID) {
         if selectedIds.contains(id) { selectedIds.remove(id) } else { selectedIds.insert(id) }
+    }
+
+    /// Replaces the category button while entries are selected.
+    private var selectionBar: some View {
+        HStack(spacing: 0) {
+            Text("\(selectedIds.count) selected")
+                .font(.subheadline)
+                .foregroundColor(Palette.textSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Menu {
+                Button { move(to: nil) } label: { Label("No Category", systemImage: "tray") }
+                ForEach(vaultManager.categories.filter { $0.id != favoritesId }) { category in
+                    Button { move(to: category.id) } label: { CategoryMenuLabel(category: category) }
+                }
+            } label: {
+                Text("Move to Category")
+            }
+            .id(moveMenuToken)
+            .padding(.horizontal, 12)
+            Rectangle().fill(Palette.stroke).frame(width: 1, height: 18)
+            Button("Clear") { selectedIds.removeAll() }
+                .padding(.horizontal, 12)
+            Rectangle().fill(Palette.stroke).frame(width: 1, height: 18)
+            Button("Delete", role: .destructive) { confirmingDelete = true }
+                .padding(.leading, 12)
+        }
+        .buttonStyle(.borderless)
+        .font(.subheadline)
+        .padding(.horizontal, 16)
+        .frame(height: 48)
+        .frame(maxWidth: .infinity)
+        .background(Palette.background)
+    }
+
+    private func move(to categoryId: UUID?) {
+        for id in selectedIds {
+            guard var entry = vaultManager.entries.first(where: { $0.id == id }) else { continue }
+            entry.categoryID = categoryId
+            vaultManager.saveEntry(entry)
+        }
+        selectedIds.removeAll()
     }
 }
 
@@ -629,6 +675,8 @@ struct CategoryGlyph: View {
 struct CategoryChips: View {
     let categories: [Category]
     @Binding var selected: Category?
+    @State private var menuToken = UUID()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         HStack {
@@ -641,7 +689,7 @@ struct CategoryChips: View {
                         if selected?.id == category.id {
                             Label(category.name, systemImage: "checkmark")
                         } else {
-                            Text("\(glyph(category.icon)) \(category.name)")
+                            CategoryMenuLabel(category: category)
                         }
                     }
                 }
@@ -662,16 +710,29 @@ struct CategoryChips: View {
                 .padding(.vertical, 8)
                 .background(Capsule().fill(Palette.surfaceRaised))
             }
+            .id(menuToken)
             .accessibilityLabel("Category")
+        }
+        .onChange(of: scenePhase) { phase in
+            // Rebuilding the menu closes it, so the picker is gone when the app comes back.
+            if phase != .active { menuToken = UUID() }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
     }
+}
 
-    /// Menu rows are plain text, so only emoji icons can sit beside the name.
-    private func glyph(_ icon: String) -> String {
-        icon.unicodeScalars.allSatisfy({ $0.isASCII }) ? "•" : icon
+/// One category row inside a menu: SF Symbol icons (made on iOS) as a real icon, emoji icons (made on the computer) beside the name.
+struct CategoryMenuLabel: View {
+    let category: Category
+
+    var body: some View {
+        if category.icon.unicodeScalars.allSatisfy({ $0.isASCII }) && !category.icon.isEmpty {
+            Label(category.name, systemImage: category.icon)
+        } else {
+            Text("\(category.icon) \(category.name)")
+        }
     }
 }
 

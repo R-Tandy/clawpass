@@ -527,9 +527,11 @@ class SyncService: ObservableObject {
     }
 
 
-    func connect(to device: SyncDevice) {
+    /// `force` is for a tap on Connect: it always starts a fresh connection (unless already fully connected),
+    /// instead of silently doing nothing because an earlier attempt is stuck.
+    func connect(to device: SyncDevice, force: Bool = false) {
         // 1. Guard: If we are already connected to this exact host/port, skip.
-        if let existing = connection, existing.state == .ready {
+        if let existing = connection, existing.state == .ready, !force || handshakeCompleted {
             if case let .hostPort(host, port) = existing.endpoint,
                host.debugDescription.contains(device.host),
                port.debugDescription.contains("\(device.port)") {
@@ -539,7 +541,7 @@ class SyncService: ObservableObject {
         }
 
         // 2. Prevent connection storms: If we are already preparing, stop.
-        if let existing = connection {
+        if !force, let existing = connection {
             switch existing.state {
             case .preparing, .setup:
                 log("SYNC: Connection already preparing for \(device.host). Skipping.")
@@ -550,6 +552,7 @@ class SyncService: ObservableObject {
         }
         
         log("SYNC: Initiating clean connection to \(device.name) (\(device.host):\(device.port))...")
+        DispatchQueue.main.async { self.syncStatus = "Connecting to \(device.host)…" }
         
         // 2. Total teardown of any lingering state
         disconnect() 
@@ -595,6 +598,10 @@ class SyncService: ObservableObject {
                     self.handleDisconnect()
                 case .cancelled:
                     self.handleDisconnect()
+                case .waiting(let error):
+                    // No route yet (often Local Network access is off for this app in iOS Settings).
+                    self.log("SYNC: Connection waiting: \(error)")
+                    DispatchQueue.main.async { self.syncStatus = "Cannot reach \(device.host). Check Wi-Fi and that Local Network is allowed for this app in Settings." }
                 default:
                     break
                 }

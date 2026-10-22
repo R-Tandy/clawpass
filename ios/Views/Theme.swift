@@ -466,14 +466,25 @@ final class UnlockPhotoService: NSObject, AVCaptureVideoDataOutputSampleBufferDe
             image.draw(in: CGRect(origin: .zero, size: size))
             UIColor(white: 0.03, alpha: 0.78).setFill()
             UIRectFill(CGRect(x: 0, y: size.height - bar, width: size.width, height: bar))
+            let place = location.map { String(format: "%.5f, %.5f", $0.coordinate.latitude, $0.coordinate.longitude) } ?? "Location unavailable"
+            let lines = [
+                DateFormatter.localizedString(from: when, dateStyle: .medium, timeStyle: .medium),
+                "\(place)  ·  WRONG PASSWORD"
+            ]
+            // Shrink the type until the longest line fits inside the photo's width, so nothing is clipped.
+            let margin: CGFloat = 12
+            var fontSize = bar * 0.3
+            func font(_ s: CGFloat) -> UIFont { UIFont.monospacedSystemFont(ofSize: s, weight: .regular) }
+            while fontSize > 8,
+                  lines.map({ ($0 as NSString).size(withAttributes: [.font: font(fontSize)]).width }).max()! > size.width - margin * 2 {
+                fontSize -= 1
+            }
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.monospacedSystemFont(ofSize: bar * 0.3, weight: .regular),
+                .font: font(fontSize),
                 .foregroundColor: UIColor(white: 0.92, alpha: 1)
             ]
-            let place = location.map { String(format: "%.5f, %.5f", $0.coordinate.latitude, $0.coordinate.longitude) } ?? "Location unavailable"
-            DateFormatter.localizedString(from: when, dateStyle: .medium, timeStyle: .medium)
-                .draw(at: CGPoint(x: 12, y: size.height - bar * 0.9), withAttributes: attrs)
-            "\(place)  ·  WRONG PASSWORD".draw(at: CGPoint(x: 12, y: size.height - bar * 0.5), withAttributes: attrs)
+            lines[0].draw(at: CGPoint(x: margin, y: size.height - bar * 0.9), withAttributes: attrs)
+            lines[1].draw(at: CGPoint(x: margin, y: size.height - bar * 0.5), withAttributes: attrs)
         }
         return stamped.jpegData(compressionQuality: 0.82)
     }
@@ -518,6 +529,12 @@ final class UnlockPhotoService: NSObject, AVCaptureVideoDataOutputSampleBufferDe
 struct UnlockPhotosView: View {
     @State private var items = UnlockPhotoService.entries()
 
+    /// The log stores an ISO-8601 stamp ("2026-10-18T21:10:05Z"); show it as a normal local date and time.
+    static func display(_ iso: String) -> String {
+        guard let date = ISO8601DateFormatter().date(from: iso) else { return iso }
+        return DateFormatter.localizedString(from: date, dateStyle: .medium, timeStyle: .medium)
+    }
+
     var body: some View {
         List {
             if items.isEmpty {
@@ -532,7 +549,7 @@ struct UnlockPhotosView: View {
                     Text("Wrong password")
                         .font(.caption.weight(.semibold))
                         .foregroundColor(Palette.danger)
-                    Text(item.takenAt).font(.caption).foregroundColor(Palette.textSecondary)
+                    Text(Self.display(item.takenAt)).font(.caption).foregroundColor(Palette.textSecondary)
                     Text(item.place).font(.caption).foregroundColor(Palette.textSecondary)
                 }
                 .swipeActions {

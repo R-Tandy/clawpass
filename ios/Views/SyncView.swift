@@ -29,6 +29,7 @@ struct SettingsView: View {
             themeSection
             unlockPhotoSection
             diagnosticsSection
+            helpSection
             aboutSection
         }
         .scrollContentBackground(.hidden)
@@ -125,6 +126,11 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundColor(Palette.warning)
                 }
+                if !syncService.isConnected, syncService.syncStatus.hasPrefix("Connecting") || syncService.syncStatus.hasPrefix("Cannot reach") {
+                    Text(syncService.syncStatus)
+                        .font(.footnote)
+                        .foregroundColor(Palette.textSecondary)
+                }
                 if let connectionError = connectionError {
                     Text(connectionError)
                         .font(.footnote)
@@ -146,7 +152,8 @@ struct SettingsView: View {
                 } else {
                     ForEach(syncService.discoveredDevices) { device in
                         Button {
-                            syncService.connect(to: device)
+                            connectionError = nil
+                            syncService.connect(to: device, force: true)
                         } label: {
                             HStack {
                                 Image(systemName: "desktopcomputer")
@@ -236,6 +243,17 @@ struct SettingsView: View {
         .listRowBackground(Palette.surface)
     }
 
+    private var helpSection: some View {
+        Section {
+            NavigationLink(destination: SmithHelpView()) {
+                Label("Ask Smith for help", systemImage: "questionmark.bubble")
+            }
+        } header: {
+            Text("Help")
+        }
+        .listRowBackground(Palette.surface)
+    }
+
     private var aboutSection: some View {
         Section {
             HStack {
@@ -293,7 +311,7 @@ struct SettingsView: View {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else { return }
         let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: nwPort)
         let device = SyncDevice(name: name, endpoint: endpoint, host: host, port: port, remoteDeviceId: id)
-        syncService.connect(to: device)
+        syncService.connect(to: device, force: true)
     }
 }
 

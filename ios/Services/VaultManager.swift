@@ -204,6 +204,7 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         }
         sqlite3_finalize(stmt)
         
+        dedupeCategories()
         var loadedCats: [Category] = []
         let catQuery = "SELECT id, name, icon, color FROM categories;"
         var catStmt: OpaquePointer?
@@ -910,11 +911,24 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
         set { UserDefaults.standard.set(newValue, forKey: categoriesDirtyKey) }
     }
 
+    /// The computer stores ids in a different letter case than this phone does, so the same category could
+    /// land twice. Ids are compared case-insensitively and any extra copies are dropped, oldest row kept.
+    private func dedupeCategories() {
+        guard let db = db else { return }
+        sqlite3_exec(db, "DELETE FROM categories WHERE rowid NOT IN (SELECT MIN(rowid) FROM categories GROUP BY lower(id));", nil, nil, nil)
+    }
+
     func saveCategory(_ category: Category) {
         guard let db = db, category.id != Self.favoritesID else { return }
         var stmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO categories (id, name, icon, color) VALUES (?, ?, ?, ?);", -1, &stmt, nil) == SQLITE_OK {
+        if sqlite3_prepare_v2(db, "DELETE FROM categories WHERE lower(id) = lower(?);", -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, category.id.uuidString, -1, SQLITE_TRANSIENT)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+        stmt = nil
+        if sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO categories (id, name, icon, color) VALUES (?, ?, ?, ?);", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, category.id.uuidString.lowercased(), -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 2, category.name, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 3, category.icon, -1, SQLITE_TRANSIENT)
             sqlite3_bind_text(stmt, 4, category.color, -1, SQLITE_TRANSIENT)
@@ -1151,7 +1165,13 @@ class VaultManager: ObservableObject, SyncServiceDelegate {
 
         if sqlite3_prepare_v2(db, insertCat, -1, &stmt, nil) == SQLITE_OK {
             for cat in categories {
-                sqlite3_bind_text(stmt, 1, cat.id, -1, SQLITE_TRANSIENT)
+                var clear: OpaquePointer?
+                if sqlite3_prepare_v2(db, "DELETE FROM categories WHERE lower(id) = lower(?);", -1, &clear, nil) == SQLITE_OK {
+                    sqlite3_bind_text(clear, 1, cat.id, -1, SQLITE_TRANSIENT)
+                    sqlite3_step(clear)
+                }
+                sqlite3_finalize(clear)
+                sqlite3_bind_text(stmt, 1, cat.id.lowercased(), -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 2, cat.name, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 3, cat.icon, -1, SQLITE_TRANSIENT)
                 sqlite3_bind_text(stmt, 4, cat.color, -1, SQLITE_TRANSIENT)
